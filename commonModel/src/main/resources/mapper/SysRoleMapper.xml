@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.SysRoleMapper">
+
+    <select
+            id="findByCode"
+            resultType="com.example.customerservice.domain.SysRole">
+
+        SELECT
+            id,
+            role_code,
+            role_name,
+            description,
+            status,
+            create_time,
+            update_time
+        FROM sys_role
+        WHERE role_code = #{roleCode}
+        LIMIT 1
+
+    </select>
+
+
+    <update id="updateSelective">
+
+        UPDATE sys_role
+
+        <set>
+
+            <if test="roleCode != null and roleCode != ''">
+                role_code = #{roleCode},
+            </if>
+
+            <if test="roleName != null and roleName != ''">
+                role_name = #{roleName},
+            </if>
+
+            <if test="description != null">
+                description = #{description},
+            </if>
+
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+
+        </set>
+
+        WHERE id = #{id}
+
+    </update>
+
+
+</mapper>
