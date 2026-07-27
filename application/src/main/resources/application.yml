@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: customer-service-chat-system
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/springboot?serverTimezone=Asia/Shanghai&characterEncoding=UTF-8}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      database: ${REDIS_DATABASE:0}
+      password: ${REDIS_PASSWORD:}
+      timeout: 3000ms
+
+mybatis-plus:
+  mapper-locations:
+    - classpath*:mapper/*Mapper.xml
+  type-aliases-package: com.example.customerservice.domain
+  configuration:
+    map-underscore-to-camel-case: true
+
+app:
+  websocket:
+    allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
+  bootstrap:
+    admin:
+      enabled: true
+      id: admin
+      username: admin
+      password: ${ADMIN_BOOTSTRAP_PASSWORD:}

@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.SysUserMapper">
+
+    <select
+            id="findByUsername"
+            resultType="com.example.customerservice.domain.SysUser">
+
+        SELECT
+            id,
+            username,
+            password,
+            status,
+            create_time,
+            update_time
+        FROM sys_user
+        WHERE username = #{username}
+        LIMIT 1
+
+    </select>
+
+
+    <update id="updateSelective">
+
+        UPDATE sys_user
+
+        <set>
+
+            <if test="username != null and username != ''">
+                username = #{username},
+            </if>
+
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+
+        </set>
+
+        WHERE id = #{id}
+
+    </update>
+
+
+    <update id="updateStatus">
+
+        UPDATE sys_user
+        SET status = #{status}
+        WHERE id = #{id}
+
+    </update>
+
+
+    <update id="updatePassword">
+
+        UPDATE sys_user
+        SET password = #{password}
+        WHERE id = #{id}
+
+    </update>
+
+
+</mapper>

@@ -1,0 +1,812 @@
+package com.example.customerservice.controller;
+
+import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.domain.ChatMessage;
+import com.example.customerservice.domain.SysUser;
+import com.example.customerservice.dto.*;
+import com.example.customerservice.mapper.SysRolePermissionMapper;
+import com.example.customerservice.mapper.SysUserMapper;
+import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.TokenService;
+import com.example.customerservice.util.PasswordUtil;
+import com.example.customerservice.common.Result;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
+import org.springframework.http.HttpStatus;
+import org.springframework.messaging.handler.annotation.Header;
+import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
+import org.springframework.util.StringUtils;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.socket.messaging.SessionSubscribeEvent;
+import jakarta.validation.Valid;
+
+import java.security.Principal;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+
+@RestController
+@RequestMapping("/chat")
+public class ChatController {
+
+    private static final Logger LOGGER =
+            LoggerFactory.getLogger(
+                    ChatController.class
+            );
+
+    private final IChatService chatService;
+
+    private final SysUserMapper sysUserMapper;
+
+    private final SysUserRoleMapper sysUserRoleMapper;
+
+    private final SysRolePermissionMapper sysRolePermissionMapper;
+
+    private final TokenService tokenService;
+
+    private final CurrentUser currentUser;
+
+
+    public ChatController(
+            IChatService chatService,
+            SysUserMapper sysUserMapper,
+            SysUserRoleMapper sysUserRoleMapper,
+            SysRolePermissionMapper sysRolePermissionMapper,
+            TokenService tokenService,
+            CurrentUser currentUser
+    ) {
+
+        this.chatService =
+                chatService;
+
+        this.sysUserMapper =
+                sysUserMapper;
+
+        this.sysUserRoleMapper =
+                sysUserRoleMapper;
+
+        this.sysRolePermissionMapper =
+                sysRolePermissionMapper;
+
+        this.tokenService =
+                tokenService;
+
+        this.currentUser =
+                currentUser;
+    }
+
+
+    @PostMapping("/login")
+    public LoginDTO login(
+            @Valid
+            @RequestBody
+            LoginDTO request
+    ) {
+
+        /*
+         * 1. 检查请求参数。
+         */
+        if (
+                request == null ||
+                        !StringUtils.hasText(
+                                request.getUsername()
+                        ) ||
+                        !StringUtils.hasText(
+                                request.getPassword()
+                        )
+        ) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "用户名和密码不能为空"
+            );
+        }
+
+
+        String username =
+                request.getUsername()
+                        .trim();
+
+
+        /*
+         * 2. 从新的sys_user表查询用户。
+         */
+        SysUser user =
+                sysUserMapper.findByUsername(
+                        username
+                );
+
+
+        /*
+         * 用户不存在和密码错误返回相同提示，
+         * 防止通过接口探测用户名是否存在。
+         */
+        if (user == null) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "用户名或密码错误"
+            );
+        }
+
+
+        /*
+         * 3. 禁用用户不能登录。
+         */
+        if (
+                !"ENABLED".equals(
+                        user.getStatus()
+                )
+        ) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN,
+                    "当前用户已被禁用"
+            );
+        }
+
+
+        /*
+         * 4. 校验密码。
+         */
+        boolean passwordCorrect =
+                PasswordUtil.matches(
+
+                        request.getPassword(),
+
+                        user.getPassword()
+                );
+
+
+        if (!passwordCorrect) {
+
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED,
+                    "用户名或密码错误"
+            );
+        }
+
+
+        /*
+         * 5. 兼容旧明文密码。
+         *
+         * 如果数据库中还是明文密码，
+         * 第一次登录成功后自动升级为PBKDF2哈希。
+         */
+        if (
+                PasswordUtil.needsUpgrade(
+                        user.getPassword()
+                )
+        ) {
+
+            String hashedPassword =
+                    PasswordUtil.hash(
+                            request.getPassword()
+                    );
+
+
+            int updatedRows =
+                    sysUserMapper.updatePassword(
+
+                            user.getId(),
+
+                            hashedPassword
+                    );
+
+
+            if (updatedRows != 1) {
+
+                throw new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR,
+                        "密码安全升级失败"
+                );
+            }
+        }
+
+
+        /*
+         * 6. 查询当前用户角色。
+         */
+        Set<String> roleCodes =
+                sysUserRoleMapper
+                        .findRoleCodesByUserId(
+                                user.getId()
+                        );
+
+
+        if (roleCodes == null) {
+
+            roleCodes =
+                    Set.of();
+        }
+
+
+        /*
+         * 7. 使用sys_user.id作为真实userId。
+         */
+        String userId =
+                user.getId();
+
+
+        /*
+         * 8. 生成Token并保存到Redis。
+         */
+        String token =
+                tokenService.issueToken(
+                        userId
+                );
+
+
+        /*
+         * 9. 返回登录结果。
+         */
+        return LoginDTO.success(
+
+                token,
+
+                "Bearer",
+
+                RedisConstants
+                        .TOKEN_TTL_MINUTES
+                        * 60,
+
+                userId,
+
+                user.getUsername(),
+
+                roleCodes
+        );
+    }
+    /**
+     * 客户端订阅/user/queue/chat时触发。
+     *
+     * 普通用户触发客服分配；
+     * 客服和管理员只建立订阅，不触发用户接入。
+     */
+    @EventListener
+    public void onChatSubscribe(
+            SessionSubscribeEvent event
+    ) {
+
+        StompHeaderAccessor accessor =
+                StompHeaderAccessor.wrap(
+                        event.getMessage()
+                );
+
+
+        String destination =
+                accessor.getDestination();
+
+
+        /*
+         * 只处理用户聊天队列订阅。
+         */
+        if (
+                !"/user/queue/chat".equals(
+                        destination
+                )
+        ) {
+
+            return;
+        }
+
+
+        Principal principal =
+                accessor.getUser();
+
+
+        if (principal == null) {
+
+            LOGGER.info(
+                    "订阅聊天队列失败：没有用户身份"
+            );
+
+            return;
+        }
+
+
+        String userId =
+                principal.getName();
+
+
+        /*
+         * 从数据库查询真实角色，
+         * 不再使用agent:load判断永久身份。
+         */
+        Set<String> roleCodes =
+                sysUserRoleMapper
+                        .findRoleCodesByUserId(
+                                userId
+                        );
+
+
+        if (
+                roleCodes == null ||
+                        roleCodes.isEmpty()
+        ) {
+
+            LOGGER.info(
+                    "订阅聊天队列失败：用户没有角色，userId："
+                            + userId
+            );
+
+            return;
+        }
+
+
+        /*
+         * 客服订阅该地址是为了接收会话通知，
+         * 不能把客服再次当成普通用户进行分配。
+         */
+        if (
+                roleCodes.contains(
+                        "AGENT"
+                )
+        ) {
+
+            LOGGER.info(
+                    "客服订阅聊天队列，不触发用户接入，agentId："
+                            + userId
+            );
+
+            return;
+        }
+
+
+        /*
+         * 管理员不触发客服分配。
+         */
+        if (
+                roleCodes.contains(
+                        "ADMIN"
+                )
+        ) {
+
+            LOGGER.info(
+                    "管理员订阅聊天队列，不触发用户接入，userId："
+                            + userId
+            );
+
+            return;
+        }
+
+
+        /*
+         * 只有USER角色触发用户接入。
+         */
+        if (
+                roleCodes.contains(
+                        "USER"
+                )
+        ) {
+
+            requireWebSocketPermission(
+                    userId,
+                    "chat:user:access"
+            );
+
+            chatService.onUserConnected(
+                    userId
+            );
+
+            return;
+        }
+
+
+        LOGGER.info(
+                "当前角色不允许进入聊天流程，userId："
+                        + userId
+        );
+    }
+
+
+    /**
+     * 当前登录客服上线。
+     *
+     * agentId从Token认证主体中获取，
+     * 不接受客户端任意传入。
+     */
+    @PostMapping("/agent/online")
+    public Result<Void> agentOnline() {
+
+        /*
+         * 必须同时拥有AGENT角色
+         * 和客服上线权限。
+         */
+        currentUser.requireRole(
+                "AGENT"
+        );
+
+
+        currentUser.requirePermission(
+                "chat:agent:online"
+        );
+
+
+        String agentId =
+                currentUser.getUserId();
+
+
+        chatService.agentOnline(
+                agentId
+        );
+
+
+        return Result.successMessage(
+                "上线成功"
+        );
+    }
+
+
+
+    /**
+     * 当前登录客服下线。
+     *
+     * agentId从Token认证主体中获取。
+     */
+    @PostMapping("/agent/offline")
+    public Result<Void> agentOffline() {
+
+        currentUser.requireRole(
+                "AGENT"
+        );
+
+
+        currentUser.requirePermission(
+                "chat:agent:offline"
+        );
+
+
+        String agentId =
+                currentUser.getUserId();
+
+
+        chatService.agentOffline(
+                agentId
+        );
+
+
+        return Result.successMessage(
+                "下线成功"
+        );
+    }
+    @MessageMapping("/chat.send")
+    public void handleSend(
+            @Valid
+            ChatMessageDTO request,
+            Principal principal
+    ) {
+
+        if (principal == null) {
+            throw new IllegalArgumentException(
+                    "当前STOMP连接没有用户身份"
+            );
+        }
+
+        if (request == null) {
+            throw new IllegalArgumentException(
+                    "聊天消息不能为空"
+            );
+        }
+
+        ChatMessage message =
+                request.toEntity(
+                        principal.getName()
+                );
+        int result =
+                chatService.handleMessage(message);
+
+
+        LOGGER.info(
+                "handleSend处理结果："
+                        + result
+        );
+    }
+    /**
+     * 结束聊天会话
+     *
+     * 客户端发送地址：
+     * /app/chat.end
+     */
+    @MessageMapping("/chat.end")
+    public void handleEndSession(
+            EndSessionRequest request,
+            Principal principal
+    ) {
+
+        if (principal == null) {
+            throw new IllegalArgumentException(
+                    "当前STOMP连接没有用户身份"
+            );
+        }
+
+
+        if (
+                request == null ||
+                        request.getSessionId() == null ||
+                        request.getSessionId().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "sessionId不能为空"
+            );
+        }
+
+
+        String agentId =
+                principal.getName();
+
+
+        requireWebSocketRole(
+                agentId,
+                "AGENT"
+        );
+
+
+        requireWebSocketPermission(
+                agentId,
+                "chat:session:end"
+        );
+
+
+        chatService.endSessionByAgent(
+                request.getSessionId(),
+                agentId
+        );
+        LOGGER.info(
+                "结束会话请求处理完成，sessionId："
+                        + request.getSessionId()
+                        + "，操作者："
+                        + agentId
+        );
+    }
+    /**
+     * 查询聊天历史
+     *
+     * 客户端发送地址：
+     * /app/chat.history
+     *
+     * 返回地址：
+     * /user/queue/chat
+     */
+    @MessageMapping("/chat.history")
+    @SendToUser("/queue/chat")
+    public Map<String, Object> getHistory(
+            HistoryRequest request,
+            Principal principal
+    ) {
+
+        /*
+         * 1. 检查STOMP身份
+         */
+        if (principal == null) {
+            throw new IllegalArgumentException(
+                    "当前STOMP连接没有用户身份"
+            );
+        }
+
+
+        /*
+         * 2. 检查请求参数
+         */
+        if (
+                request == null ||
+                        request.getSessionId() == null ||
+                        request.getSessionId().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "sessionId不能为空"
+            );
+        }
+
+
+        /*
+         * 3. 查询历史消息
+         */
+        List<ChatMessageDTO> messages =
+                chatService.getHistory(
+                        request.getSessionId(),
+                        principal.getName()
+                )
+                        .stream()
+                        .map(
+                                ChatMessageDTO::fromEntity
+                        )
+                        .toList();
+
+
+        /*
+         * 4. 构造返回结果
+         */
+        Map<String, Object> response =
+                new HashMap<>();
+
+
+        response.put(
+                "event",
+                "CHAT_HISTORY"
+        );
+
+
+        response.put(
+                "sessionId",
+                request.getSessionId()
+        );
+
+
+        response.put(
+                "count",
+                messages.size()
+        );
+
+
+        response.put(
+                "messages",
+                messages
+        );
+
+
+        LOGGER.info(
+                "历史记录已返回给："
+                        + principal.getName()
+        );
+
+
+        return response;
+    }
+    /**
+     * 当前用户主动拉取离线消息
+     */
+    @MessageMapping("/chat.offline.pull")
+    public void pullOfflineMessages(
+            Principal principal
+    ) {
+
+        if (principal == null) {
+
+            throw new IllegalArgumentException(
+                    "当前用户身份不存在"
+            );
+        }
+
+
+        String userId =
+                principal.getName();
+
+
+        chatService.pullOfflineMessages(
+                userId
+        );
+    }
+    /**
+     * 客户端确认已经收到聊天消息
+     */
+    @MessageMapping("/chat.ack")
+    public void handleAck(
+            AckRequest request,
+            Principal principal
+    ) {
+
+        if (principal == null) {
+
+            throw new IllegalArgumentException(
+                    "当前用户身份不存在"
+            );
+        }
+
+
+        if (request == null) {
+
+            throw new IllegalArgumentException(
+                    "ACK请求不能为空"
+            );
+        }
+        chatService.handleAck(
+                request.getMessageId(),
+                principal.getName()
+        );
+    }
+    /**
+     * 接收客户端心跳
+     *
+     * 浏览器发送地址：
+     * /app/chat.heartbeat
+     */
+    @MessageMapping("/chat.heartbeat")
+    public void handleHeartbeat(
+            Principal principal,
+            @Header("simpSessionId")
+            String wsSessionId
+    ) {
+
+        /*
+         * Principal中的name就是握手时传入的userId
+         */
+        if (principal == null) {
+
+            throw new IllegalArgumentException(
+                    "当前WebSocket连接没有用户身份"
+            );
+        }
+
+
+        String userId =
+                principal.getName();
+
+
+        chatService.handleHeartbeat(
+                userId,
+                wsSessionId
+        );
+    }
+
+
+    /**
+     * 校验WebSocket用户是否具有指定角色。
+     *
+     * STOMP消息不经过Shiro的HTTP过滤器，
+     * 因此必须根据认证后的Principal再次查询RBAC数据。
+     */
+    private void requireWebSocketRole(
+            String userId,
+            String roleCode
+    ) {
+
+        Set<String> roleCodes =
+                sysUserRoleMapper
+                        .findRoleCodesByUserId(
+                                userId
+                        );
+
+
+        if (
+                roleCodes == null ||
+                        !roleCodes.contains(
+                                roleCode
+                        )
+        ) {
+
+            throw new IllegalArgumentException(
+                    "当前用户缺少角色："
+                            + roleCode
+            );
+        }
+    }
+
+
+    /**
+     * 校验WebSocket用户是否具有指定权限。
+     */
+    private void requireWebSocketPermission(
+            String userId,
+            String permissionCode
+    ) {
+
+        Set<String> permissionCodes =
+                sysRolePermissionMapper
+                        .findPermissionCodesByUserId(
+                                userId
+                        );
+
+
+        if (
+                permissionCodes == null ||
+                        !permissionCodes.contains(
+                                permissionCode
+                        )
+        ) {
+
+            throw new IllegalArgumentException(
+                    "当前用户缺少权限："
+                            + permissionCode
+            );
+        }
+    }
+}

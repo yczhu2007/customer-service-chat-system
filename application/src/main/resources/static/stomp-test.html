@@ -1,0 +1,825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>STOMP连接测试</title>
+
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            width: 700px;
+            margin: 40px auto;
+        }
+
+        input {
+            width: 250px;
+            padding: 8px;
+        }
+
+        button {
+            padding: 8px 16px;
+            margin-left: 8px;
+        }
+
+        #log {
+            margin-top: 20px;
+            padding: 15px;
+            min-height: 300px;
+            background: #eeeeee;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+
+<body>
+
+<h2>STOMP连接测试</h2>
+
+<label>
+    登录Token：
+</label>
+
+<input
+        id="token"
+        placeholder="请粘贴登录接口返回的Token"
+        style="width: 500px"
+>
+
+<button onclick="connectStomp()">
+    连接
+</button>
+
+<button onclick="disconnectStomp()">
+    断开
+</button>
+<hr>
+
+<h3>发送聊天消息</h3>
+
+<p>
+    <label>
+        会话ID：
+        <input
+                id="sessionId"
+                value="613ddee5-d654-431c-98c8-715755c4b9e0">
+    </label>
+</p>
+
+<p>
+    <label>
+        clientMsgId：
+        <input
+                id="clientMsgId"
+                placeholder="留空会自动生成">
+    </label>
+</p>
+
+<p>
+    <label>
+        消息内容：
+        <input
+                id="messageContent"
+                value="你好，这是一条STOMP聊天消息">
+    </label>
+</p>
+
+<button onclick="sendChatMessage()">
+    发送聊天消息
+</button>
+<button onclick="endChatSession()">
+    结束当前会话
+</button>
+<button onclick="loadChatHistory()">
+    加载聊天历史
+</button>
+
+<div id="log"></div>
+
+
+<script>
+
+    let socket = null;
+    /*
+     * 是否自动发送业务ACK
+     *
+     * true：收到消息后自动ACK
+     * false：收到消息后不发送ACK
+     */
+    /*
+ * 心跳定时器
+ */
+    let heartbeatTimer = null;
+
+
+    /*
+     * 心跳发送间隔：30秒
+     */
+    const HEARTBEAT_INTERVAL_MS = 30000;
+    const AUTO_ACK = true;
+
+    function writeLog(message) {
+
+        const log =
+            document.getElementById("log");
+
+        log.textContent +=
+            message + "\n";
+    }
+
+
+    function connectStomp() {
+
+        const token =
+            document.getElementById("token")
+                .value
+                .trim();
+
+
+        if (!token) {
+
+            writeLog("请先登录并输入Token");
+
+            return;
+        }
+
+
+        const websocketProtocol =
+            window.location.protocol === "https:"
+                ? "wss://"
+                : "ws://";
+
+
+        const websocketUrl =
+            websocketProtocol +
+            window.location.host +
+            "/ws/chat?token=" +
+            encodeURIComponent(token);
+
+
+        writeLog(
+            "开始连接：" + websocketUrl
+        );
+
+        stopHeartbeat();
+
+        /*
+         * v12.stomp表示使用STOMP 1.2协议
+         */
+        socket =
+            new WebSocket(
+                websocketUrl,
+                ["v12.stomp"]
+            );
+
+
+        /*
+         * WebSocket握手成功
+         */
+        socket.onopen = function () {
+
+            writeLog(
+                "WebSocket握手成功"
+            );
+
+
+            /*
+             * 发送STOMP CONNECT帧
+             *
+             * 最后的 \u0000 是STOMP帧结束标志
+             */
+            const connectFrame =
+                "CONNECT\n" +
+                "accept-version:1.2\n" +
+                "host:localhost\n" +
+                "heart-beat:0,0\n" +
+                "\n" +
+                "\u0000";
+
+
+            socket.send(connectFrame);
+
+
+            writeLog(
+                "已经发送STOMP CONNECT帧"
+            );
+        };
+
+
+        /*
+         * 收到服务器返回的信息
+         */
+        socket.onmessage = function (event) {
+
+            const message =
+                event.data.replace(
+                    /\u0000/g,
+                    "\\0"
+                );
+
+
+            writeLog(
+                "服务器返回：\n" + message
+            );
+
+
+            if (
+                event.data.startsWith("CONNECTED")
+            ) {
+
+                writeLog(
+                    "STOMP连接成功"
+                );
+
+
+                /*
+                 * 订阅普通聊天消息
+                 */
+                const chatSubscribeFrame =
+                    "SUBSCRIBE\n" +
+                    "id:chat-subscription\n" +
+                    "destination:/user/queue/chat\n" +
+                    "ack:auto\n" +
+                    "\n" +
+                    "\u0000";
+
+
+                socket.send(
+                    chatSubscribeFrame
+                );
+
+
+                writeLog(
+                    "已订阅：/user/queue/chat"
+                );
+
+
+                /*
+                 * 订阅当前连接的错误消息
+                 */
+                const errorSubscribeFrame =
+                    "SUBSCRIBE\n" +
+                    "id:error-subscription\n" +
+                    "destination:/user/queue/errors\n" +
+                    "ack:auto\n" +
+                    "\n" +
+                    "\u0000";
+
+
+                socket.send(
+                    errorSubscribeFrame
+                );
+
+
+                writeLog(
+                    "已订阅：/user/queue/errors"
+                );
+                /*
+ * 聊天队列和错误队列订阅完成后，
+ * 主动请求拉取当前用户的离线消息
+ */
+                const offlinePullFrame =
+                    "SEND\n" +
+                    "destination:/app/chat.offline.pull\n" +
+                    "content-type:application/json\n" +
+                    "\n" +
+                    "{}" +
+                    "\u0000";
+
+
+                socket.send(
+                    offlinePullFrame
+                );
+
+
+                writeLog(
+                    "已请求拉取离线消息"
+                );
+                /*
+ * STOMP连接成功后启动心跳
+ */
+                startHeartbeat();
+            }
+            /*
+ * 收到普通MESSAGE帧时，
+ * 判断是不是一条聊天消息。
+ */
+            if (
+                event.data.startsWith("MESSAGE")
+            ) {
+
+                const bodyText =
+                    extractStompBody(
+                        event.data
+                    );
+
+
+                if (bodyText) {
+
+                    try {
+
+                        const body =
+                            JSON.parse(
+                                bodyText
+                            );
+
+
+                        /*
+                         * 真正的ChatMessage同时包含：
+                         * id
+                         * sessionId
+                         * senderId
+                         *
+                         * SESSION_CREATED、ERROR、CHAT_HISTORY
+                         * 不满足这些条件，因此不会误发ACK。
+                         */
+                        if (
+                            body["id"] &&
+                            body["sessionId"] &&
+                            body["senderId"]
+                        ) {
+
+                            if (AUTO_ACK) {
+
+                                sendBusinessAck(
+                                    body["id"]
+                                );
+
+                            } else {
+
+                                writeLog(
+                                    "自动业务ACK已关闭，messageId："
+                                    + body["id"]
+                                );
+                            }
+                        }
+                    } catch (error) {
+
+                        /*
+                         * 某些服务器帧不是JSON，
+                         * 不需要因此中断页面。
+                         */
+                        writeLog(
+                            "当前MESSAGE不是可确认的聊天消息"
+                        );
+                    }
+                }
+            }
+        };
+
+
+        /*
+         * 连接关闭
+         */
+        socket.onclose = function () {
+            stopHeartbeat();
+            writeLog(
+                "连接已经关闭"
+            );
+
+            socket = null;
+        };
+
+
+        /*
+         * 连接出错
+         */
+        socket.onerror = function () {
+
+            writeLog(
+                "连接发生错误"
+            );
+        };
+    }
+    /*
+     * 发送业务消息ACK
+     */
+    function sendBusinessAck(messageId) {
+
+        if (
+            socket == null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            writeLog(
+                "ACK发送失败：连接已断开"
+            );
+
+            return;
+        }
+
+
+        const requestBody = {
+            messageId: messageId
+        };
+
+
+        const ackFrame =
+            "SEND\n" +
+            "destination:/app/chat.ack\n" +
+            "content-type:application/json\n" +
+            "\n" +
+            JSON.stringify(requestBody) +
+            "\u0000";
+
+
+        socket.send(
+            ackFrame
+        );
+
+
+        writeLog(
+            "已发送业务ACK，messageId："
+            + messageId
+        );
+    }
+    /**
+     * 向服务端发送一次心跳
+     */
+    function sendHeartbeat() {
+
+        /*
+         * WebSocket不存在或没有处于连接状态时，
+         * 不发送心跳。
+         */
+        if (
+            socket === null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            return;
+        }
+
+
+        /*
+         * 构造STOMP SEND帧
+         *
+         * 对应服务端：
+         * @MessageMapping("/chat.heartbeat")
+         */
+        const frame =
+            "SEND\n"
+            + "destination:/app/chat.heartbeat\n"
+            + "content-type:application/json\n"
+            + "\n"
+            + "{}\u0000";
+
+
+        socket.send(
+            frame
+        );
+    }
+
+
+    /**
+     * 开始定时发送心跳
+     */
+    function startHeartbeat() {
+
+        /*
+         * 先停止旧定时器，
+         * 防止重复连接后出现多个心跳定时器。
+         */
+        stopHeartbeat();
+
+
+        /*
+         * STOMP连接成功后立即发送一次心跳，
+         * 不需要先等待30秒。
+         */
+        sendHeartbeat();
+
+
+        /*
+         * 之后每30秒发送一次。
+         */
+        heartbeatTimer =
+            setInterval(
+                sendHeartbeat,
+                HEARTBEAT_INTERVAL_MS
+            );
+    }
+
+
+    /**
+     * 停止心跳定时器
+     */
+    function stopHeartbeat() {
+
+        if (heartbeatTimer !== null) {
+
+            clearInterval(
+                heartbeatTimer
+            );
+
+
+            heartbeatTimer = null;
+        }
+    }
+    /*
+ * 从STOMP帧中提取JSON消息体
+ */
+    function extractStompBody(frame) {
+
+        const bodyStart =
+            frame.indexOf("\n\n");
+
+
+        if (bodyStart === -1) {
+
+            return null;
+        }
+
+
+        return frame
+            .substring(bodyStart + 2)
+            .replace(/\u0000/g, "")
+            .trim();
+    }
+    function sendChatMessage() {
+
+        if (
+            socket == null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            writeLog(
+                "请先建立STOMP连接"
+            );
+
+            return;
+        }
+
+
+        const sessionId =
+            document.getElementById(
+                "sessionId"
+            ).value.trim();
+
+
+        const messageContent =
+            document.getElementById(
+                "messageContent"
+            ).value.trim();
+
+
+        const clientMsgIdInput =
+            document.getElementById(
+                "clientMsgId"
+            );
+
+
+        let clientMsgId =
+            clientMsgIdInput.value.trim();
+
+
+        if (!sessionId) {
+
+            writeLog(
+                "请输入会话ID"
+            );
+
+            return;
+        }
+
+
+        if (!messageContent) {
+
+            writeLog(
+                "请输入消息内容"
+            );
+
+            return;
+        }
+
+
+        /*
+         * clientMsgId为空时自动生成。
+         * 生成后写回输入框。
+         *
+         * 因此再次点击发送时，
+         * 会继续使用同一个clientMsgId，
+         * 方便测试消息去重。
+         */
+        if (!clientMsgId) {
+
+            clientMsgId =
+                "client-" + Date.now();
+
+            clientMsgIdInput.value =
+                clientMsgId;
+        }
+
+
+        const messageBody = {
+
+            sessionId: sessionId,
+
+            type: "TEXT",
+
+            content: messageContent,
+
+            clientMsgId: clientMsgId
+        };
+
+
+        const sendFrame =
+            "SEND\n" +
+            "destination:/app/chat.send\n" +
+            "content-type:application/json\n" +
+            "\n" +
+            JSON.stringify(messageBody) +
+            "\u0000";
+
+
+        socket.send(
+            sendFrame
+        );
+
+
+        writeLog(
+            "已发送聊天消息：\n"
+            + JSON.stringify(
+                messageBody,
+                null,
+                2
+            )
+        );
+    }
+    function endChatSession() {
+
+        if (
+            socket == null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            writeLog(
+                "请先建立STOMP连接"
+            );
+
+            return;
+        }
+
+
+        const sessionId =
+            document.getElementById(
+                "sessionId"
+            ).value.trim();
+
+
+        if (!sessionId) {
+
+            writeLog(
+                "请输入会话ID"
+            );
+
+            return;
+        }
+
+
+        const requestBody = {
+            sessionId: sessionId
+        };
+
+
+        const endFrame =
+            "SEND\n" +
+            "destination:/app/chat.end\n" +
+            "content-type:application/json\n" +
+            "\n" +
+            JSON.stringify(requestBody) +
+            "\u0000";
+
+
+        socket.send(
+            endFrame
+        );
+
+
+        writeLog(
+            "已发送结束会话请求：\n"
+            + JSON.stringify(
+                requestBody,
+                null,
+                2
+            )
+        );
+    }
+    function loadChatHistory() {
+
+        /*
+         * 1. 检查连接
+         */
+        if (
+            socket == null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            writeLog(
+                "请先建立STOMP连接"
+            );
+
+            return;
+        }
+
+
+        /*
+         * 2. 获取会话ID
+         */
+        const sessionId =
+            document.getElementById(
+                "sessionId"
+            ).value.trim();
+
+
+        if (!sessionId) {
+
+            writeLog(
+                "请输入会话ID"
+            );
+
+            return;
+        }
+
+
+        /*
+         * 3. 构造请求数据
+         */
+        const requestBody = {
+            sessionId: sessionId
+        };
+
+
+        /*
+         * 4. 构造STOMP SEND帧
+         */
+        const historyFrame =
+            "SEND\n" +
+            "destination:/app/chat.history\n" +
+            "content-type:application/json\n" +
+            "\n" +
+            JSON.stringify(requestBody) +
+            "\u0000";
+
+
+        /*
+         * 5. 发送查询请求
+         */
+        socket.send(
+            historyFrame
+        );
+
+
+        writeLog(
+            "已发送聊天历史查询：\n"
+            + JSON.stringify(
+                requestBody,
+                null,
+                2
+            )
+        );
+    }
+    function disconnectStomp() {
+        stopHeartbeat();
+        if (
+            socket == null ||
+            socket.readyState !== WebSocket.OPEN
+        ) {
+
+            writeLog(
+                "当前没有已连接的STOMP会话"
+            );
+
+            return;
+        }
+
+
+        /*
+         * 先发送STOMP DISCONNECT帧
+         */
+        const disconnectFrame =
+            "DISCONNECT\n" +
+            "receipt:disconnect-001\n" +
+            "\n" +
+            "\u0000";
+
+
+        socket.send(
+            disconnectFrame
+        );
+
+
+        /*
+         * 然后关闭WebSocket
+         */
+        socket.close();
+
+
+        writeLog(
+            "已经发送断开请求"
+        );
+    }
+
+</script>
+
+</body>
+</html>

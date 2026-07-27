@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.SysPermissionMapper">
+
+    <select
+            id="findByCode"
+            resultType="com.example.customerservice.domain.SysPermission">
+
+        SELECT
+            id,
+            permission_code,
+            permission_name,
+            permission_type,
+            request_method,
+            request_path,
+            description,
+            status,
+            create_time,
+            update_time
+        FROM sys_permission
+        WHERE permission_code = #{permissionCode}
+        LIMIT 1
+
+    </select>
+
+
+    <update id="updateSelective">
+
+        UPDATE sys_permission
+
+        <set>
+
+            <if test="permissionCode != null and permissionCode != ''">
+                permission_code = #{permissionCode},
+            </if>
+
+            <if test="permissionName != null and permissionName != ''">
+                permission_name = #{permissionName},
+            </if>
+
+            <if test="permissionType != null and permissionType != ''">
+                permission_type = #{permissionType},
+            </if>
+
+            <if test="requestMethod != null">
+                request_method = NULLIF(#{requestMethod}, ''),
+            </if>
+
+            <if test="requestPath != null">
+                request_path = NULLIF(#{requestPath}, ''),
+            </if>
+
+            <if test="description != null">
+                description = #{description},
+            </if>
+
+            <if test="status != null and status != ''">
+                status = #{status},
+            </if>
+
+        </set>
+
+        WHERE id = #{id}
+
+    </update>
+
+
+</mapper>

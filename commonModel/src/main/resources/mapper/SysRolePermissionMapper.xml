@@ -1,0 +1,103 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.SysRolePermissionMapper">
+
+    <select
+            id="findPermissionCodesByUserId"
+            resultType="java.lang.String">
+
+        SELECT DISTINCT
+            permission.permission_code
+        FROM sys_user_role AS user_role
+
+                 INNER JOIN sys_role AS role
+                            ON role.id = user_role.role_id
+
+                 INNER JOIN sys_role_permission AS role_permission
+                            ON role_permission.role_id = role.id
+
+                 INNER JOIN sys_permission AS permission
+                            ON permission.id = role_permission.permission_id
+
+        WHERE user_role.user_id = #{userId}
+          AND role.status = 'ENABLED'
+          AND permission.status = 'ENABLED'
+
+        ORDER BY permission.permission_code ASC
+
+    </select>
+
+
+    <select
+            id="findPermissionCodesByRoleId"
+            resultType="java.lang.String">
+
+        SELECT DISTINCT
+            permission.permission_code
+        FROM sys_role_permission AS role_permission
+
+                 INNER JOIN sys_permission AS permission
+                            ON permission.id = role_permission.permission_id
+
+        WHERE role_permission.role_id = #{roleId}
+          AND permission.status = 'ENABLED'
+
+        ORDER BY permission.permission_code ASC
+
+    </select>
+
+    <select
+            id="findAllPermissionCodesByRoleId"
+            resultType="java.lang.String">
+
+        SELECT DISTINCT
+            permission.permission_code
+        FROM sys_role_permission AS role_permission
+
+                 INNER JOIN sys_permission AS permission
+                            ON permission.id = role_permission.permission_id
+
+        WHERE role_permission.role_id = #{roleId}
+
+        ORDER BY permission.permission_code ASC
+
+    </select>
+
+
+    <insert id="assignPermission">
+
+        INSERT IGNORE INTO sys_role_permission
+        (
+            role_id,
+            permission_id
+        )
+        VALUES
+            (
+                #{roleId},
+                #{permissionId}
+            )
+
+    </insert>
+
+
+    <delete id="removePermission">
+
+        DELETE FROM sys_role_permission
+        WHERE role_id = #{roleId}
+          AND permission_id = #{permissionId}
+
+    </delete>
+
+
+    <delete id="deleteByRoleId">
+
+        DELETE FROM sys_role_permission
+        WHERE role_id = #{roleId}
+
+    </delete>
+
+</mapper>
