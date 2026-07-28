@@ -5,9 +5,20 @@ public class RedisConstants {
 
     public static final String AGENT_LOAD = "agent:load";
     public static final int AGENT_MAX_CONCURRENCY = 5;
+    /** 等待用户 ZSET，score 为入队时间戳。 */
     public static final String QUEUE_PENDING = "queue:pending";
+    /** 保存上一次入队 score，用于在同一毫秒内生成严格递增的 FIFO score。 */
+    public static final String QUEUE_SEQUENCE = "queue:sequence";
+    private static final String AGENT_PREFIX = "agent:";
+    private static final String AGENT_SESSIONS_SUFFIX = ":sessions";
+    public static final String AGENT_RECONNECT_GRACE = "agent:reconnect:grace";
     public static final String CHAT_ASSIGN_LOCK = "chat:assign:lock:";
     public static final long CHAT_ASSIGN_LOCK_TTL_SECONDS = 30L;
+    public static final String ASSIGNMENT_PENDING = "assignment:pending";
+    public static final String ASSIGNMENT_PENDING_PAYLOAD = "assignment:pending:payload";
+    public static final String SESSION_FINALIZE_PENDING = "session:finalize:pending";
+    public static final String SESSION_FINALIZE_PENDING_PAYLOAD =
+            "session:finalize:pending:payload";
     public static final String SESSION_MSG = "session:msg:";
     public static final String CLIENT_MSG_DEDUP = "client:msg:dedup:";
     /**
@@ -17,8 +28,15 @@ public class RedisConstants {
      * field：服务端消息ID
      * value：完整消息JSON
      */
-    public static final String PERSIST_FAILED =
-            "persist:failed";
+    /** 尚未被 MySQL 确认写入的消息 ZSET。 */
+    public static final String PERSIST_PENDING = "persist:pending";
+    /** 待落库消息的完整 JSON 内容。 */
+    public static final String PERSIST_PENDING_PAYLOAD = "persist:pending:payload:";
+    /** 达到最大重试次数后等待人工处理的消息 ZSET。 */
+    public static final String PERSIST_DEADLETTER = "persist:deadletter";
+    public static final String PERSIST_RETRY_COUNT = "persist:retry:count:";
+    public static final String PERSIST_RETRY_LEASE = "persist:retry:lease:";
+    public static final long PERSIST_RETRY_LEASE_SECONDS = 180L;
     //websocket
     public static final String USER_WS = "user:ws:";
     public static final String WS_SESSION = "ws:session:";
@@ -159,6 +177,13 @@ public class RedisConstants {
     ) {
 
         return TOKEN_PREFIX + token;
+    }
+
+    /**
+     * 客服持有的全部活跃会话反向索引：agent:{agentId}:sessions。
+     */
+    public static String agentSessionsKey(String agentId) {
+        return AGENT_PREFIX + agentId + AGENT_SESSIONS_SUFFIX;
     }
 
     /*

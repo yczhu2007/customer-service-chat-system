@@ -2,6 +2,7 @@ package com.example.customerservice.dto;
 
 import com.example.customerservice.domain.ChatMessage;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
 import java.time.LocalDateTime;
 
@@ -22,6 +23,11 @@ public class ChatMessageDTO {
 
     private String senderRole;
 
+    @NotBlank(message = "消息类型不能为空")
+    @Pattern(
+            regexp = "(?i)TEXT|IMAGE|FILE",
+            message = "消息类型只支持 TEXT、IMAGE、FILE"
+    )
     private String type;
 
     @NotBlank(message = "消息内容不能为空")
@@ -31,6 +37,12 @@ public class ChatMessageDTO {
     private String clientMsgId;
 
     private LocalDateTime createTime;
+
+    /**
+     * 服务端处理确认状态：RECEIVED 表示已进入 Redis，
+     * STORED 表示已确认写入 MySQL。
+     */
+    private String ackStatus;
 
     public ChatMessage toEntity(String authenticatedSenderId) {
         ChatMessage message = new ChatMessage();
@@ -119,5 +131,13 @@ public class ChatMessageDTO {
 
     public void setCreateTime(LocalDateTime createTime) {
         this.createTime = createTime;
+    }
+
+    public String getAckStatus() {
+        return ackStatus;
+    }
+
+    public void setAckStatus(String ackStatus) {
+        this.ackStatus = ackStatus;
     }
 }

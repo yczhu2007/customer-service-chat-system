@@ -24,11 +24,12 @@ public interface IChatService {
      */
     void agentOffline(String agentId);
 
-    String findIdleAgent();
+    String findIdleAgent(String userId);
 
 
 
     void enqueueWaitingUser(String userId);
+    void refreshWaitingPositions();
     // 通知双方
     void notifyBothParties(ChatSession session);
 
@@ -113,6 +114,9 @@ public interface IChatService {
     void handleHeartbeatTimeout(
             String userId
     );
+    void handleAgentReconnectGraceTimeout(String agentId);
+    void reconcilePendingAssignments();
+    void reconcilePendingSessionFinalizations();
     void registerOnline(
             String userId,
             String wsSessionId
