@@ -2,260 +2,217 @@ package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatMessage;
+import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.service.MessagePersistService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import tools.jackson.databind.ObjectMapper;
 
-import java.util.Map;
+import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 /**
- * 聊天消息异步落库服务。
- *
- * 首次落库失败时在当前异步线程中进行有限重试；
- * 多次失败后保存到Redis，等待定时任务继续补写。
+ * 消息写入 MySQL 的可靠异步服务。
+ * Redis 待确认记录在提交异步任务前写入，只有 MySQL 成功后才移除。
  */
 @Service
-public class MessagePersistServiceImpl
-        implements MessagePersistService {
+public class MessagePersistServiceImpl implements MessagePersistService {
 
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    MessagePersistServiceImpl.class
+    private static final Logger LOGGER = LoggerFactory.getLogger(MessagePersistServiceImpl.class);
+    /** 首次执行 + 3 次指数退避重试。 */
+    private static final int MAX_ATTEMPTS = 4;
+    private static final long[] RETRY_DELAYS_SECONDS = {10L, 30L, 60L};
+    private static final DefaultRedisScript<Long> MARK_PENDING_SCRIPT =
+            new DefaultRedisScript<>(
+                    "redis.call('SET', KEYS[1], ARGV[1]); " +
+                            "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[2]); " +
+                            "return 1;",
+                    Long.class
             );
 
-    private static final int MAX_ATTEMPTS = 3;
-
-    private static final long RETRY_DELAY_MILLIS =
-            1_000L;
-
     private final ChatMessageMapper chatMessageMapper;
-
     private final StringRedisTemplate redisTemplate;
-
     private final ObjectMapper objectMapper;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final ThreadPoolTaskExecutor messagePersistExecutor;
 
     public MessagePersistServiceImpl(
             ChatMessageMapper chatMessageMapper,
             StringRedisTemplate redisTemplate,
-            ObjectMapper objectMapper
+            ObjectMapper objectMapper,
+            SimpMessagingTemplate messagingTemplate,
+            @Qualifier("messagePersistExecutor")
+            ThreadPoolTaskExecutor messagePersistExecutor
     ) {
-        this.chatMessageMapper =
-                chatMessageMapper;
-        this.redisTemplate =
-                redisTemplate;
-        this.objectMapper =
-                objectMapper;
+        this.chatMessageMapper = chatMessageMapper;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
+        this.messagingTemplate = messagingTemplate;
+        this.messagePersistExecutor = messagePersistExecutor;
     }
 
     @Override
-    @Async
-    public void persistMessageAsync(
-            ChatMessage message
-    ) {
-        if (!persistWithRetry(message)) {
-            saveFailedMessage(message);
+    public void markPending(ChatMessage message) {
+        validateMessage(message);
+        try {
+            String payload = objectMapper.writeValueAsString(message);
+            redisTemplate.execute(
+                    MARK_PENDING_SCRIPT,
+                    List.of(
+                            RedisConstants.PERSIST_PENDING_PAYLOAD + message.getId(),
+                            RedisConstants.PERSIST_PENDING
+                    ),
+                    payload,
+                    message.getId(),
+                    String.valueOf(System.currentTimeMillis())
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("记录待落库消息失败", exception);
+        }
+    }
+
+    @Override
+    @Async("messagePersistExecutor")
+    public void persistMessageAsync(ChatMessage message) {
+        if (!tryAcquireRetryLease(message.getId())) {
+            return;
+        }
+        try {
+            persistWithRetry(message);
+        } finally {
+            releaseRetryLease(message.getId());
         }
     }
 
     @Override
     public void retryFailedMessages() {
-        Map<Object, Object> failedMessages =
-                redisTemplate.opsForHash()
-                        .entries(
-                                RedisConstants
-                                        .PERSIST_FAILED
-                        );
-
-        if (failedMessages.isEmpty()) {
+        Set<String> pendingIds = redisTemplate.opsForZSet().rangeByScore(
+                RedisConstants.PERSIST_PENDING,
+                0,
+                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(10),
+                0,
+                100
+        );
+        if (pendingIds == null || pendingIds.isEmpty()) {
             return;
         }
-
-        for (
-                Map.Entry<Object, Object> entry
-                : failedMessages.entrySet()
-        ) {
-            String messageId =
-                    String.valueOf(
-                            entry.getKey()
-                    );
-
+        for (String messageId : pendingIds) {
             try {
-                ChatMessage message =
-                        objectMapper.readValue(
-                                String.valueOf(
-                                        entry.getValue()
-                                ),
-                                ChatMessage.class
-                        );
-
-                if (persistWithRetry(message)) {
-                    removeFailedMessage(
-                            messageId
-                    );
+                if (!tryAcquireRetryLease(messageId)) {
+                    continue;
                 }
-            } catch (Exception exception) {
-                LOGGER.error(
-                        "解析待重试消息失败，messageId={}",
-                        messageId,
-                        exception
+                String payload = redisTemplate.opsForValue().get(
+                        RedisConstants.PERSIST_PENDING_PAYLOAD + messageId
                 );
+                if (payload == null || payload.isBlank()) {
+                    moveToDeadLetter(messageId);
+                    releaseRetryLease(messageId);
+                    continue;
+                }
+                ChatMessage message = objectMapper.readValue(payload, ChatMessage.class);
+                messagePersistExecutor.execute(() -> {
+                    try {
+                        persistWithRetry(message);
+                    } finally {
+                        releaseRetryLease(message.getId());
+                    }
+                });
+            } catch (Exception exception) {
+                releaseRetryLease(messageId);
+                LOGGER.error("重新提交待落库消息失败，messageId={}", messageId, exception);
             }
         }
     }
 
-    private boolean persistWithRetry(
-            ChatMessage message
-    ) {
-        if (
-                message == null ||
-                        message.getId() == null ||
-                        message.getId().isBlank()
-        ) {
-            LOGGER.error(
-                    "消息落库失败：消息或消息ID为空"
-            );
-            return false;
-        }
-
-        for (
-                int attempt = 1;
-                attempt <= MAX_ATTEMPTS;
-                attempt++
-        ) {
+    private boolean persistWithRetry(ChatMessage message) {
+        validateMessage(message);
+        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
             try {
-                int insertedRows =
-                        chatMessageMapper.insert(
-                                message
-                        );
-
+                int insertedRows = chatMessageMapper.insert(message);
                 if (insertedRows != 1) {
-                    throw new IllegalStateException(
-                            "消息写入行数不是1"
-                    );
+                    throw new IllegalStateException("消息写入行数不是 1");
                 }
-
-                removeFailedMessage(
-                        message.getId()
-                );
-
-                LOGGER.info(
-                        "聊天消息落库成功，messageId={}",
-                        message.getId()
-                );
-
+                markStored(message);
                 return true;
-            } catch (
-                    DuplicateKeyException exception
-            ) {
-                /*
-                 * 主键或clientMsgId重复说明该消息已经成功写入，
-                 * 直接移除失败记录，保证重试幂等。
-                 */
-                removeFailedMessage(
-                        message.getId()
-                );
-
-                LOGGER.info(
-                        "聊天消息已经存在，按落库成功处理，messageId={}",
-                        message.getId()
-                );
-
+            } catch (DuplicateKeyException exception) {
+                // 主键或 clientMsgId 重复代表上次写入已经成功，按成功处理。
+                markStored(message);
                 return true;
             } catch (Exception exception) {
-                LOGGER.warn(
-                        "聊天消息落库失败，第{}次尝试，messageId={}",
-                        attempt,
-                        message.getId(),
-                        exception
-                );
-
-                if (attempt < MAX_ATTEMPTS) {
-                    if (!waitBeforeRetry()) {
-                        return false;
-                    }
+                LOGGER.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
+                if (attempt < MAX_ATTEMPTS && !waitBeforeRetry(attempt)) {
+                    return false;
                 }
             }
         }
-
+        moveToDeadLetter(message.getId());
         return false;
     }
 
-    private boolean waitBeforeRetry() {
+    private boolean waitBeforeRetry(int attempt) {
         try {
-            Thread.sleep(
-                    RETRY_DELAY_MILLIS
-            );
+            Thread.sleep(TimeUnit.SECONDS.toMillis(RETRY_DELAYS_SECONDS[attempt - 1]));
             return true;
         } catch (InterruptedException exception) {
-            Thread.currentThread()
-                    .interrupt();
-
-            LOGGER.warn(
-                    "消息落库重试线程被中断"
-            );
-
+            Thread.currentThread().interrupt();
             return false;
         }
     }
 
-    private void saveFailedMessage(
-            ChatMessage message
-    ) {
-        if (
-                message == null ||
-                        message.getId() == null ||
-                        message.getId().isBlank()
-        ) {
-            return;
-        }
+    private void markStored(ChatMessage message) {
+        String messageId = message.getId();
+        redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_PENDING, messageId);
+        redisTemplate.delete(RedisConstants.PERSIST_PENDING_PAYLOAD + messageId);
+        redisTemplate.delete(RedisConstants.PERSIST_RETRY_COUNT + messageId);
+        releaseRetryLease(messageId);
+        ChatMessageDTO acknowledgement = ChatMessageDTO.fromEntity(message);
+        acknowledgement.setAckStatus("STORED");
+        messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/chat", acknowledgement);
+    }
 
-        try {
-            String messageJson =
-                    objectMapper.writeValueAsString(
-                            message
-                    );
+    private void moveToDeadLetter(String messageId) {
+        redisTemplate.opsForZSet().add(
+                RedisConstants.PERSIST_DEADLETTER,
+                messageId,
+                System.currentTimeMillis()
+        );
+        redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_PENDING, messageId);
+        releaseRetryLease(messageId);
+        LOGGER.error("消息达到最大落库重试次数，已转入死信集合，messageId={}", messageId);
+    }
 
-            redisTemplate.opsForHash()
-                    .put(
-                            RedisConstants
-                                    .PERSIST_FAILED,
-                            message.getId(),
-                            messageJson
-                    );
-
-            LOGGER.error(
-                    "聊天消息多次落库失败，已保存到Redis等待重试，messageId={}",
-                    message.getId()
-            );
-        } catch (Exception exception) {
-            LOGGER.error(
-                    "保存落库失败消息到Redis时发生异常，messageId={}",
-                    message.getId(),
-                    exception
-            );
+    private void validateMessage(ChatMessage message) {
+        if (message == null || message.getId() == null || message.getId().isBlank()) {
+            throw new IllegalArgumentException("消息或消息 ID 不能为空");
         }
     }
 
-    private void removeFailedMessage(
-            String messageId
-    ) {
-        if (
-                messageId == null ||
-                        messageId.isBlank()
-        ) {
-            return;
+    private void releaseRetryLease(String messageId) {
+        if (messageId != null && !messageId.isBlank()) {
+            redisTemplate.delete(RedisConstants.PERSIST_RETRY_LEASE + messageId);
         }
+    }
 
-        redisTemplate.opsForHash()
-                .delete(
-                        RedisConstants.PERSIST_FAILED,
-                        messageId
-                );
+    private boolean tryAcquireRetryLease(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            return false;
+        }
+        Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
+                RedisConstants.PERSIST_RETRY_LEASE + messageId,
+                "1",
+                RedisConstants.PERSIST_RETRY_LEASE_SECONDS,
+                TimeUnit.SECONDS
+        );
+        return Boolean.TRUE.equals(acquired);
     }
 }

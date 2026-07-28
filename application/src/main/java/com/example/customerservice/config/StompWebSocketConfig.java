@@ -1,9 +1,11 @@
 package com.example.customerservice.config;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.util.StringUtils;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -28,6 +30,8 @@ public class StompWebSocketConfig
 
     private final String[] allowedOriginPatterns;
 
+    private final TaskScheduler stompHeartbeatTaskScheduler;
+
     public StompWebSocketConfig(
             StompAuthChannelInterceptor
                     stompAuthChannelInterceptor,
@@ -35,6 +39,8 @@ public class StompWebSocketConfig
                     webSocketHandshakeInterceptor,
             WebSocketHandshakeHandler
                     webSocketHandshakeHandler,
+            @Qualifier("stompHeartbeatTaskScheduler")
+            TaskScheduler stompHeartbeatTaskScheduler,
             @Value("${app.websocket.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
             String allowedOriginPatterns
     ) {
@@ -44,6 +50,7 @@ public class StompWebSocketConfig
                 webSocketHandshakeInterceptor;
         this.webSocketHandshakeHandler =
                 webSocketHandshakeHandler;
+        this.stompHeartbeatTaskScheduler = stompHeartbeatTaskScheduler;
 
         this.allowedOriginPatterns =
                 StringUtils
@@ -92,7 +99,9 @@ public class StompWebSocketConfig
         registry.enableSimpleBroker(
                 "/queue",
                 "/topic"
-        );
+        )
+                .setHeartbeatValue(new long[]{10_000L, 10_000L})
+                .setTaskScheduler(stompHeartbeatTaskScheduler);
 
         registry.setApplicationDestinationPrefixes(
                 "/app"

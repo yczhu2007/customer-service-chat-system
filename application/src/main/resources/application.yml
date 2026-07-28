@@ -30,3 +30,10 @@ app:
       id: admin
       username: admin
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
+  chat:
+    agent-reconnect-grace-seconds: ${CHAT_AGENT_RECONNECT_GRACE_SECONDS:20}
+    persist:
+      alert-threshold: ${CHAT_PERSIST_ALERT_THRESHOLD:20}
+    queue:
+      timeout-seconds: ${CHAT_QUEUE_TIMEOUT_SECONDS:300}
+      sweep-delay-ms: ${CHAT_QUEUE_SWEEP_DELAY_MS:15000}

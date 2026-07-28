@@ -16,6 +16,7 @@ public class AssignResult {
     private String assignmentStatus;
     private String message;
     private ChatSessionDTO session;
+    private Long waitingPosition;
 
     public static AssignResult assigned(
             ChatSession session
@@ -46,12 +47,18 @@ public class AssignResult {
     }
 
     public static AssignResult waiting() {
-        return of(
+        return waiting(null);
+    }
+
+    public static AssignResult waiting(Long waitingPosition) {
+        AssignResult result = of(
                 "WAITING_FOR_AGENT",
                 WAITING,
                 "暂无可用客服，您已进入等待队列",
                 null
         );
+        result.setWaitingPosition(waitingPosition);
+        return result;
     }
 
     public static AssignResult processing() {
@@ -111,5 +118,13 @@ public class AssignResult {
             ChatSessionDTO session
     ) {
         this.session = session;
+    }
+
+    public Long getWaitingPosition() {
+        return waitingPosition;
+    }
+
+    public void setWaitingPosition(Long waitingPosition) {
+        this.waitingPosition = waitingPosition;
     }
 }
