@@ -41,7 +41,7 @@
 
 <input
         id="token"
-        placeholder="请粘贴登录接口返回的Token"
+        placeholder="请粘贴登录接口返回结果中的 data.token"
         style="width: 500px"
 >
 
@@ -335,7 +335,8 @@
                         if (
                             body["id"] &&
                             body["sessionId"] &&
-                            body["senderId"]
+                            body["senderId"] &&
+                            body["ackStatus"] !== "RECEIVED"
                         ) {
 
                             if (AUTO_ACK) {

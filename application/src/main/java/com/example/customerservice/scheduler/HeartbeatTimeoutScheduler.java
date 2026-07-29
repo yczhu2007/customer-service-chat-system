@@ -2,8 +2,7 @@ package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.IChatService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,12 +13,8 @@ import java.util.Set;
  * 定时扫描心跳超时用户
  */
 @Component
+@Slf4j
 public class HeartbeatTimeoutScheduler {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    HeartbeatTimeoutScheduler.class
-            );
 
     private final StringRedisTemplate redisTemplate;
 
@@ -96,7 +91,7 @@ public class HeartbeatTimeoutScheduler {
 
             } catch (Exception e) {
 
-                LOGGER.info(
+                log.info(
                         "处理心跳超时失败，用户："
                                 + userId
                                 + "，原因："

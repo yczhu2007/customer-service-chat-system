@@ -5,8 +5,7 @@ import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.service.MessagePersistService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -26,9 +25,9 @@ import java.util.concurrent.TimeUnit;
  * Redis 待确认记录在提交异步任务前写入，只有 MySQL 成功后才移除。
  */
 @Service
+@Slf4j
 public class MessagePersistServiceImpl implements MessagePersistService {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(MessagePersistServiceImpl.class);
     /** 首次执行 + 3 次指数退避重试。 */
     private static final int MAX_ATTEMPTS = 4;
     private static final long[] RETRY_DELAYS_SECONDS = {10L, 30L, 60L};
@@ -129,7 +128,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 });
             } catch (Exception exception) {
                 releaseRetryLease(messageId);
-                LOGGER.error("重新提交待落库消息失败，messageId={}", messageId, exception);
+                log.error("重新提交待落库消息失败，messageId={}", messageId, exception);
             }
         }
     }
@@ -149,7 +148,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 markStored(message);
                 return true;
             } catch (Exception exception) {
-                LOGGER.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
+                log.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
                 if (attempt < MAX_ATTEMPTS && !waitBeforeRetry(attempt)) {
                     return false;
                 }
@@ -188,7 +187,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         );
         redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_PENDING, messageId);
         releaseRetryLease(messageId);
-        LOGGER.error("消息达到最大落库重试次数，已转入死信集合，messageId={}", messageId);
+        log.error("消息达到最大落库重试次数，已转入死信集合，messageId={}", messageId);
     }
 
     private void validateMessage(ChatMessage message) {
