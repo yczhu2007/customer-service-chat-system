@@ -1,8 +1,7 @@
 package com.example.customerservice.listener;
 
 import com.example.customerservice.service.IChatService;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.stereotype.Component;
@@ -13,12 +12,8 @@ import java.security.Principal;
 
 
 @Component
+@Slf4j
 public class WebSocketEventListener {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    WebSocketEventListener.class
-            );
 
     private final IChatService chatService;
 
@@ -62,7 +57,7 @@ public class WebSocketEventListener {
                         sessionId.isBlank()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "STOMP连接失败：没有sessionId"
             );
 
@@ -75,7 +70,7 @@ public class WebSocketEventListener {
          */
         if (principal == null) {
 
-            LOGGER.info(
+            log.info(
                     "STOMP连接失败：没有Principal"
             );
 
@@ -97,22 +92,22 @@ public class WebSocketEventListener {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "STOMP连接成功，用户Principal："
                         + userId
         );
 
 
-        LOGGER.info(
+        log.info(
                 "WebSocket SessionId："
                         + sessionId
         );
 
 
-        LOGGER.info(
+        log.info(
                 "WebSocket在线状态已写入Redis"
         );
-        LOGGER.info(
+        log.info(
                 "初始心跳登记完成，用户："
                         + userId
         );
@@ -136,7 +131,7 @@ public class WebSocketEventListener {
                         sessionId.isBlank()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "WebSocket断开事件没有sessionId"
             );
 
@@ -156,7 +151,7 @@ public class WebSocketEventListener {
 
         } catch (Exception e) {
 
-            LOGGER.info(
+            log.info(
                     "WebSocket业务断线处理失败，sessionId："
                             + sessionId
                             + "，原因："
@@ -165,7 +160,7 @@ public class WebSocketEventListener {
         }
 
 
-        LOGGER.info(
+        log.info(
                 "WebSocket断开，sessionId："
                         + sessionId
         );

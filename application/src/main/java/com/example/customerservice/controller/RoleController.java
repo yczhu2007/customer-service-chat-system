@@ -4,6 +4,7 @@ import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IRoleService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,50 +22,50 @@ import com.example.customerservice.common.Result;
 @RestController
 public class RoleController {
 
-    private final IRoleService roleService;
+    @Autowired
+    private IRoleService roleService;
 
-    private final CurrentUser currentUser;
-
-    public RoleController(
-            IRoleService roleService,
-            CurrentUser currentUser
-    ) {
-        this.roleService = roleService;
-        this.currentUser = currentUser;
-    }
+    @Autowired
+    private CurrentUser currentUser;
 
     @GetMapping("/roles")
-    public List<RoleVO> findAllRoles() {
+    public Result<List<RoleVO>> findAllRoles() {
         requireRoleManagementPermission();
-        return roleService.findAllRoles();
+        return Result.success(roleService.findAllRoles());
     }
 
     @GetMapping("/roles/{id}")
-    public RoleVO findRoleById(
+    public Result<RoleVO> findRoleById(
             @PathVariable String id
     ) {
         requireRoleManagementPermission();
-        return roleService.findRoleById(id);
+        return Result.success(roleService.findRoleById(id));
     }
 
     @PostMapping("/roles")
     @ResponseStatus(HttpStatus.CREATED)
-    public RoleVO createRole(
+    public Result<RoleVO> createRole(
             @Valid
             @RequestBody RoleCreateDTO request
     ) {
         requireRoleManagementPermission();
-        return roleService.createRole(request);
+        return Result.success(
+                HttpStatus.CREATED.value(),
+                "角色创建成功",
+                roleService.createRole(request)
+        );
     }
 
     @PutMapping("/roles/{id}")
-    public RoleVO updateRole(
+    public Result<RoleVO> updateRole(
             @PathVariable String id,
             @Valid
             @RequestBody RoleUpdateDTO request
     ) {
         requireRoleManagementPermission();
-        return roleService.updateRole(id, request);
+        return Result.success(
+                roleService.updateRole(id, request)
+        );
     }
 
     @DeleteMapping("/roles/{id}")
@@ -82,35 +83,37 @@ public class RoleController {
     }
 
     @GetMapping("/permissions")
-    public List<PermissionVO> findAllPermissions() {
+    public Result<List<PermissionVO>> findAllPermissions() {
         requirePermissionManagementPermission();
-        return roleService.findAllPermissions();
+        return Result.success(roleService.findAllPermissions());
     }
 
     @GetMapping("/permissions/{id}")
-    public PermissionVO findPermissionById(
+    public Result<PermissionVO> findPermissionById(
             @PathVariable String id
     ) {
         requirePermissionManagementPermission();
-        return roleService.findPermissionById(id);
+        return Result.success(roleService.findPermissionById(id));
     }
 
     @PostMapping("/permissions")
     @ResponseStatus(HttpStatus.CREATED)
-    public PermissionVO createPermission(
+    public Result<PermissionVO> createPermission(
             @Valid
             @RequestBody
             PermissionCreateDTO request
     ) {
         requirePermissionManagementPermission();
 
-        return roleService.createPermission(
-                request
+        return Result.success(
+                HttpStatus.CREATED.value(),
+                "权限创建成功",
+                roleService.createPermission(request)
         );
     }
 
     @PutMapping("/permissions/{id}")
-    public PermissionVO updatePermission(
+    public Result<PermissionVO> updatePermission(
             @PathVariable
             String id,
             @Valid
@@ -119,9 +122,8 @@ public class RoleController {
     ) {
         requirePermissionManagementPermission();
 
-        return roleService.updatePermission(
-                id,
-                request
+        return Result.success(
+                roleService.updatePermission(id, request)
         );
     }
 
@@ -140,16 +142,15 @@ public class RoleController {
     }
 
     @GetMapping("/roles/{roleId}/permissions")
-    public Set<String> findRolePermissions(
+    public Result<Set<String>> findRolePermissions(
             @PathVariable
             String roleId
     ) {
         requireRolePermissionManagementPermission();
 
-        return roleService
-                .findPermissionCodesByRoleId(
-                        roleId
-                );
+        return Result.success(
+                roleService.findPermissionCodesByRoleId(roleId)
+        );
     }
 
     @PutMapping(

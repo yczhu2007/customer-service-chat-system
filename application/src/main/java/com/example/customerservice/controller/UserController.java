@@ -6,6 +6,7 @@ import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IUserService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,50 +30,37 @@ import com.example.customerservice.common.Result;
 @RequestMapping("/users")
 public class UserController {
 
-    private final IUserService userService;
+    @Autowired
+    private IUserService userService;
 
-    private final CurrentUser currentUser;
-
-
-    public UserController(
-            IUserService userService,
-            CurrentUser currentUser
-    ) {
-
-        this.userService =
-                userService;
-
-        this.currentUser =
-                currentUser;
-    }
+    @Autowired
+    private CurrentUser currentUser;
 
 
     @GetMapping
-    public List<UserVO> findAll() {
+    public Result<List<UserVO>> findAll() {
 
         requireUserManagementPermission();
 
-        return userService.findAll();
+        return Result.success(userService.findAll());
     }
 
 
     @GetMapping("/{id}")
-    public UserVO findById(
+    public Result<UserVO> findById(
             @PathVariable
             String id
     ) {
 
         requireUserManagementPermission();
 
-        return userService.findById(
-                id
-        );
+        return Result.success(userService.findById(id));
     }
 
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public UserVO create(
+    public Result<UserVO> create(
             @Valid
             @RequestBody
             UserCreateDTO request
@@ -80,14 +68,16 @@ public class UserController {
 
         requireUserManagementPermission();
 
-        return userService.create(
-                request
+        return Result.success(
+                HttpStatus.CREATED.value(),
+                "用户创建成功",
+                userService.create(request)
         );
     }
 
 
     @PutMapping("/{id}")
-    public UserVO update(
+    public Result<UserVO> update(
             @PathVariable
             String id,
             @Valid
@@ -97,9 +87,8 @@ public class UserController {
 
         requireUserManagementPermission();
 
-        return userService.update(
-                id,
-                request
+        return Result.success(
+                userService.update(id, request)
         );
     }
 
@@ -141,14 +130,14 @@ public class UserController {
         );
     }
     @GetMapping("/{userId}/roles")
-    public Set<String> findUserRoles(
+    public Result<Set<String>> findUserRoles(
             @PathVariable
             String userId
     ) {
         requireUserRoleManagementPermission();
 
-        return userService.findRoleCodesByUserId(
-                userId
+        return Result.success(
+                userService.findRoleCodesByUserId(userId)
         );
     }
 

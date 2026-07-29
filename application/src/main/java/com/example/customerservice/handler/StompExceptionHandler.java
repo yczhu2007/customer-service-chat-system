@@ -1,7 +1,6 @@
 package com.example.customerservice.handler;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -15,12 +14,8 @@ import java.util.Map;
  * 统一处理STOMP消息业务中的异常
  */
 @ControllerAdvice
+@Slf4j
 public class StompExceptionHandler {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    StompExceptionHandler.class
-            );
 
     /**
      * 处理主动抛出的业务参数异常
@@ -60,7 +55,7 @@ public class StompExceptionHandler {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "STOMP业务异常："
                         + exception.getMessage()
         );
@@ -109,7 +104,7 @@ public class StompExceptionHandler {
          * 详细异常只保留在服务器控制台，
          * 不发送给浏览器。
          */
-        LOGGER.error(
+        log.error(
                 "STOMP系统异常："
                         + exception.getMessage()
         );

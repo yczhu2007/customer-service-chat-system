@@ -15,8 +15,7 @@ import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.MessagePersistService;
 import com.example.customerservice.util.ChatMessageContentValidator;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -32,12 +31,8 @@ import java.util.concurrent.TimeUnit;
 
 
 @Service
+@Slf4j
 public class ChatServiceImpl implements IChatService {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    ChatServiceImpl.class
-            );
 
     private static final DefaultRedisScript<String>
             RESERVE_IDLE_AGENT_SCRIPT =
@@ -229,7 +224,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         if (assignmentLockToken == null) {
-            LOGGER.info(
+            log.info(
                     "用户分配正在处理中，忽略重复请求，userId："
                             + userId
             );
@@ -436,7 +431,7 @@ public class ChatServiceImpl implements IChatService {
                 session
         );
 
-        LOGGER.info(
+        log.info(
                 "聊天会话创建成功，sessionId："
                         + session.getId()
                         + "，用户："
@@ -546,7 +541,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "活动会话Redis索引已写入，sessionId："
                         + sessionId
         );
@@ -606,7 +601,7 @@ public class ChatServiceImpl implements IChatService {
                 this::notifyBothParties
         );
 
-        LOGGER.info(
+        log.info(
                 "客服上线，agentId={}，已恢复活动会话数={}",
                 agentId,
                 activeSessions.size()
@@ -735,7 +730,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "会话创建通知已发送，用户："
                         + session.getUserId()
                         + "，客服："
@@ -812,7 +807,7 @@ public class ChatServiceImpl implements IChatService {
             );
 
 
-            LOGGER.info(
+            log.info(
                     "忽略旧WebSocket连接断开，用户："
                             + userId
                             + "，旧连接："
@@ -911,7 +906,7 @@ public class ChatServiceImpl implements IChatService {
 
         if (!Boolean.TRUE.equals(firstSend)) {
 
-            LOGGER.info(
+            log.info(
                     "检测到重复消息，clientMsgId："
                             + message.getClientMsgId()
             );
@@ -1029,7 +1024,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "消息处理完成，messageId："
                         + message.getId()
         );
@@ -1164,7 +1159,7 @@ public class ChatServiceImpl implements IChatService {
             );
 
 
-            LOGGER.info(
+            log.info(
                     "待确认消息已保存，接收者："
                             + receiverId
                             + "，messageId："
@@ -1270,7 +1265,7 @@ public class ChatServiceImpl implements IChatService {
                         wsSessionId.isBlank()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "接收者当前离线，消息等待上线拉取："
                             + receiverId
             );
@@ -1292,7 +1287,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "消息已实时推送，等待ACK，接收者："
                         + receiverId
         );
@@ -1336,7 +1331,7 @@ public class ChatServiceImpl implements IChatService {
                         wsSessionId.isBlank()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "用户当前不在线，不拉取消息："
                             + userId
             );
@@ -1367,7 +1362,7 @@ public class ChatServiceImpl implements IChatService {
                         messageJsonList.isEmpty()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "待确认消息拉取完成，用户："
                             + userId
                             + "，数量：0"
@@ -1410,7 +1405,7 @@ public class ChatServiceImpl implements IChatService {
                 pushedCount++;
 
 
-                LOGGER.info(
+                log.info(
                         "待确认消息已重新推送，用户："
                                 + userId
                                 + "，messageId："
@@ -1419,13 +1414,13 @@ public class ChatServiceImpl implements IChatService {
 
             } catch (Exception e) {
 
-                LOGGER.info(
+                log.info(
                         "待确认消息反序列化失败："
                                 + messageJson
                 );
 
 
-                LOGGER.info(
+                log.info(
                         "失败原因："
                                 + e.getMessage()
                 );
@@ -1433,7 +1428,7 @@ public class ChatServiceImpl implements IChatService {
         }
 
 
-        LOGGER.info(
+        log.info(
                 "待确认消息拉取完成，用户："
                         + userId
                         + "，数量："
@@ -1590,7 +1585,7 @@ public class ChatServiceImpl implements IChatService {
                         break;
                     }
                 } catch (Exception exception) {
-                    LOGGER.info(
+                    log.info(
                             "检查ACK消息时忽略无效JSON："
                                     + exception.getMessage()
                     );
@@ -1625,7 +1620,7 @@ public class ChatServiceImpl implements IChatService {
                 );
 
 
-        LOGGER.info(
+        log.info(
                 "ACK后删除待确认消息，messageId："
                         + messageId
                         + "，删除数量："
@@ -1633,7 +1628,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "客户端ACK处理完成，messageId："
                         + messageId
                         + "，接收者："
@@ -1838,7 +1833,7 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "会话结束通知已发送，用户："
                         + session.getUserId()
                         + "，客服："
@@ -1861,7 +1856,7 @@ public class ChatServiceImpl implements IChatService {
                         agentId.isBlank()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "处理等待队列失败：agentId为空"
             );
 
@@ -1873,7 +1868,7 @@ public class ChatServiceImpl implements IChatService {
          * 2. 只有仍在线且负载为0的客服才能被原子占用。
          */
         if (!reserveSpecificAgent(agentId)) {
-            LOGGER.info(
+            log.info(
                     "客服已经离线或正在处理会话，不处理等待队列："
                             + agentId
             );
@@ -1903,7 +1898,7 @@ public class ChatServiceImpl implements IChatService {
 
             if (waitingUserId == null) {
                 refreshWaitingPositions();
-                LOGGER.info(
+                log.info(
                         "当前没有等待用户"
                 );
                 return;
@@ -1935,7 +1930,7 @@ public class ChatServiceImpl implements IChatService {
 
                 if (oldSession != null) {
                     rollbackAssignmentReservation(waitingUserId, agentId, false);
-                    LOGGER.info(
+                    log.info(
                             "跳过已经有活动会话的用户："
                                     + waitingUserId
                     );
@@ -1964,7 +1959,7 @@ public class ChatServiceImpl implements IChatService {
                 );
 
 
-                LOGGER.info(
+                log.info(
                         "等待用户分配成功，用户："
                                 + waitingUserId
                                 + "，客服："
@@ -2030,7 +2025,7 @@ public class ChatServiceImpl implements IChatService {
                     chatSessionMapper.findActiveByUserId(userId);
             if (activeSession != null
                     && agentId.equals(activeSession.getAgentId())) {
-                LOGGER.warn(
+                log.warn(
                         "会话已写入MySQL但Redis状态尚未确认，将由对账任务修复，sessionId={}",
                         activeSession.getId()
                 );
@@ -2042,7 +2037,7 @@ public class ChatServiceImpl implements IChatService {
                     requeueWhenNotCreated
             );
         } catch (Exception reconciliationException) {
-            LOGGER.error(
+            log.error(
                     "确认会话创建状态失败，保留分配pending等待后续对账，userId={}",
                     userId,
                     reconciliationException
@@ -2177,7 +2172,7 @@ public class ChatServiceImpl implements IChatService {
                         false
                 );
             } catch (Exception exception) {
-                LOGGER.error(
+                log.error(
                         "会话结束状态对账失败，sessionId={}",
                         sessionId,
                         exception
@@ -2262,7 +2257,7 @@ public class ChatServiceImpl implements IChatService {
                 );
 
 
-        LOGGER.info(
+        log.info(
                 "聊天历史查询成功，sessionId："
                         + sessionId
                         + "，查询者："
@@ -2314,7 +2309,7 @@ public class ChatServiceImpl implements IChatService {
                 )
         ) {
 
-            LOGGER.info(
+            log.info(
                     "忽略旧WebSocket连接的心跳，用户："
                             + userId
                             + "，wsSessionId："

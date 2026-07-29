@@ -12,8 +12,8 @@ import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.TokenService;
 import com.example.customerservice.util.PasswordUtil;
 import com.example.customerservice.common.Result;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
 import org.springframework.http.HttpStatus;
 import org.springframework.messaging.handler.annotation.Header;
@@ -35,57 +35,30 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/chat")
+@Slf4j
 public class ChatController {
 
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    ChatController.class
-            );
+    @Autowired
+    private IChatService chatService;
 
-    private final IChatService chatService;
+    @Autowired
+    private SysUserMapper sysUserMapper;
 
-    private final SysUserMapper sysUserMapper;
+    @Autowired
+    private SysUserRoleMapper sysUserRoleMapper;
 
-    private final SysUserRoleMapper sysUserRoleMapper;
+    @Autowired
+    private SysRolePermissionMapper sysRolePermissionMapper;
 
-    private final SysRolePermissionMapper sysRolePermissionMapper;
+    @Autowired
+    private TokenService tokenService;
 
-    private final TokenService tokenService;
-
-    private final CurrentUser currentUser;
-
-
-    public ChatController(
-            IChatService chatService,
-            SysUserMapper sysUserMapper,
-            SysUserRoleMapper sysUserRoleMapper,
-            SysRolePermissionMapper sysRolePermissionMapper,
-            TokenService tokenService,
-            CurrentUser currentUser
-    ) {
-
-        this.chatService =
-                chatService;
-
-        this.sysUserMapper =
-                sysUserMapper;
-
-        this.sysUserRoleMapper =
-                sysUserRoleMapper;
-
-        this.sysRolePermissionMapper =
-                sysRolePermissionMapper;
-
-        this.tokenService =
-                tokenService;
-
-        this.currentUser =
-                currentUser;
-    }
+    @Autowired
+    private CurrentUser currentUser;
 
 
     @PostMapping("/login")
-    public LoginDTO login(
+    public Result<LoginDTO> login(
             @Valid
             @RequestBody
             LoginDTO request
@@ -248,22 +221,16 @@ public class ChatController {
         /*
          * 9. 返回登录结果。
          */
-        return LoginDTO.success(
-
+        LoginDTO response = LoginDTO.success(
                 token,
-
                 "Bearer",
-
-                RedisConstants
-                        .TOKEN_TTL_MINUTES
-                        * 60,
-
+                RedisConstants.TOKEN_TTL_MINUTES * 60,
                 userId,
-
                 user.getUsername(),
-
                 roleCodes
         );
+
+        return Result.success(response);
     }
     /**
      * 客户端订阅/user/queue/chat时触发。
@@ -305,7 +272,7 @@ public class ChatController {
 
         if (principal == null) {
 
-            LOGGER.info(
+            log.info(
                     "订阅聊天队列失败：没有用户身份"
             );
 
@@ -333,7 +300,7 @@ public class ChatController {
                         roleCodes.isEmpty()
         ) {
 
-            LOGGER.info(
+            log.info(
                     "订阅聊天队列失败：用户没有角色，userId："
                             + userId
             );
@@ -352,7 +319,7 @@ public class ChatController {
                 )
         ) {
 
-            LOGGER.info(
+            log.info(
                     "客服订阅聊天队列，不触发用户接入，agentId："
                             + userId
             );
@@ -370,7 +337,7 @@ public class ChatController {
                 )
         ) {
 
-            LOGGER.info(
+            log.info(
                     "管理员订阅聊天队列，不触发用户接入，userId："
                             + userId
             );
@@ -401,7 +368,7 @@ public class ChatController {
         }
 
 
-        LOGGER.info(
+        log.info(
                 "当前角色不允许进入聊天流程，userId："
                         + userId
         );
@@ -505,7 +472,7 @@ public class ChatController {
                 chatService.handleMessage(message);
 
 
-        LOGGER.info(
+        log.info(
                 "handleSend处理结果："
                         + result
         );
@@ -560,7 +527,7 @@ public class ChatController {
                 request.getSessionId(),
                 agentId
         );
-        LOGGER.info(
+        log.info(
                 "结束会话请求处理完成，sessionId："
                         + request.getSessionId()
                         + "，操作者："
@@ -653,7 +620,7 @@ public class ChatController {
         );
 
 
-        LOGGER.info(
+        log.info(
                 "历史记录已返回给："
                         + principal.getName()
         );

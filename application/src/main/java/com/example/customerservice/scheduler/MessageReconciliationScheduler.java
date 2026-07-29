@@ -2,10 +2,9 @@ package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.MessagePersistService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -13,12 +12,8 @@ import org.springframework.stereotype.Component;
  * 定时补写异步落库失败的聊天消息。
  */
 @Component
+@Slf4j
 public class MessageReconciliationScheduler {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    MessageReconciliationScheduler.class
-            );
 
     private final MessagePersistService
             messagePersistService;
@@ -47,7 +42,7 @@ public class MessageReconciliationScheduler {
                     .retryFailedMessages();
             checkBacklog();
         } catch (Exception exception) {
-            LOGGER.error(
+            log.error(
                     "定时补写聊天消息失败",
                     exception
             );
@@ -63,7 +58,7 @@ public class MessageReconciliationScheduler {
         );
         if ((pendingCount != null && pendingCount >= alertThreshold)
                 || (deadLetterCount != null && deadLetterCount > 0)) {
-            LOGGER.warn(
+            log.warn(
                     "消息持久化告警：pending={}, deadletter={}, threshold={}",
                     pendingCount,
                     deadLetterCount,

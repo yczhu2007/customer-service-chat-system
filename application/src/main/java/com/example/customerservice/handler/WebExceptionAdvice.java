@@ -2,10 +2,9 @@ package com.example.customerservice.handler;
 
 import com.example.customerservice.common.Result;
 import com.example.customerservice.exception.NotFoundException;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.authz.UnauthorizedException;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -20,12 +19,8 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
  * HTTP接口统一异常处理。
  */
 @RestControllerAdvice
+@Slf4j
 public class WebExceptionAdvice {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    WebExceptionAdvice.class
-            );
 
     @ExceptionHandler(
             MethodArgumentNotValidException.class
@@ -166,7 +161,7 @@ public class WebExceptionAdvice {
     handleException(
             Exception exception
     ) {
-        LOGGER.error(
+        log.error(
                 "服务器内部异常",
                 exception
         );

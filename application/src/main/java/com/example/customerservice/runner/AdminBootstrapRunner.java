@@ -6,8 +6,7 @@ import com.example.customerservice.mapper.SysRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.util.PasswordUtil;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
@@ -26,13 +25,9 @@ import org.springframework.util.StringUtils;
  * 5. 重复启动不会重复创建数据。
  */
 @Component
+@Slf4j
 public class AdminBootstrapRunner
         implements ApplicationRunner {
-
-    private static final Logger LOGGER =
-            LoggerFactory.getLogger(
-                    AdminBootstrapRunner.class
-            );
 
     private final SysUserMapper sysUserMapper;
 
@@ -77,7 +72,7 @@ public class AdminBootstrapRunner
             ApplicationArguments arguments
     ) {
         if (!enabled) {
-            LOGGER.info(
+            log.info(
                     "默认管理员初始化功能已关闭"
             );
 
@@ -129,13 +124,13 @@ public class AdminBootstrapRunner
                 );
             }
 
-            LOGGER.info(
+            log.info(
                     "默认管理员创建成功，username："
                             + adminUsername
             );
 
         } else {
-            LOGGER.info(
+            log.info(
                     "默认管理员已经存在，username："
                             + adminUsername
             );
@@ -152,7 +147,7 @@ public class AdminBootstrapRunner
                 adminRole.getId()
         );
 
-        LOGGER.info(
+        log.info(
                 "默认管理员ADMIN角色检查完成，userId："
                         + adminUser.getId()
         );
@@ -162,7 +157,7 @@ public class AdminBootstrapRunner
          * 避免每次重启都覆盖管理员主动设置的状态。
          */
         if (!"ENABLED".equals(adminUser.getStatus())) {
-            LOGGER.info(
+            log.info(
                     "警告：默认管理员当前已被禁用，userId："
                             + adminUser.getId()
             );
