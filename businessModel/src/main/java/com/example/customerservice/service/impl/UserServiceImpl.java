@@ -176,6 +176,13 @@ public class UserServiceImpl
                 )
         );
 
+        user.setVipLevel(
+                normalizeVipLevel(
+                        request.getVipLevel(),
+                        0
+                )
+        );
+
 
         int insertedRows =
                 sysUserMapper.insert(
@@ -229,11 +236,13 @@ public class UserServiceImpl
                         request.getStatus()
                 );
 
+        boolean hasVipLevel =
+                request.getVipLevel() != null;
 
-        if (!hasUsername && !hasStatus) {
+        if (!hasUsername && !hasStatus && !hasVipLevel) {
 
             throw new IllegalArgumentException(
-                    "username和status至少需要提供一项"
+                    "username、status和vipLevel至少需要提供一项"
             );
         }
 
@@ -305,6 +314,17 @@ public class UserServiceImpl
 
             user.setStatus(
                     normalizedStatus
+            );
+        }
+
+        if (hasVipLevel) {
+            user.setVipLevel(
+                    normalizeVipLevel(
+                            request.getVipLevel(),
+                            currentUser.getVipLevel() == null
+                                    ? 0
+                                    : currentUser.getVipLevel()
+                    )
             );
         }
 
@@ -603,6 +623,12 @@ public class UserServiceImpl
                 user.getStatus()
         );
 
+        userVO.setVipLevel(
+                user.getVipLevel() == null
+                        ? 0
+                        : user.getVipLevel()
+        );
+
 
         userVO.setCreateTime(
                 user.getCreateTime()
@@ -625,6 +651,22 @@ public class UserServiceImpl
                         : roleCodes
         );
         return userVO;
+    }
+
+    private int normalizeVipLevel(
+            Integer vipLevel,
+            int defaultLevel
+    ) {
+        int normalizedLevel =
+                vipLevel == null
+                        ? defaultLevel
+                        : vipLevel;
+        if (normalizedLevel < 0 || normalizedLevel > 5) {
+            throw new IllegalArgumentException(
+                    "vipLevel必须在0到5之间"
+            );
+        }
+        return normalizedLevel;
     }
 
 

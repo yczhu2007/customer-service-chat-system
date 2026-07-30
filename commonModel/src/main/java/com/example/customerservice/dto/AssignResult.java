@@ -17,6 +17,7 @@ public class AssignResult {
     private String message;
     private ChatSessionDTO session;
     private Long waitingPosition;
+    private Integer vipLevel;
 
     public static AssignResult assigned(
             ChatSession session
@@ -55,6 +56,19 @@ public class AssignResult {
                 "WAITING_FOR_AGENT",
                 WAITING,
                 "暂无可用客服，您已进入等待队列",
+                null
+        );
+        result.setWaitingPosition(waitingPosition);
+        return result;
+    }
+
+    public static AssignResult vipCallbackRequired(
+            Long waitingPosition
+    ) {
+        AssignResult result = of(
+                "VIP_CALLBACK_REQUIRED",
+                WAITING,
+                "当前客服全部离线，已为VIP用户登记优先回呼",
                 null
         );
         result.setWaitingPosition(waitingPosition);
@@ -126,5 +140,13 @@ public class AssignResult {
 
     public void setWaitingPosition(Long waitingPosition) {
         this.waitingPosition = waitingPosition;
+    }
+
+    public Integer getVipLevel() {
+        return vipLevel;
+    }
+
+    public void setVipLevel(Integer vipLevel) {
+        this.vipLevel = vipLevel;
     }
 }

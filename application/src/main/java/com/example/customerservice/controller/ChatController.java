@@ -261,6 +261,37 @@ public class ChatController {
                 "下线成功"
         );
     }
+
+    /** 管理员将指定客服加入VIP坐席技能组。 */
+    @PutMapping("/agents/{agentId}/vip-skill")
+    public Result<Void> enableAgentVipSkill(
+            @PathVariable String agentId
+    ) {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        chatService.setAgentVipSkill(agentId, true);
+        return Result.successMessage("已加入VIP坐席技能组");
+    }
+
+    /** 管理员将指定客服移出VIP坐席技能组。 */
+    @DeleteMapping("/agents/{agentId}/vip-skill")
+    public Result<Void> disableAgentVipSkill(
+            @PathVariable String agentId
+    ) {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        chatService.setAgentVipSkill(agentId, false);
+        return Result.successMessage("已移出VIP坐席技能组");
+    }
+
+    /** 管理员查询当前VIP坐席技能组。 */
+    @GetMapping("/agents/vip-skill")
+    public Result<Set<String>> findVipSkillAgents() {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        return Result.success(chatService.findVipSkillAgentIds());
+    }
+
     @MessageMapping("/chat.send")
     public void handleSend(
             @Valid

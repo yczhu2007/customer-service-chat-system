@@ -7,11 +7,25 @@ public class RedisConstants {
     public static final int AGENT_MAX_CONCURRENCY = 5;
     /** 等待用户 ZSET，score 为入队时间戳。 */
     public static final String QUEUE_PENDING = "queue:pending";
+    /** 等待用户真实入队时间，避免VIP加权score影响超时判断。 */
+    public static final String QUEUE_ENQUEUED_AT = "queue:enqueued-at";
+    /** 排队用户VIP等级Hash，供Lua分配和超时任务读取。 */
+    public static final String QUEUE_VIP_LEVEL = "queue:vip-level";
     /** 保存上一次入队 score，用于在同一毫秒内生成严格递增的 FIFO score。 */
     public static final String QUEUE_SEQUENCE = "queue:sequence";
+    /** VIP用户排队score的等级偏移量。 */
+    public static final long VIP_QUEUE_PRIORITY_OFFSET = 1_000_000_000_000L;
     private static final String AGENT_PREFIX = "agent:";
     private static final String AGENT_SESSIONS_SUFFIX = ":sessions";
     public static final String AGENT_RECONNECT_GRACE = "agent:reconnect:grace";
+    /** 具有VIP接待技能的客服集合。 */
+    public static final String AGENT_SKILL_VIP = "agent:skill:vip";
+    /** VIP用户等待时长统计，member为sessionId，score为毫秒。 */
+    public static final String STATS_VIP_WAIT = "stats:vip:wait";
+    /** VIP用户会话解决时长统计，member为sessionId，score为毫秒。 */
+    public static final String STATS_VIP_RESOLVE = "stats:vip:resolve";
+    /** 全部客服离线时等待回呼的VIP用户。 */
+    public static final String VIP_CALLBACK_PENDING = "vip:callback:pending";
     public static final String CHAT_ASSIGN_LOCK = "chat:assign:lock:";
     public static final long CHAT_ASSIGN_LOCK_TTL_SECONDS = 30L;
     public static final String ASSIGNMENT_PENDING = "assignment:pending";

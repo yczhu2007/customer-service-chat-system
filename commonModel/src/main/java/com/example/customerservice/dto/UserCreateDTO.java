@@ -1,6 +1,8 @@
 package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 /**
@@ -24,6 +26,10 @@ public class UserCreateDTO {
             message = "用户状态只能是ENABLED或DISABLED"
     )
     private String status;
+
+    @Min(value = 0, message = "VIP等级不能小于0")
+    @Max(value = 5, message = "VIP等级不能大于5")
+    private Integer vipLevel;
 
     public String getId() {
 
@@ -78,5 +84,13 @@ public class UserCreateDTO {
     ) {
 
         this.status = status;
+    }
+
+    public Integer getVipLevel() {
+        return vipLevel;
+    }
+
+    public void setVipLevel(Integer vipLevel) {
+        this.vipLevel = vipLevel;
     }
 }

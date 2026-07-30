@@ -7,6 +7,7 @@ import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
 
 import java.util.List;
+import java.util.Set;
 
 
 public interface IChatService {
@@ -24,6 +25,12 @@ public interface IChatService {
      * 客服下线
      */
     void agentOffline(String agentId);
+
+    /** 管理VIP坐席技能组。 */
+    void setAgentVipSkill(String agentId, boolean enabled);
+
+    /** 查询当前VIP坐席技能组。 */
+    Set<String> findVipSkillAgentIds();
 
     String findIdleAgent(String userId);
 

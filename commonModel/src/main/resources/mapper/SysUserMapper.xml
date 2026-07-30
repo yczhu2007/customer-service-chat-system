@@ -15,6 +15,7 @@
             username,
             password,
             status,
+            vip_level,
             create_time,
             update_time
         FROM sys_user
@@ -36,6 +37,10 @@
 
             <if test="status != null and status != ''">
                 status = #{status},
+            </if>
+
+            <if test="vipLevel != null">
+                vip_level = #{vipLevel},
             </if>
 
         </set>
