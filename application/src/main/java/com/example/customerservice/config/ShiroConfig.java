@@ -143,9 +143,8 @@ public class ShiroConfig {
 
 
         /*
-         * WebSocket握手暂时允许匿名访问。
-         *
-         * 后续在WebSocket握手拦截器中校验Token。
+         * WebSocket 握手请求不经过 HTTP Token 过滤器，
+         * 由 WebSocket 握手拦截器负责校验 Token。
          */
         filterChain.put(
                 "/ws/chat",

@@ -5,25 +5,4 @@
 
 <mapper namespace="com.example.customerservice.mapper.ChatMessageMapper">
 
-    <select id="findBySessionId"
-            resultType="com.example.customerservice.domain.ChatMessage">
-
-        SELECT
-        id,
-        session_id,
-        sender_id,
-        sender_role,
-        type,
-        content,
-        client_msg_id,
-        create_time
-
-        FROM chat_message
-
-        WHERE session_id = #{sessionId}
-
-        ORDER BY create_time ASC
-
-    </select>
-
 </mapper>
