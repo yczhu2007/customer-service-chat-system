@@ -2,6 +2,8 @@ package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 
 /**
  * 修改系统用户请求。
@@ -27,6 +29,10 @@ public class UserUpdateDTO {
     )
     private String status;
 
+    @Min(value = 0, message = "VIP等级不能小于0")
+    @Max(value = 5, message = "VIP等级不能大于5")
+    private Integer vipLevel;
+
     public String getUsername() {
         return username;
     }
@@ -45,5 +51,13 @@ public class UserUpdateDTO {
             String status
     ) {
         this.status = status;
+    }
+
+    public Integer getVipLevel() {
+        return vipLevel;
+    }
+
+    public void setVipLevel(Integer vipLevel) {
+        this.vipLevel = vipLevel;
     }
 }

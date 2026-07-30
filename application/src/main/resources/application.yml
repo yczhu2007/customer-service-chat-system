@@ -32,8 +32,11 @@ app:
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
   chat:
     agent-reconnect-grace-seconds: ${CHAT_AGENT_RECONNECT_GRACE_SECONDS:20}
+    vip:
+      reserved-slots: ${CHAT_VIP_RESERVED_SLOTS:1}
     persist:
       alert-threshold: ${CHAT_PERSIST_ALERT_THRESHOLD:20}
     queue:
       timeout-seconds: ${CHAT_QUEUE_TIMEOUT_SECONDS:300}
+      vip-timeout-seconds: ${CHAT_VIP_QUEUE_TIMEOUT_SECONDS:120}
       sweep-delay-ms: ${CHAT_QUEUE_SWEEP_DELAY_MS:15000}

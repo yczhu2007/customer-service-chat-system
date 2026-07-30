@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS sys_user
     password    VARCHAR(255) NOT NULL COMMENT 'PBKDF2密码哈希',
     status      VARCHAR(16)  NOT NULL DEFAULT 'ENABLED'
         COMMENT '用户状态：ENABLED、DISABLED',
+    vip_level   TINYINT      NOT NULL DEFAULT 0
+        COMMENT 'VIP等级：0为普通用户，1到5为VIP',
     create_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
         COMMENT '创建时间',
     update_time DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP
@@ -28,7 +30,9 @@ CREATE TABLE IF NOT EXISTS sys_user
     KEY idx_sys_user_create_time (create_time),
 
     CONSTRAINT chk_sys_user_status
-        CHECK (status IN ('ENABLED', 'DISABLED'))
+        CHECK (status IN ('ENABLED', 'DISABLED')),
+    CONSTRAINT chk_sys_user_vip_level
+        CHECK (vip_level BETWEEN 0 AND 5)
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4

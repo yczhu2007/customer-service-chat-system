@@ -17,6 +17,8 @@ public class UserVO {
 
     private String status;
 
+    private Integer vipLevel;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
@@ -71,6 +73,14 @@ public class UserVO {
     ) {
 
         this.status = status;
+    }
+
+    public Integer getVipLevel() {
+        return vipLevel;
+    }
+
+    public void setVipLevel(Integer vipLevel) {
+        this.vipLevel = vipLevel;
     }
 
 

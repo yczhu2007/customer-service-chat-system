@@ -18,6 +18,8 @@ public class SysUser {
 
     private String status;
 
+    private Integer vipLevel;
+
     private LocalDateTime createTime;
 
     private LocalDateTime updateTime;
@@ -78,6 +80,14 @@ public class SysUser {
         this.status = status;
     }
 
+    public Integer getVipLevel() {
+        return vipLevel;
+    }
+
+    public void setVipLevel(Integer vipLevel) {
+        this.vipLevel = vipLevel;
+    }
+
 
     public LocalDateTime getCreateTime() {
 
@@ -115,6 +125,7 @@ public class SysUser {
                 ", username='" + username + '\'' +
                 ", password='******'" +
                 ", status='" + status + '\'' +
+                ", vipLevel=" + vipLevel +
                 ", createTime=" + createTime +
                 ", updateTime=" + updateTime +
                 '}';

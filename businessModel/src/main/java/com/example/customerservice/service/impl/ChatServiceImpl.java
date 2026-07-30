@@ -8,6 +8,7 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.ChatMessageType;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
@@ -15,6 +16,7 @@ import com.example.customerservice.dto.ChatSessionDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.MessagePersistService;
 import com.example.customerservice.util.ChatMessageContentValidator;
@@ -28,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -41,12 +44,31 @@ public class ChatServiceImpl implements IChatService {
             RESERVE_IDLE_AGENT_SCRIPT =
             new DefaultRedisScript<>(
                     "local maxLoad = tonumber(ARGV[1]); " +
-                    "local agents = redis.call('ZRANGEBYSCORE', KEYS[1], 0, maxLoad - 1, 'LIMIT', 0, 1); " +
-                            "if #agents == 0 then return nil; end; " +
-                            "redis.call('ZINCRBY', KEYS[1], 1, agents[1]); " +
+                            "local isVip = ARGV[4] == '1'; " +
+                            "local reserved = tonumber(ARGV[5]); " +
+                            "local vipAgentCount = redis.call('SCARD', KEYS[4]); " +
+                            "local agents = redis.call('ZRANGEBYSCORE', KEYS[1], 0, maxLoad - 1); " +
+                            "local selected = nil; " +
+                            "if isVip and vipAgentCount > 0 then " +
+                            "for _, agent in ipairs(agents) do " +
+                            "if redis.call('SISMEMBER', KEYS[4], agent) == 1 then selected = agent; break; end; " +
+                            "end; end; " +
+                            "for _, agent in ipairs(agents) do " +
+                            "if selected then break; end; " +
+                            "local load = tonumber(redis.call('ZSCORE', KEYS[1], agent)); " +
+                            "local vipSkilled = redis.call('SISMEMBER', KEYS[4], agent) == 1; " +
+                            "if isVip then " +
+                            "selected = agent; break; " +
+                            "else " +
+                            "local regularLimit = maxLoad; " +
+                            "if vipSkilled then regularLimit = math.max(0, maxLoad - reserved); end; " +
+                            "if load < regularLimit then selected = agent; break; end; " +
+                            "end; end; " +
+                            "if not selected then return nil; end; " +
+                            "redis.call('ZINCRBY', KEYS[1], 1, selected); " +
                             "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[2]); " +
-                            "redis.call('HSET', KEYS[3], ARGV[2], agents[1] .. '|' .. ARGV[3]); " +
-                            "return agents[1];",
+                            "redis.call('HSET', KEYS[3], ARGV[2], selected .. '|' .. ARGV[3] .. '|' .. ARGV[3]); " +
+                            "return selected;",
                     String.class
             );
 
@@ -77,14 +99,21 @@ public class ChatServiceImpl implements IChatService {
     private static final DefaultRedisScript<String>
             RESERVE_AGENT_AND_DEQUEUE_SCRIPT =
             new DefaultRedisScript<>(
-                    "local score = redis.call('ZSCORE', KEYS[1], ARGV[1]); " +
+                            "local score = redis.call('ZSCORE', KEYS[1], ARGV[1]); " +
                             "local maxLoad = tonumber(ARGV[2]); " +
                             "if not score or tonumber(score) >= maxLoad then return nil; end; " +
+                            "local first = redis.call('ZRANGE', KEYS[2], 0, 0); " +
+                            "if #first == 0 then return nil; end; " +
+                            "local vipLevel = tonumber(redis.call('HGET', KEYS[6], first[1]) or '0'); " +
+                            "local vipSkilled = redis.call('SISMEMBER', KEYS[7], ARGV[1]) == 1; " +
+                            "local reserved = tonumber(ARGV[4]); " +
+                            "if vipLevel == 0 and vipSkilled and tonumber(score) >= math.max(0, maxLoad - reserved) then return nil; end; " +
                             "local users = redis.call('ZPOPMIN', KEYS[2], 1); " +
                             "if #users == 0 then return nil; end; " +
+                            "local enqueuedAt = redis.call('ZSCORE', KEYS[5], users[1]) or ARGV[3]; " +
                             "redis.call('ZINCRBY', KEYS[1], 1, ARGV[1]); " +
                             "redis.call('ZADD', KEYS[3], ARGV[3], users[1]); " +
-                            "redis.call('HSET', KEYS[4], users[1], ARGV[1] .. '|' .. users[2]); " +
+                            "redis.call('HSET', KEYS[4], users[1], ARGV[1] .. '|' .. users[2] .. '|' .. enqueuedAt); " +
                             "return users[1];",
                     String.class
             );
@@ -99,10 +128,15 @@ public class ChatServiceImpl implements IChatService {
                             "if not payload then return 0; end; " +
                             "local split = string.find(payload, '|', 1, true); " +
                             "if not split then return 0; end; " +
+                            "local secondSplit = string.find(payload, '|', split + 1, true); " +
+                            "if not secondSplit then return 0; end; " +
                             "local storedAgent = string.sub(payload, 1, split - 1); " +
-                            "local queueScore = tonumber(string.sub(payload, split + 1)); " +
+                            "local queueScore = tonumber(string.sub(payload, split + 1, secondSplit - 1)); " +
+                            "local enqueuedAt = tonumber(string.sub(payload, secondSplit + 1)); " +
                             "if storedAgent ~= ARGV[2] then return 0; end; " +
-                            "if ARGV[3] == '1' then redis.call('ZADD', KEYS[2], queueScore, ARGV[1]); end; " +
+                            "if ARGV[3] == '1' then " +
+                            "redis.call('ZADD', KEYS[2], queueScore, ARGV[1]); " +
+                            "redis.call('ZADD', KEYS[5], enqueuedAt, ARGV[1]); end; " +
                             "local load = redis.call('ZSCORE', KEYS[1], ARGV[2]); " +
                             "if load then redis.call('ZADD', KEYS[1], math.max(0, tonumber(load) - 1), ARGV[2]); end; " +
                             "redis.call('ZREM', KEYS[3], ARGV[1]); " +
@@ -121,18 +155,22 @@ public class ChatServiceImpl implements IChatService {
             );
 
     /**
-     * 入队时间仍作为 score 的主体；同一毫秒内通过极小增量保持严格 FIFO。
-     * 这样 QueueTimeoutSweeper 可以继续直接按毫秒时间范围清理超时用户。
+     * 同一VIP等级内按入队时间保持FIFO；VIP等级越高，score越小。
+     * 真实入队时间单独写入QUEUE_ENQUEUED_AT，供超时清扫和等待时长统计使用。
      */
     private static final DefaultRedisScript<Long>
             ENQUEUE_WAITING_USER_SCRIPT =
             new DefaultRedisScript<>(
                     "local now = tonumber(ARGV[2]); " +
-                            "local last = tonumber(redis.call('GET', KEYS[2]) or '0'); " +
-                            "local score = now; " +
+                            "local vipLevel = tonumber(ARGV[3]); " +
+                            "local offset = tonumber(ARGV[4]); " +
+                            "local last = tonumber(redis.call('HGET', KEYS[2], ARGV[3]) or '0'); " +
+                            "local score = now - vipLevel * offset; " +
                             "if last >= score then score = last + 0.001; end; " +
-                            "redis.call('SET', KEYS[2], tostring(score)); " +
+                            "redis.call('HSET', KEYS[2], ARGV[3], tostring(score)); " +
                             "redis.call('ZADD', KEYS[1], score, ARGV[1]); " +
+                            "redis.call('ZADD', KEYS[3], now, ARGV[1]); " +
+                            "redis.call('HSET', KEYS[4], ARGV[1], ARGV[3]); " +
                             "return 1;",
                     Long.class
             );
@@ -182,7 +220,9 @@ public class ChatServiceImpl implements IChatService {
     private final MessagePersistService messagePersistService;
     private final ObjectMapper objectMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final SysUserMapper sysUserMapper;
     private final long agentReconnectGraceMillis;
+    private final int vipReservedSlots;
 
     public ChatServiceImpl(
             StringRedisTemplate redisTemplate,
@@ -192,8 +232,11 @@ public class ChatServiceImpl implements IChatService {
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
             SysUserRoleMapper sysUserRoleMapper,
+            SysUserMapper sysUserMapper,
             @Value("${app.chat.agent-reconnect-grace-seconds:20}")
-            long agentReconnectGraceSeconds
+            long agentReconnectGraceSeconds,
+            @Value("${app.chat.vip.reserved-slots:1}")
+            int vipReservedSlots
     ) {
         this.redisTemplate = redisTemplate;
         this.chatSessionMapper = chatSessionMapper;
@@ -202,7 +245,12 @@ public class ChatServiceImpl implements IChatService {
         this.messagePersistService = messagePersistService;
         this.objectMapper = objectMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
+        this.sysUserMapper = sysUserMapper;
         this.agentReconnectGraceMillis = agentReconnectGraceSeconds * 1000L;
+        this.vipReservedSlots = Math.max(
+                0,
+                Math.min(vipReservedSlots, RedisConstants.AGENT_MAX_CONCURRENCY)
+        );
     }
 
     @Override
@@ -220,6 +268,8 @@ public class ChatServiceImpl implements IChatService {
             );
         }
 
+        int vipLevel = getVipLevel(userId);
+
         String assignmentLockToken =
                 acquireAssignmentLock(
                         userId
@@ -231,7 +281,10 @@ public class ChatServiceImpl implements IChatService {
                     "用户分配正在处理中，忽略重复请求，userId："
                             + userId
             );
-            return AssignResult.processing();
+            return withVipLevel(
+                    AssignResult.processing(),
+                    vipLevel
+            );
         }
 
 
@@ -283,8 +336,9 @@ public class ChatServiceImpl implements IChatService {
                 );
 
 
-                return AssignResult.reconnected(
-                        cachedSession
+                return withVipLevel(
+                        AssignResult.reconnected(cachedSession),
+                        vipLevel
                 );
             }
 
@@ -325,8 +379,9 @@ public class ChatServiceImpl implements IChatService {
             );
 
 
-            return AssignResult.reconnected(
-                    oldSession
+            return withVipLevel(
+                    AssignResult.reconnected(oldSession),
+                    vipLevel
             );
         }
         String agentId =
@@ -340,7 +395,10 @@ public class ChatServiceImpl implements IChatService {
             Long waitingPosition = getWaitingPosition(userId);
             notifyWaitingUser(userId, waitingPosition);
 
-            return AssignResult.waiting(waitingPosition);
+            return createWaitingResult(
+                    userId,
+                    waitingPosition
+            );
         }
         ChatSession session;
 
@@ -362,8 +420,9 @@ public class ChatServiceImpl implements IChatService {
         );
 
 
-        return AssignResult.assigned(
-                session
+        return withVipLevel(
+                AssignResult.assigned(session),
+                vipLevel
         );
         } finally {
             releaseAssignmentLock(
@@ -410,6 +469,8 @@ public class ChatServiceImpl implements IChatService {
         cacheActiveSessionState(
                 session
         );
+
+        recordVipWaitTime(session);
 
         log.info(
                 "聊天会话创建成功，sessionId："
@@ -488,6 +549,11 @@ public class ChatServiceImpl implements IChatService {
                     session.getCreateTime().toString()
             );
         }
+
+        sessionMeta.put(
+                "vipLevel",
+                String.valueOf(getVipLevel(userId))
+        );
 
 
         redisTemplate.opsForHash().putAll(
@@ -616,27 +682,31 @@ public class ChatServiceImpl implements IChatService {
     public String findIdleAgent(String userId) {
 
         /*
-         * 原子查询并占用负载等于0的客服。
+         * 原子查询并占用尚未达到最大并发数的最低负载客服。
          *
          * score = 0：
          * 当前没有活动会话，可以接用户。
          *
-         * score >= 1：
-         * 已经在处理会话，不能继续分配。
+         * score为1到4：
+         * 仍有容量，可以继续分配；score达到5后停止分配。
          */
+        int vipLevel = getVipLevel(userId);
         return redisTemplate.execute(
                 RESERVE_IDLE_AGENT_SCRIPT,
                 List.of(
                         RedisConstants.AGENT_LOAD,
                         RedisConstants.ASSIGNMENT_PENDING,
-                        RedisConstants.ASSIGNMENT_PENDING_PAYLOAD
+                        RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
+                        RedisConstants.AGENT_SKILL_VIP
                 ),
                 String.valueOf(
                         RedisConstants
                                 .AGENT_MAX_CONCURRENCY
                 ),
                 userId,
-                String.valueOf(System.currentTimeMillis())
+                String.valueOf(System.currentTimeMillis()),
+                vipLevel > 0 ? "1" : "0",
+                String.valueOf(vipReservedSlots)
         );
     }
 
@@ -654,10 +724,14 @@ public class ChatServiceImpl implements IChatService {
                 ENQUEUE_WAITING_USER_SCRIPT,
                 List.of(
                         RedisConstants.QUEUE_PENDING,
-                        RedisConstants.QUEUE_SEQUENCE
+                        RedisConstants.QUEUE_SEQUENCE,
+                        RedisConstants.QUEUE_ENQUEUED_AT,
+                        RedisConstants.QUEUE_VIP_LEVEL
                 ),
                 userId,
-                String.valueOf(System.currentTimeMillis())
+                String.valueOf(System.currentTimeMillis()),
+                String.valueOf(getVipLevel(userId)),
+                String.valueOf(RedisConstants.VIP_QUEUE_PRIORITY_OFFSET)
         );
         refreshWaitingPositions();
     }
@@ -667,6 +741,9 @@ public class ChatServiceImpl implements IChatService {
                 AssignResult.assigned(
                         session
                 );
+        notice.setVipLevel(
+                getVipLevel(session.getUserId())
+        );
 
 
         /*
@@ -1749,11 +1826,15 @@ public class ChatServiceImpl implements IChatService {
                                     RedisConstants.AGENT_LOAD,
                                     RedisConstants.QUEUE_PENDING,
                                     RedisConstants.ASSIGNMENT_PENDING,
-                                    RedisConstants.ASSIGNMENT_PENDING_PAYLOAD
+                                    RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
+                                    RedisConstants.QUEUE_ENQUEUED_AT,
+                                    RedisConstants.QUEUE_VIP_LEVEL,
+                                    RedisConstants.AGENT_SKILL_VIP
                             ),
                             agentId,
                             String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY),
-                            String.valueOf(System.currentTimeMillis())
+                            String.valueOf(System.currentTimeMillis()),
+                            String.valueOf(vipReservedSlots)
                     );
 
 
@@ -1850,12 +1931,50 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.AGENT_LOAD,
                         RedisConstants.QUEUE_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING,
-                        RedisConstants.ASSIGNMENT_PENDING_PAYLOAD
+                        RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
+                        RedisConstants.QUEUE_ENQUEUED_AT
                 ),
                 userId,
                 agentId,
                 requeue ? "1" : "0"
         );
+    }
+
+    @Override
+    public void setAgentVipSkill(
+            String agentId,
+            boolean enabled
+    ) {
+        if (agentId == null || agentId.isBlank()) {
+            throw new IllegalArgumentException("agentId不能为空");
+        }
+        SysUser agent = sysUserMapper.selectById(agentId);
+        if (agent == null) {
+            throw new IllegalArgumentException("客服不存在");
+        }
+        Set<String> roleCodes = sysUserRoleMapper.findRoleCodesByUserId(agentId);
+        if (roleCodes == null || !roleCodes.contains("AGENT")) {
+            throw new IllegalArgumentException("该用户不具有AGENT角色");
+        }
+        if (enabled) {
+            redisTemplate.opsForSet().add(
+                    RedisConstants.AGENT_SKILL_VIP,
+                    agentId
+            );
+        } else {
+            redisTemplate.opsForSet().remove(
+                    RedisConstants.AGENT_SKILL_VIP,
+                    agentId
+            );
+        }
+    }
+
+    @Override
+    public Set<String> findVipSkillAgentIds() {
+        Set<String> agentIds = redisTemplate.opsForSet().members(
+                RedisConstants.AGENT_SKILL_VIP
+        );
+        return agentIds == null ? Set.of() : agentIds;
     }
 
     private void clearAssignmentReservation(String userId) {
@@ -2277,6 +2396,21 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.QUEUE_PENDING,
                         userId
                 );
+        redisTemplate.opsForZSet()
+                .remove(
+                        RedisConstants.QUEUE_ENQUEUED_AT,
+                        userId
+                );
+        redisTemplate.opsForHash()
+                .delete(
+                        RedisConstants.QUEUE_VIP_LEVEL,
+                        userId
+                );
+        redisTemplate.opsForZSet()
+                .remove(
+                        RedisConstants.VIP_CALLBACK_PENDING,
+                        userId
+                );
         if (isAgent) {
 
             handleAgentDisconnect(
@@ -2677,6 +2811,11 @@ public class ChatServiceImpl implements IChatService {
                 endTime
         );
 
+        recordVipResolveTime(
+                session,
+                endTime
+        );
+
 
         String sessionId =
                 session.getId();
@@ -2769,6 +2908,9 @@ public class ChatServiceImpl implements IChatService {
                 AssignResult.reconnected(
                         session
                 );
+        notice.setVipLevel(
+                getVipLevel(session.getUserId())
+        );
 
 
         messagingTemplate.convertAndSendToUser(
@@ -2790,7 +2932,10 @@ public class ChatServiceImpl implements IChatService {
             Long waitingPosition
     ) {
         AssignResult notice =
-                AssignResult.waiting(waitingPosition);
+                createWaitingResult(
+                        userId,
+                        waitingPosition
+                );
 
 
         messagingTemplate.convertAndSendToUser(
@@ -2950,6 +3095,13 @@ public class ChatServiceImpl implements IChatService {
                         wsSessionId
                 );
 
+        redisTemplate.opsForHash()
+                .put(
+                        userOnlineKey,
+                        "vipLevel",
+                        String.valueOf(getVipLevel(userId))
+                );
+
 
         /*
          * userId → wsSessionId
@@ -3053,5 +3205,107 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.ONLINE_HEARTBEAT,
                         userId
                 );
+    }
+
+    private int getVipLevel(String userId) {
+        if (userId == null || userId.isBlank()) {
+            return 0;
+        }
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || user.getVipLevel() == null) {
+            return 0;
+        }
+        return Math.max(
+                0,
+                Math.min(user.getVipLevel(), 5)
+        );
+    }
+
+    private AssignResult withVipLevel(
+            AssignResult result,
+            int vipLevel
+    ) {
+        result.setVipLevel(vipLevel);
+        return result;
+    }
+
+    private AssignResult createWaitingResult(
+            String userId,
+            Long waitingPosition
+    ) {
+        int vipLevel = getVipLevel(userId);
+        Long onlineAgentCount = redisTemplate.opsForZSet().zCard(
+                RedisConstants.AGENT_LOAD
+        );
+        boolean callbackRequired =
+                vipLevel > 0
+                        && (onlineAgentCount == null || onlineAgentCount == 0);
+        AssignResult result =
+                callbackRequired
+                        ? AssignResult.vipCallbackRequired(waitingPosition)
+                        : AssignResult.waiting(waitingPosition);
+        if (callbackRequired) {
+            redisTemplate.opsForZSet().add(
+                    RedisConstants.VIP_CALLBACK_PENDING,
+                    userId,
+                    System.currentTimeMillis()
+            );
+        }
+        return withVipLevel(result, vipLevel);
+    }
+
+    private void recordVipWaitTime(ChatSession session) {
+        String userId = session.getUserId();
+        Double enqueuedAt = redisTemplate.opsForZSet().score(
+                RedisConstants.QUEUE_ENQUEUED_AT,
+                userId
+        );
+        redisTemplate.opsForZSet().remove(
+                RedisConstants.QUEUE_ENQUEUED_AT,
+                userId
+        );
+        redisTemplate.opsForHash().delete(
+                RedisConstants.QUEUE_VIP_LEVEL,
+                userId
+        );
+        redisTemplate.opsForZSet().remove(
+                RedisConstants.VIP_CALLBACK_PENDING,
+                userId
+        );
+        if (enqueuedAt == null || getVipLevel(userId) <= 0) {
+            return;
+        }
+        long waitMillis = Math.max(
+                0L,
+                System.currentTimeMillis() - enqueuedAt.longValue()
+        );
+        redisTemplate.opsForZSet().add(
+                RedisConstants.STATS_VIP_WAIT,
+                session.getId(),
+                waitMillis
+        );
+    }
+
+    private void recordVipResolveTime(
+            ChatSession session,
+            LocalDateTime endTime
+    ) {
+        if (getVipLevel(session.getUserId()) <= 0
+                || session.getCreateTime() == null
+                || endTime == null) {
+            return;
+        }
+        long resolveMillis = Math.max(
+                0L,
+                Duration.between(
+                        session.getCreateTime(),
+                        endTime
+                ).toMillis()
+        );
+        redisTemplate.opsForZSet().add(
+                RedisConstants.STATS_VIP_RESOLVE,
+                session.getId(),
+                resolveMillis
+        );
     }
 }

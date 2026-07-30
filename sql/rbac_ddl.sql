@@ -207,6 +207,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_AGENT_VIP_SKILL_MANAGE',
+        'chat:agent:vip-skill:manage',
+        'VIP坐席技能组管理',
+        'API',
+        NULL,
+        '/chat/agents/**/vip-skill',
+        '允许管理员配置和查询VIP坐席技能组',
+        'ENABLED'
+    ),
+    (
         'P_CHAT_SESSION_END',
         'chat:session:end',
         '结束聊天会话',
@@ -289,4 +299,3 @@ FROM sys_permission AS permission
 WHERE permission.status = 'ENABLED'
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
-
