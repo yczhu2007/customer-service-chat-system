@@ -4,6 +4,7 @@ package com.example.customerservice.service;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AssignResult;
+import com.example.customerservice.dto.ChatHistoryPage;
 
 import java.util.List;
 
@@ -74,9 +75,11 @@ public interface IChatService {
     /**
      * 查询指定会话的聊天历史
      */
-    List<ChatMessage> getHistory(
+    ChatHistoryPage getHistory(
             String sessionId,
-            String operatorId
+            String operatorId,
+            int pageNo,
+            int pageSize
     );
 
     /**

@@ -1,28 +1,19 @@
 package com.example.customerservice.controller;
 
-import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatMessage;
-import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.*;
-import com.example.customerservice.mapper.SysRolePermissionMapper;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.IChatService;
-import com.example.customerservice.service.TokenService;
-import com.example.customerservice.util.PasswordUtil;
 import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.event.EventListener;
-import org.springframework.http.HttpStatus;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import jakarta.validation.Valid;
 
@@ -42,16 +33,7 @@ public class ChatController {
     private IChatService chatService;
 
     @Autowired
-    private SysUserMapper sysUserMapper;
-
-    @Autowired
-    private SysUserRoleMapper sysUserRoleMapper;
-
-    @Autowired
-    private SysRolePermissionMapper sysRolePermissionMapper;
-
-    @Autowired
-    private TokenService tokenService;
+    private IAuthenticationService authenticationService;
 
     @Autowired
     private CurrentUser currentUser;
@@ -63,174 +45,9 @@ public class ChatController {
             @RequestBody
             LoginDTO request
     ) {
-
-        /*
-         * 1. 检查请求参数。
-         */
-        if (
-                request == null ||
-                        !StringUtils.hasText(
-                                request.getUsername()
-                        ) ||
-                        !StringUtils.hasText(
-                                request.getPassword()
-                        )
-        ) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "用户名和密码不能为空"
-            );
-        }
-
-
-        String username =
-                request.getUsername()
-                        .trim();
-
-
-        /*
-         * 2. 从新的sys_user表查询用户。
-         */
-        SysUser user =
-                sysUserMapper.findByUsername(
-                        username
-                );
-
-
-        /*
-         * 用户不存在和密码错误返回相同提示，
-         * 防止通过接口探测用户名是否存在。
-         */
-        if (user == null) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "用户名或密码错误"
-            );
-        }
-
-
-        /*
-         * 3. 禁用用户不能登录。
-         */
-        if (
-                !"ENABLED".equals(
-                        user.getStatus()
-                )
-        ) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.FORBIDDEN,
-                    "当前用户已被禁用"
-            );
-        }
-
-
-        /*
-         * 4. 校验密码。
-         */
-        boolean passwordCorrect =
-                PasswordUtil.matches(
-
-                        request.getPassword(),
-
-                        user.getPassword()
-                );
-
-
-        if (!passwordCorrect) {
-
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "用户名或密码错误"
-            );
-        }
-
-
-        /*
-         * 5. 兼容旧明文密码。
-         *
-         * 如果数据库中还是明文密码，
-         * 第一次登录成功后自动升级为PBKDF2哈希。
-         */
-        if (
-                PasswordUtil.needsUpgrade(
-                        user.getPassword()
-                )
-        ) {
-
-            String hashedPassword =
-                    PasswordUtil.hash(
-                            request.getPassword()
-                    );
-
-
-            int updatedRows =
-                    sysUserMapper.updatePassword(
-
-                            user.getId(),
-
-                            hashedPassword
-                    );
-
-
-            if (updatedRows != 1) {
-
-                throw new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "密码安全升级失败"
-                );
-            }
-        }
-
-
-        /*
-         * 6. 查询当前用户角色。
-         */
-        Set<String> roleCodes =
-                sysUserRoleMapper
-                        .findRoleCodesByUserId(
-                                user.getId()
-                        );
-
-
-        if (roleCodes == null) {
-
-            roleCodes =
-                    Set.of();
-        }
-
-
-        /*
-         * 7. 使用sys_user.id作为真实userId。
-         */
-        String userId =
-                user.getId();
-
-
-        /*
-         * 8. 生成Token并保存到Redis。
-         */
-        String token =
-                tokenService.issueToken(
-                        userId
-                );
-
-
-        /*
-         * 9. 返回登录结果。
-         */
-        LoginDTO response = LoginDTO.success(
-                token,
-                "Bearer",
-                RedisConstants.TOKEN_TTL_MINUTES * 60,
-                userId,
-                user.getUsername(),
-                roleCodes
+        return Result.success(
+                authenticationService.login(request)
         );
-
-        return Result.success(response);
     }
     /**
      * 客户端订阅/user/queue/chat时触发。
@@ -289,10 +106,9 @@ public class ChatController {
          * 不再使用agent:load判断永久身份。
          */
         Set<String> roleCodes =
-                sysUserRoleMapper
-                        .findRoleCodesByUserId(
-                                userId
-                        );
+                authenticationService.findRoleCodesByUserId(
+                        userId
+                );
 
 
         if (
@@ -546,7 +362,7 @@ public class ChatController {
     @MessageMapping("/chat.history")
     @SendToUser("/queue/chat")
     public Map<String, Object> getHistory(
-            HistoryRequest request,
+            @Valid HistoryRequest request,
             Principal principal
     ) {
 
@@ -577,11 +393,14 @@ public class ChatController {
         /*
          * 3. 查询历史消息
          */
-        List<ChatMessageDTO> messages =
-                chatService.getHistory(
+        ChatHistoryPage historyPage = chatService.getHistory(
                         request.getSessionId(),
-                        principal.getName()
-                )
+                        principal.getName(),
+                        request.getPageNo(),
+                        request.getPageSize()
+        );
+
+        List<ChatMessageDTO> messages = historyPage.records()
                         .stream()
                         .map(
                                 ChatMessageDTO::fromEntity
@@ -612,6 +431,11 @@ public class ChatController {
                 "count",
                 messages.size()
         );
+
+        response.put("pageNo", historyPage.pageNo());
+        response.put("pageSize", historyPage.pageSize());
+        response.put("total", historyPage.total());
+        response.put("pages", historyPage.pages());
 
 
         response.put(
@@ -726,25 +550,10 @@ public class ChatController {
             String roleCode
     ) {
 
-        Set<String> roleCodes =
-                sysUserRoleMapper
-                        .findRoleCodesByUserId(
-                                userId
-                        );
-
-
-        if (
-                roleCodes == null ||
-                        !roleCodes.contains(
-                                roleCode
-                        )
-        ) {
-
-            throw new IllegalArgumentException(
-                    "当前用户缺少角色："
-                            + roleCode
-            );
-        }
+        authenticationService.requireRole(
+                userId,
+                roleCode
+        );
     }
 
 
@@ -756,24 +565,9 @@ public class ChatController {
             String permissionCode
     ) {
 
-        Set<String> permissionCodes =
-                sysRolePermissionMapper
-                        .findPermissionCodesByUserId(
-                                userId
-                        );
-
-
-        if (
-                permissionCodes == null ||
-                        !permissionCodes.contains(
-                                permissionCode
-                        )
-        ) {
-
-            throw new IllegalArgumentException(
-                    "当前用户缺少权限："
-                            + permissionCode
-            );
-        }
+        authenticationService.requirePermission(
+                userId,
+                permissionCode
+        );
     }
 }

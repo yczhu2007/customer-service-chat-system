@@ -135,7 +135,7 @@ public final class PasswordUtil {
          * 兼容现有数据库中的明文密码。
          *
          * 用户第一次登录成功后，
-         * ChatController会把它升级成哈希密码。
+         * AuthenticationService会把它升级成哈希密码。
          */
         return MessageDigest.isEqual(
 

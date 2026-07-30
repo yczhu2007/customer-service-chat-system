@@ -2,11 +2,14 @@ package com.example.customerservice.service.impl;
 
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.ChatMessageType;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AssignResult;
+import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.dto.ChatSessionDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
@@ -233,10 +236,6 @@ public class ChatServiceImpl implements IChatService {
 
 
         try {
-
-        /*
-         * 1. 优先从Redis检查已有活跃会话。
-         */
         String activeSessionKey =
                 RedisConstants.USER_ACTIVE_SESSION
                         + userId;
@@ -262,7 +261,7 @@ public class ChatServiceImpl implements IChatService {
 
             if (
                     cachedSession != null &&
-                            "ACTIVE".equals(
+                            ChatConstants.SESSION_STATUS_ACTIVE.equals(
                                     cachedSession.getStatus()
                             ) &&
                             userId.equals(
@@ -301,7 +300,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 2. Redis没有有效会话时查询MySQL，
+         * Redis没有有效会话时查询MySQL，
          * 防止Redis数据丢失后重复创建会话。
          */
         ChatSession oldSession =
@@ -330,18 +329,8 @@ public class ChatServiceImpl implements IChatService {
                     oldSession
             );
         }
-
-
-        /*
-         * 3. 查找当前可用客服。
-         */
         String agentId =
                 findIdleAgent(userId);
-
-
-        /*
-         * 4. 没有客服则进入等待队列。
-         */
         if (agentId == null) {
 
             enqueueWaitingUser(
@@ -353,11 +342,6 @@ public class ChatServiceImpl implements IChatService {
 
             return AssignResult.waiting(waitingPosition);
         }
-
-
-        /*
-         * 5. 创建会话。
-         */
         ChatSession session;
 
 
@@ -373,10 +357,6 @@ public class ChatServiceImpl implements IChatService {
         }
 
         clearAssignmentReservation(userId);
-
-        /*
-         * 6. 通知双方。
-         */
         notifyBothParties(
                 session
         );
@@ -404,7 +384,7 @@ public class ChatServiceImpl implements IChatService {
 
         session.setAgentId(agentId);
 
-        session.setStatus("ACTIVE");
+        session.setStatus(ChatConstants.SESSION_STATUS_ACTIVE);
 
         session.setCreateTime(LocalDateTime.now());
 
@@ -461,7 +441,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 1. 用户 → 当前活动会话
+         * 用户 → 当前活动会话
          *
          * user:active:session:U990
          * → 聊天会话ID
@@ -471,21 +451,11 @@ public class ChatServiceImpl implements IChatService {
                         + userId,
                 sessionId
         );
-
-
-        /*
-         * 2. 会话 → 用户
-         */
         redisTemplate.opsForValue().set(
                 RedisConstants.SESSION_USER
                         + sessionId,
                 userId
         );
-
-
-        /*
-         * 3. 会话 → 客服
-         */
         redisTemplate.opsForValue().set(
                 RedisConstants.SESSION_AGENT
                         + sessionId,
@@ -496,11 +466,6 @@ public class ChatServiceImpl implements IChatService {
                 RedisConstants.agentSessionsKey(agentId),
                 sessionId
         );
-
-
-        /*
-         * 4. 保存会话元数据
-         */
         String metaKey =
                 RedisConstants.SESSION_META
                         + sessionId;
@@ -564,7 +529,7 @@ public class ChatServiceImpl implements IChatService {
         if (indexedSessionIds != null && !indexedSessionIds.isEmpty()) {
             for (String sessionId : indexedSessionIds) {
                 ChatSession session = chatSessionMapper.selectById(sessionId);
-                if (session != null && "ACTIVE".equals(session.getStatus())) {
+                if (session != null && ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
                     activeSessions.add(session);
                 } else {
                     redisTemplate.opsForSet().remove(
@@ -579,7 +544,7 @@ public class ChatServiceImpl implements IChatService {
             activeSessions = chatSessionMapper.selectList(
                     Wrappers.<ChatSession>lambdaQuery()
                             .eq(ChatSession::getAgentId, agentId)
-                            .eq(ChatSession::getStatus, "ACTIVE")
+                            .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
                             .orderByAsc(ChatSession::getCreateTime)
             );
         }
@@ -644,7 +609,7 @@ public class ChatServiceImpl implements IChatService {
         handleOffline(
                 agentId,
                 wsSessionId,
-                "AGENT_OFFLINE"
+                ChatConstants.REASON_AGENT_OFFLINE
         );
     }
     @Override
@@ -751,11 +716,6 @@ public class ChatServiceImpl implements IChatService {
 
             return;
         }
-
-
-        /*
-         * 1. 根据断开的WebSocket连接查询用户。
-         */
         String userId =
                 redisTemplate.opsForValue()
                         .get(
@@ -775,11 +735,6 @@ public class ChatServiceImpl implements IChatService {
              */
             return;
         }
-
-
-        /*
-         * 2. 查询该用户当前最新的WebSocket连接。
-         */
         String currentWsSessionId =
                 redisTemplate.opsForValue()
                         .get(
@@ -822,13 +777,13 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 3. 当前连接真正断开，
+         * 当前连接真正断开，
          * 执行完整业务清理。
          */
         handleOffline(
                 userId,
                 wsSessionId,
-                "WEBSOCKET_DISCONNECT"
+                ChatConstants.REASON_WEBSOCKET_DISCONNECT
         );
     }
     /**
@@ -836,10 +791,6 @@ public class ChatServiceImpl implements IChatService {
      */
     @Override
     public int handleMessage(ChatMessage message) {
-
-        /*
-         * 1. 检查必要参数
-         */
         if (
                 message.getSessionId() == null ||
                         message.getSessionId().isBlank()
@@ -885,10 +836,6 @@ public class ChatServiceImpl implements IChatService {
                         message.getContent()
                 );
         message.setType(messageType.name());
-
-        /*
-         * 2. 根据clientMsgId进行消息去重
-         */
         String dedupKey =
                 RedisConstants.CLIENT_MSG_DEDUP
                         + message.getClientMsgId();
@@ -913,11 +860,6 @@ public class ChatServiceImpl implements IChatService {
 
             return 0;
         }
-
-
-        /*
-         * 3. 查询消息所属会话
-         */
         ChatSession session =
                 chatSessionMapper.selectById(
                         message.getSessionId()
@@ -935,7 +877,7 @@ public class ChatServiceImpl implements IChatService {
         }
 
 
-        if (!"ACTIVE".equals(session.getStatus())) {
+        if (!ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
 
             redisTemplate.delete(dedupKey);
 
@@ -946,7 +888,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 4. 判断发送者是不是会话参与者，
+         * 判断发送者是不是会话参与者，
          *    同时确定发送者角色
          */
         if (
@@ -971,11 +913,6 @@ public class ChatServiceImpl implements IChatService {
                     "当前用户不属于这个聊天会话"
             );
         }
-
-
-        /*
-         * 5. 生成服务器消息ID和时间
-         */
         message.setId(
                 UUID.randomUUID().toString()
         );
@@ -992,11 +929,6 @@ public class ChatServiceImpl implements IChatService {
         messagePersistService.markPending(
                 message
         );
-
-
-        /*
-         * 6. 写入Redis热缓存
-         */
         cacheMessage(message);
 
 
@@ -1008,17 +940,7 @@ public class ChatServiceImpl implements IChatService {
                 "/queue/chat",
                 receivedAcknowledgement
         );
-
-
-        /*
-         * 7. 路由并推送给接收方
-         */
         routeAndPush(message);
-
-
-        /*
-         * 8. 异步写入MySQL
-         */
         messagePersistService.persistMessageAsync(
                 message
         );
@@ -1181,10 +1103,6 @@ public class ChatServiceImpl implements IChatService {
     public void routeAndPush(
             ChatMessage message
     ) {
-
-        /*
-         * 1. 查询聊天会话
-         */
         ChatSession session =
                 chatSessionMapper.selectById(
                         message.getSessionId()
@@ -1197,11 +1115,6 @@ public class ChatServiceImpl implements IChatService {
                     "聊天会话不存在"
             );
         }
-
-
-        /*
-         * 2. 确定消息接收者
-         */
         String receiverId;
 
 
@@ -1234,7 +1147,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 3. 消息先进入待确认列表
+         * 消息先进入待确认列表
          *
          * 只有收到客户端ACK后才删除。
          */
@@ -1242,11 +1155,6 @@ public class ChatServiceImpl implements IChatService {
                 receiverId,
                 message
         );
-
-
-        /*
-         * 4. 查询接收者是否在线
-         */
         String wsSessionId =
                 redisTemplate.opsForValue().get(
                         RedisConstants.USER_WS
@@ -1255,7 +1163,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 5. 接收者离线
+         * 接收者离线
          *
          * 消息已经保存在Redis中，
          * 等待用户上线后拉取。
@@ -1273,11 +1181,6 @@ public class ChatServiceImpl implements IChatService {
 
             return;
         }
-
-
-        /*
-         * 6. 通过STOMP实时推送
-         */
         messagingTemplate.convertAndSendToUser(
                 receiverId,
                 "/queue/chat",
@@ -1301,10 +1204,6 @@ public class ChatServiceImpl implements IChatService {
     public void pullOfflineMessages(
             String userId
     ) {
-
-        /*
-         * 1. 检查参数
-         */
         if (
                 userId == null ||
                         userId.isBlank()
@@ -1314,11 +1213,6 @@ public class ChatServiceImpl implements IChatService {
                     "userId不能为空"
             );
         }
-
-
-        /*
-         * 2. 确认用户当前在线
-         */
         String wsSessionId =
                 redisTemplate.opsForValue().get(
                         RedisConstants.USER_WS
@@ -1344,11 +1238,6 @@ public class ChatServiceImpl implements IChatService {
         String offlineKey =
                 RedisConstants.OFFLINE_MSG
                         + userId;
-
-
-        /*
-         * 3. 读取消息，但不要删除
-         */
         List<String> messageJsonList =
                 redisTemplate.opsForList().range(
                         offlineKey,
@@ -1374,11 +1263,6 @@ public class ChatServiceImpl implements IChatService {
 
 
         int pushedCount = 0;
-
-
-        /*
-         * 4. 按列表顺序逐条推送
-         */
         for (String messageJson : messageJsonList) {
 
             try {
@@ -1443,10 +1327,6 @@ public class ChatServiceImpl implements IChatService {
             String messageId,
             String receiverId
     ) {
-
-        /*
-         * 1. 参数检查
-         */
         if (
                 messageId == null ||
                         messageId.isBlank()
@@ -1529,11 +1409,6 @@ public class ChatServiceImpl implements IChatService {
                 return;
             }
         }
-
-
-        /*
-         * 2. Set中已经存在当前接收者，说明这条消息已经确认过。
-         */
         Boolean alreadyAcked =
                 redisTemplate.opsForSet()
                         .isMember(
@@ -1548,7 +1423,7 @@ public class ChatServiceImpl implements IChatService {
 
 
         /*
-         * 3. 只在当前接收者自己的待确认列表中查找消息，
+         * 只在当前接收者自己的待确认列表中查找消息，
          * 防止确认其他用户的消息。
          */
         String offlineKey =
@@ -1735,7 +1610,7 @@ public class ChatServiceImpl implements IChatService {
         ChatSessionDTO notice =
                 new ChatSessionDTO();
         notice.setEvent(
-                "SESSION_CLOSED"
+                ChatConstants.EVENT_SESSION_CLOSED
         );
         notice.setSessionId(
                 sessionId
@@ -1806,7 +1681,7 @@ public class ChatServiceImpl implements IChatService {
         ChatSessionDTO notice =
                 ChatSessionDTO.fromEntity(
                         session,
-                        "SESSION_ENDED"
+                        ChatConstants.EVENT_SESSION_ENDED
                 );
         notice.setEndedBy(
                 operatorId
@@ -1847,10 +1722,6 @@ public class ChatServiceImpl implements IChatService {
     public void processNextWaitingUser(
             String agentId
     ) {
-
-        /*
-         * 1. 检查客服ID
-         */
         if (
                 agentId == null ||
                         agentId.isBlank()
@@ -1862,11 +1733,6 @@ public class ChatServiceImpl implements IChatService {
 
             return;
         }
-
-
-        /*
-         * 2. 只有仍在线且负载为0的客服才能被原子占用。
-         */
         if (!reserveSpecificAgent(agentId)) {
             log.info(
                     "客服已经离线或正在处理会话，不处理等待队列："
@@ -1874,11 +1740,6 @@ public class ChatServiceImpl implements IChatService {
             );
             return;
         }
-
-
-        /*
-         * 3. 从队列左边取出最早等待的用户。
-         */
         while (true) {
 
             String waitingUserId =
@@ -1918,9 +1779,6 @@ public class ChatServiceImpl implements IChatService {
 
 
             try {
-                /*
-                 * 4. 防止队列旧数据导致重复创建会话。
-                 */
                 ChatSession oldSession =
                         chatSessionMapper
                                 .findActiveByUserId(
@@ -2098,7 +1956,7 @@ public class ChatServiceImpl implements IChatService {
         Long activeSessionCount = chatSessionMapper.selectCount(
                 Wrappers.<ChatSession>lambdaQuery()
                         .eq(ChatSession::getAgentId, agentId)
-                        .eq(ChatSession::getStatus, "ACTIVE")
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
         );
         redisTemplate.opsForZSet().add(
                 RedisConstants.AGENT_LOAD,
@@ -2147,7 +2005,7 @@ public class ChatServiceImpl implements IChatService {
                     clearSessionFinalizePending(sessionId);
                     continue;
                 }
-                if (!RedisConstants.SESSION_STATUS_CLOSED.equals(
+                if (!ChatConstants.SESSION_STATUS_CLOSED.equals(
                         session.getStatus()
                 )) {
                     chatSessionMapper.endSession(
@@ -2156,7 +2014,7 @@ public class ChatServiceImpl implements IChatService {
                     );
                     session = chatSessionMapper.selectById(sessionId);
                     if (session == null
-                            || !RedisConstants.SESSION_STATUS_CLOSED.equals(
+                            || !ChatConstants.SESSION_STATUS_CLOSED.equals(
                             session.getStatus()
                     )) {
                         continue;
@@ -2182,14 +2040,12 @@ public class ChatServiceImpl implements IChatService {
     }
 
     @Override
-    public List<ChatMessage> getHistory(
+    public ChatHistoryPage getHistory(
             String sessionId,
-            String operatorId
+            String operatorId,
+            int pageNo,
+            int pageSize
     ) {
-
-        /*
-         * 1. 检查参数
-         */
         if (
                 sessionId == null ||
                         sessionId.isBlank()
@@ -2209,10 +2065,13 @@ public class ChatServiceImpl implements IChatService {
             );
         }
 
+        if (pageNo < 1) {
+            throw new IllegalArgumentException("页码必须大于等于1");
+        }
 
-        /*
-         * 2. 查询会话
-         */
+        if (pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("每页数量必须在1到100之间");
+        }
         ChatSession session =
                 chatSessionMapper.selectById(
                         sessionId
@@ -2224,11 +2083,6 @@ public class ChatServiceImpl implements IChatService {
                     "聊天会话不存在"
             );
         }
-
-
-        /*
-         * 3. 检查当前查询者是否属于该会话
-         */
         boolean isUser =
                 operatorId.equals(
                         session.getUserId()
@@ -2246,15 +2100,12 @@ public class ChatServiceImpl implements IChatService {
                     "当前用户无权查看这个会话的聊天记录"
             );
         }
-
-
-        /*
-         * 4. 从MySQL查询完整聊天记录
-         */
-        List<ChatMessage> messages =
-                chatMessageMapper.findBySessionId(
-                        sessionId
-                );
+        Page<ChatMessage> historyPage = chatMessageMapper.selectPage(
+                new Page<>(pageNo, pageSize),
+                Wrappers.<ChatMessage>lambdaQuery()
+                        .eq(ChatMessage::getSessionId, sessionId)
+                        .orderByAsc(ChatMessage::getCreateTime)
+        );
 
 
         log.info(
@@ -2262,12 +2113,20 @@ public class ChatServiceImpl implements IChatService {
                         + sessionId
                         + "，查询者："
                         + operatorId
-                        + "，消息数量："
-                        + messages.size()
+                        + "，页码："
+                        + pageNo
+                        + "，本页消息数量："
+                        + historyPage.getRecords().size()
         );
 
 
-        return messages;
+        return new ChatHistoryPage(
+                historyPage.getRecords(),
+                historyPage.getTotal(),
+                historyPage.getCurrent(),
+                historyPage.getSize(),
+                historyPage.getPages()
+        );
     }
     /**
      * 接收客户端心跳并续期在线状态。
@@ -2277,10 +2136,6 @@ public class ChatServiceImpl implements IChatService {
             String userId,
             String wsSessionId
     ) {
-
-        /*
-         * 1. 参数检查。
-         */
         if (
                 userId == null ||
                         userId.isBlank() ||
@@ -2290,11 +2145,6 @@ public class ChatServiceImpl implements IChatService {
 
             return;
         }
-
-
-        /*
-         * 2. 查询该用户当前最新的WebSocket连接。
-         */
         String currentWsSessionId =
                 redisTemplate.opsForValue()
                         .get(
@@ -2318,11 +2168,6 @@ public class ChatServiceImpl implements IChatService {
 
             return;
         }
-
-
-        /*
-         * 3. 统一刷新在线状态和TTL。
-         */
         refreshOnlineState(
                 userId,
                 wsSessionId
@@ -2383,7 +2228,7 @@ public class ChatServiceImpl implements IChatService {
         handleOffline(
                 userId,
                 wsSessionId,
-                "HEARTBEAT_TIMEOUT"
+                ChatConstants.REASON_HEARTBEAT_TIMEOUT
         );
     }
     /**
@@ -2411,25 +2256,20 @@ public class ChatServiceImpl implements IChatService {
                         roleCodes.contains(
                                 "AGENT"
                         );
-
-
-        /*
-         * 1. 清理在线状态。
-         */
         cleanupOnlineState(
                 userId,
                 wsSessionId
         );
 
-        if (isAgent && ("WEBSOCKET_DISCONNECT".equals(reason)
-                || "HEARTBEAT_TIMEOUT".equals(reason))) {
+        if (isAgent && (ChatConstants.REASON_WEBSOCKET_DISCONNECT.equals(reason)
+                || ChatConstants.REASON_HEARTBEAT_TIMEOUT.equals(reason))) {
             scheduleAgentReconnectGrace(userId);
             return;
         }
 
 
         /*
-         * 2. 如果是仍在排队的普通用户，
+         * 如果是仍在排队的普通用户，
          * 断线后必须从等待队列删除。
          */
         redisTemplate.opsForZSet()
@@ -2437,11 +2277,6 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.QUEUE_PENDING,
                         userId
                 );
-
-
-        /*
-         * 3. 按角色进入不同清理分支。
-         */
         if (isAgent) {
 
             handleAgentDisconnect(
@@ -2542,36 +2377,53 @@ public class ChatServiceImpl implements IChatService {
             String agentId,
             String reason
     ) {
-        List<ChatSession> activeSessions =
-                chatSessionMapper.selectList(
-                        Wrappers.<ChatSession>lambdaQuery()
-                                .eq(
-                                        ChatSession::getAgentId,
-                                        agentId
-                                )
-                                .eq(
-                                        ChatSession::getStatus,
-                                        "ACTIVE"
-                                )
-                                .orderByAsc(
-                                        ChatSession::getCreateTime
-                                )
-                );
-
-
         /*
-         * 客服已经离线，不应继续参与分配。
+         * 优先通过 Redis 反向索引获取该客服的活动会话。
+         * 缓存索引只保存 sessionId，仍需根据 ID 从 MySQL 取得
+         * 会话实体，以便执行会话最终结算和持久化状态更新。
          */
         Set<String> indexedSessionIds = redisTemplate.opsForSet().members(
                 RedisConstants.agentSessionsKey(agentId)
         );
+
+        List<ChatSession> activeSessions = new ArrayList<>();
+
         if (indexedSessionIds != null && !indexedSessionIds.isEmpty()) {
-            activeSessions = indexedSessionIds.stream()
-                    .map(chatSessionMapper::selectById)
-                    .filter(Objects::nonNull)
-                    .filter(session -> "ACTIVE".equals(session.getStatus()))
-                    .sorted(Comparator.comparing(ChatSession::getCreateTime))
-                    .toList();
+            for (String sessionId : indexedSessionIds) {
+                ChatSession session = chatSessionMapper.selectById(sessionId);
+                if (session != null && ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
+                    activeSessions.add(session);
+                } else {
+                    redisTemplate.opsForSet().remove(
+                            RedisConstants.agentSessionsKey(agentId),
+                            sessionId
+                    );
+                }
+            }
+
+            activeSessions.sort(
+                    Comparator.comparing(ChatSession::getCreateTime)
+            );
+        }
+
+        /*
+         * Redis 索引不存在、丢失或全为失效数据时，才查询 MySQL 兜底，
+         * 并在下方重新补齐 Redis 反向索引。
+         */
+        if (activeSessions.isEmpty()) {
+            activeSessions = chatSessionMapper.selectList(
+                    Wrappers.<ChatSession>lambdaQuery()
+                            .eq(ChatSession::getAgentId, agentId)
+                            .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
+                            .orderByAsc(ChatSession::getCreateTime)
+            );
+
+            for (ChatSession session : activeSessions) {
+                redisTemplate.opsForSet().add(
+                        RedisConstants.agentSessionsKey(agentId),
+                        session.getId()
+                );
+            }
         }
 
         for (ChatSession session : activeSessions) {
@@ -2585,7 +2437,7 @@ public class ChatServiceImpl implements IChatService {
             ChatSessionDTO notice =
                     ChatSessionDTO.fromEntity(
                             session,
-                            "AGENT_DISCONNECTED"
+                            ChatConstants.REASON_AGENT_DISCONNECTED
                     );
             notice.setReason(
                     reason
@@ -2803,7 +2655,7 @@ public class ChatServiceImpl implements IChatService {
                 clearSessionFinalizePending(session.getId());
                 return false;
             }
-            if (!RedisConstants.SESSION_STATUS_CLOSED.equals(
+            if (!ChatConstants.SESSION_STATUS_CLOSED.equals(
                     currentSession.getStatus()
             )) {
                 return false;
