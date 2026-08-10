@@ -5,6 +5,8 @@ import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
+import com.example.customerservice.dto.MessageReadResult;
+import com.example.customerservice.dto.MessageMutationResult;
 
 import java.util.List;
 import java.util.Set;
@@ -110,6 +112,32 @@ public interface IChatService {
             String messageId,
             String receiverId
     );
+
+    /** 持久化当前会话参与者的批量已读状态并返回剩余未读数。 */
+    MessageReadResult markMessagesRead(
+            String sessionId,
+            String lastReadMessageId,
+            String readerId
+    );
+
+    /** 查询当前会话参与者的未读消息数量。 */
+    long countUnreadMessages(
+            String sessionId,
+            String userId
+    );
+
+    /** 编辑当前用户在允许时间内发送的文本消息。 */
+    MessageMutationResult editMessage(
+            String messageId,
+            String newContent,
+            String operatorId
+    );
+
+    /** 撤回当前用户在允许时间内发送的消息。 */
+    MessageMutationResult recallMessage(
+            String messageId,
+            String operatorId
+    );
     /**
      * 处理用户或客服的WebSocket断开
      */
@@ -135,6 +163,7 @@ public interface IChatService {
     void reconcilePendingAssignments();
     void reconcilePendingSessionFinalizations();
     void reconcileActiveSessionState();
+    void handleSessionInactivityTimeout(String sessionId, long cutoffMillis);
     void registerOnline(
             String userId,
             String wsSessionId

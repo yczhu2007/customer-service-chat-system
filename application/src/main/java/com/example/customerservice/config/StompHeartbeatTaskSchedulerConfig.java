@@ -17,4 +17,16 @@ public class StompHeartbeatTaskSchedulerConfig {
         scheduler.initialize();
         return scheduler;
     }
+
+    /** 业务清扫、补偿和断线处理任务使用的默认调度器。 */
+    @Bean("taskScheduler")
+    public TaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(4);
+        scheduler.setThreadNamePrefix("chat-scheduler-");
+        scheduler.setWaitForTasksToCompleteOnShutdown(true);
+        scheduler.setAwaitTerminationSeconds(30);
+        scheduler.initialize();
+        return scheduler;
+    }
 }

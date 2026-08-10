@@ -37,6 +37,10 @@ public class ChatMessageDTO {
     private String clientMsgId;
 
     private LocalDateTime createTime;
+    private boolean edited;
+    private LocalDateTime editedAt;
+    private boolean recalled;
+    private LocalDateTime recalledAt;
 
     /**
      * 服务端处理确认状态：RECEIVED 表示已进入 Redis，
@@ -63,9 +67,13 @@ public class ChatMessageDTO {
         dto.setSenderId(message.getSenderId());
         dto.setSenderRole(message.getSenderRole());
         dto.setType(message.getType());
-        dto.setContent(message.getContent());
+        dto.setContent(Boolean.TRUE.equals(message.getRecalled()) ? null : message.getContent());
         dto.setClientMsgId(message.getClientMsgId());
         dto.setCreateTime(message.getCreateTime());
+        dto.setEdited(Boolean.TRUE.equals(message.getEdited()));
+        dto.setEditedAt(message.getEditedAt());
+        dto.setRecalled(Boolean.TRUE.equals(message.getRecalled()));
+        dto.setRecalledAt(message.getRecalledAt());
         return dto;
     }
 
@@ -140,4 +148,13 @@ public class ChatMessageDTO {
     public void setAckStatus(String ackStatus) {
         this.ackStatus = ackStatus;
     }
+
+    public boolean isEdited() { return edited; }
+    public void setEdited(boolean edited) { this.edited = edited; }
+    public LocalDateTime getEditedAt() { return editedAt; }
+    public void setEditedAt(LocalDateTime editedAt) { this.editedAt = editedAt; }
+    public boolean isRecalled() { return recalled; }
+    public void setRecalled(boolean recalled) { this.recalled = recalled; }
+    public LocalDateTime getRecalledAt() { return recalledAt; }
+    public void setRecalledAt(LocalDateTime recalledAt) { this.recalledAt = recalledAt; }
 }

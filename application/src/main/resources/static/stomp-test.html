@@ -7,7 +7,7 @@
     <style>
         body {
             font-family: Arial, sans-serif;
-            width: 700px;
+            width: 960px;
             margin: 40px auto;
         }
 
@@ -27,6 +27,22 @@
             min-height: 300px;
             background: #eeeeee;
             white-space: pre-wrap;
+        }
+
+        .panel {
+            margin-top: 18px;
+            padding: 14px;
+            border: 1px solid #cccccc;
+            border-radius: 6px;
+        }
+
+        .panel h3 {
+            margin-top: 0;
+        }
+
+        .hint {
+            color: #555555;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -52,9 +68,29 @@
 <button onclick="disconnectStomp()">
     断开
 </button>
-<hr>
 
-<h3>发送聊天消息</h3>
+<div class="panel">
+    <h3>VIP客户与客服状态</h3>
+    <p class="hint">REST操作使用上方Token。设置VIP和管理VIP技能组需要管理员Token；客服上线、离线需要客服Token。</p>
+    <p>
+        <label>用户ID：<input id="vipUserId" placeholder="例如 U001"></label>
+        <label>VIP等级：<input id="vipLevel" type="number" min="0" max="5" value="1"></label>
+        <button onclick="updateVipCustomer()">设置VIP等级</button>
+    </p>
+    <p>
+        <button onclick="setAgentOnline(true)">当前客服上线</button>
+        <button onclick="setAgentOnline(false)">当前客服离线</button>
+    </p>
+    <p>
+        <label>客服ID：<input id="vipAgentId" placeholder="例如 A001"></label>
+        <button onclick="setVipAgentSkill(true)">加入VIP技能组</button>
+        <button onclick="setVipAgentSkill(false)">移出VIP技能组</button>
+        <button onclick="queryVipAgentSkills()">查询VIP技能组</button>
+    </p>
+</div>
+
+<div class="panel">
+<h3>聊天消息与历史记录</h3>
 
 <p>
     <label>
@@ -92,6 +128,29 @@
 <button onclick="loadChatHistory()">
     加载聊天历史
 </button>
+</div>
+
+<div class="panel">
+    <h3>消息已读、编辑和撤回</h3>
+    <p class="hint">收到或发送消息后，可把服务端消息ID填入下方。页面收到聊天消息时也会自动填入最近的消息ID。</p>
+    <p>
+        <label>消息ID：<input id="messageId" placeholder="服务端返回的消息id"></label>
+    </p>
+    <p>
+        <label>编辑后内容：<input id="editedMessageContent" value="这是编辑后的消息"></label>
+    </p>
+    <button onclick="markMessageRead()">标记已读</button>
+    <button onclick="editChatMessage()">编辑消息</button>
+    <button onclick="recallChatMessage()">撤回消息</button>
+</div>
+
+<div class="panel">
+    <h3>自动分配策略测试入口</h3>
+    <p class="hint">这些策略由后端自动执行，页面提供准备入口和测试步骤。多坐席测试需要分别打开多个浏览器窗口并使用不同账号Token。</p>
+    <button onclick="showStrategyGuide('load')">最长空闲客服测试步骤</button>
+    <button onclick="showStrategyGuide('vip')">VIP优先分配测试步骤</button>
+    <button onclick="showStrategyGuide('timeout')">超时自动转分配测试步骤</button>
+</div>
 
 <div id="log"></div>
 
@@ -252,6 +311,18 @@
                     "已订阅：/user/queue/chat"
                 );
 
+                /* 已读、编辑和撤回事件统一从这个队列接收。 */
+                const messageEventSubscribeFrame =
+                    "SUBSCRIBE\n" +
+                    "id:message-event-subscription\n" +
+                    "destination:/user/queue/messages\n" +
+                    "ack:auto\n" +
+                    "\n" +
+                    "\u0000";
+
+                socket.send(messageEventSubscribeFrame);
+                writeLog("已订阅：/user/queue/messages");
+
 
                 /*
                  * 订阅当前连接的错误消息
@@ -335,17 +406,20 @@
                         if (
                             body["id"] &&
                             body["sessionId"] &&
-                            body["senderId"] &&
-                            body["ackStatus"] !== "RECEIVED"
+                            body["senderId"]
                         ) {
 
-                            if (AUTO_ACK) {
+                            document.getElementById("messageId").value = body["id"];
+                            document.getElementById("sessionId").value = body["sessionId"];
+
+                            /* RECEIVED/STORED是发送方状态回执，不能再当成接收消息ACK。 */
+                            if (AUTO_ACK && !body["ackStatus"]) {
 
                                 sendBusinessAck(
                                     body["id"]
                                 );
 
-                            } else {
+                            } else if (!body["ackStatus"]) {
 
                                 writeLog(
                                     "自动业务ACK已关闭，messageId："
@@ -779,6 +853,192 @@
             )
         );
     }
+
+    function requireToken() {
+        const token = document.getElementById("token").value.trim();
+        if (!token) {
+            writeLog("请先粘贴登录Token");
+            return null;
+        }
+        return token;
+    }
+
+    async function callRest(method, path, requestBody) {
+        const token = requireToken();
+        if (!token) {
+            return null;
+        }
+        const options = {
+            method: method,
+            headers: {
+                "Authorization": "Bearer " + token,
+                "Content-Type": "application/json"
+            }
+        };
+        if (requestBody !== undefined && requestBody !== null) {
+            options.body = JSON.stringify(requestBody);
+        }
+        try {
+            const response = await fetch(path, options);
+            const text = await response.text();
+            let body = text;
+            try {
+                body = text ? JSON.parse(text) : null;
+            } catch (ignored) {
+                // 非JSON响应直接显示原文。
+            }
+            writeLog(method + " " + path + "\nHTTP " + response.status + "\n"
+                + (body == null ? "" : JSON.stringify(body, null, 2)));
+            if (!response.ok) {
+                throw new Error("HTTP " + response.status);
+            }
+            return body;
+        } catch (error) {
+            writeLog("REST请求失败：" + error.message);
+            return null;
+        }
+    }
+
+    async function updateVipCustomer() {
+        const userId = document.getElementById("vipUserId").value.trim();
+        const vipLevelText = document.getElementById("vipLevel").value.trim();
+        const vipLevel = Number(vipLevelText);
+        if (!userId) {
+            writeLog("请输入需要设置VIP的用户ID");
+            return;
+        }
+        if (!Number.isInteger(vipLevel) || vipLevel < 0 || vipLevel > 5) {
+            writeLog("VIP等级必须是0到5之间的整数");
+            return;
+        }
+        await callRest(
+            "PUT",
+            "/users/" + encodeURIComponent(userId),
+            {vipLevel: vipLevel}
+        );
+    }
+
+    async function setAgentOnline(online) {
+        await callRest(
+            "POST",
+            online ? "/chat/agent/online" : "/chat/agent/offline",
+            null
+        );
+    }
+
+    async function setVipAgentSkill(enabled) {
+        const agentId = document.getElementById("vipAgentId").value.trim();
+        if (!agentId) {
+            writeLog("请输入客服ID");
+            return;
+        }
+        await callRest(
+            enabled ? "PUT" : "DELETE",
+            "/chat/agents/" + encodeURIComponent(agentId) + "/vip-skill",
+            null
+        );
+    }
+
+    async function queryVipAgentSkills() {
+        await callRest("GET", "/chat/agents/vip-skill", null);
+    }
+
+    function sendStompJson(destination, requestBody, actionName) {
+        if (socket == null || socket.readyState !== WebSocket.OPEN) {
+            writeLog("请先建立STOMP连接");
+            return false;
+        }
+        const frame =
+            "SEND\n" +
+            "destination:" + destination + "\n" +
+            "content-type:application/json\n" +
+            "\n" +
+            JSON.stringify(requestBody) +
+            "\u0000";
+        socket.send(frame);
+        writeLog(actionName + "：\n" + JSON.stringify(requestBody, null, 2));
+        return true;
+    }
+
+    function requireMessageOperationInput(requireSession) {
+        const messageId = document.getElementById("messageId").value.trim();
+        const sessionId = document.getElementById("sessionId").value.trim();
+        if (!messageId) {
+            writeLog("请输入服务端消息ID");
+            return null;
+        }
+        if (requireSession && !sessionId) {
+            writeLog("请输入会话ID");
+            return null;
+        }
+        return {messageId: messageId, sessionId: sessionId};
+    }
+
+    function markMessageRead() {
+        const input = requireMessageOperationInput(true);
+        if (!input) {
+            return;
+        }
+        sendStompJson(
+            "/app/chat.read",
+            {sessionId: input.sessionId, lastReadMessageId: input.messageId},
+            "已发送标记已读请求"
+        );
+    }
+
+    function editChatMessage() {
+        const input = requireMessageOperationInput(false);
+        if (!input) {
+            return;
+        }
+        const content = document.getElementById("editedMessageContent").value.trim();
+        if (!content) {
+            writeLog("请输入编辑后的消息内容");
+            return;
+        }
+        sendStompJson(
+            "/app/chat.message.edit",
+            {messageId: input.messageId, content: content},
+            "已发送消息编辑请求"
+        );
+    }
+
+    function recallChatMessage() {
+        const input = requireMessageOperationInput(false);
+        if (!input) {
+            return;
+        }
+        sendStompJson(
+            "/app/chat.message.recall",
+            {messageId: input.messageId},
+            "已发送消息撤回请求"
+        );
+    }
+
+    function showStrategyGuide(type) {
+        const guides = {
+            load:
+                "最长空闲客服测试：\n"
+                + "1. 分别打开两个页面，使用两个客服Token连接。\n"
+                + "2. 两个页面分别点击‘当前客服上线’。\n"
+                + "3. 再打开多个用户页面并依次连接。\n"
+                + "4. 查看SESSION_CREATED中的agentId；同负载时应分给最久未接待的客服。",
+            vip:
+                "VIP优先分配测试：\n"
+                + "1. 使用管理员Token为用户设置vipLevel，并按需配置VIP技能客服。\n"
+                + "2. 先让普通用户和VIP用户在无客服时进入等待队列。\n"
+                + "3. 客服上线后，VIP等级更高的用户应优先收到SESSION_CREATED。",
+            timeout:
+                "会话超时自动转分配测试：\n"
+                + "1. 启动前设置 CHAT_SESSION_INACTIVITY_TIMEOUT_SECONDS=60，便于测试。\n"
+                + "2. 准备两个在线客服并创建一个用户会话。\n"
+                + "3. 60秒内不要发送消息。\n"
+                + "4. 用户应先收到SESSION_CLOSED，再收到由另一客服创建的SESSION_CREATED。\n"
+                + "5. 没有其他可用客服时系统会保留原会话。"
+        };
+        writeLog(guides[type] || "未知测试类型");
+    }
+
     function disconnectStomp() {
         stopHeartbeat();
         if (

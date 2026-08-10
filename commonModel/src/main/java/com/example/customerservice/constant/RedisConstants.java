@@ -4,6 +4,8 @@ package com.example.customerservice.constant;
 public class RedisConstants {
 
     public static final String AGENT_LOAD = "agent:load";
+    /** 客服上次被分配时间，score越小表示空闲或等待分配时间越长。 */
+    public static final String AGENT_LAST_ASSIGNED = "agent:last-assigned";
     public static final int AGENT_MAX_CONCURRENCY = 5;
     /** 等待用户 ZSET，score 为入队时间戳。 */
     public static final String QUEUE_PENDING = "queue:pending";
@@ -26,15 +28,18 @@ public class RedisConstants {
     public static final String VIP_CALLBACK_PENDING = "vip:callback:pending";
     public static final String CHAT_ASSIGN_LOCK = "chat:assign:lock:";
     public static final long CHAT_ASSIGN_LOCK_TTL_SECONDS = 30L;
-    /** Prevents transfer, close and disconnect cleanup from changing one session concurrently. */
+    /** 防止转接、结束和断线清理并发修改同一会话。 */
     public static final String SESSION_OPERATION_LOCK = "session:operation:lock:";
-    public static final long SESSION_OPERATION_LOCK_TTL_SECONDS = 5L;
+    /** 会话结束或转接锁，覆盖一次完整数据库事务的正常执行时间。 */
+    public static final long SESSION_OPERATION_LOCK_TTL_SECONDS = 30L;
     public static final String ASSIGNMENT_PENDING = "assignment:pending";
     public static final String ASSIGNMENT_PENDING_PAYLOAD = "assignment:pending:payload";
     public static final String SESSION_FINALIZE_PENDING = "session:finalize:pending";
     public static final String SESSION_FINALIZE_PENDING_PAYLOAD =
             "session:finalize:pending:payload";
     public static final String SESSION_MSG = "session:msg:";
+    /** 活动会话最后一次消息时间，供会话无活动超时转分配任务扫描。 */
+    public static final String SESSION_LAST_ACTIVITY = "session:last-activity";
     public static final String CLIENT_MSG_DEDUP = "client:msg:dedup:";
     /**
      * 异步落库失败的消息。
