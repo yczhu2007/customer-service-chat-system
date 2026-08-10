@@ -13,7 +13,10 @@ import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.dto.ChatSessionDTO;
+import com.example.customerservice.dto.MessageReadResult;
+import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.mapper.ChatMessageMapper;
+import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
@@ -28,6 +31,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
@@ -46,26 +51,25 @@ public class ChatServiceImpl implements IChatService {
                     "local maxLoad = tonumber(ARGV[1]); " +
                             "local isVip = ARGV[4] == '1'; " +
                             "local reserved = tonumber(ARGV[5]); " +
+                            "local excludedAgent = ARGV[6]; " +
                             "local vipAgentCount = redis.call('SCARD', KEYS[4]); " +
                             "local agents = redis.call('ZRANGEBYSCORE', KEYS[1], 0, maxLoad - 1); " +
-                            "local selected = nil; " +
-                            "if isVip and vipAgentCount > 0 then " +
+                            "local preferVipSkill = isVip and vipAgentCount > 0; " +
+                            "local selected = nil; local selectedLoad = nil; local selectedAt = nil; " +
                             "for _, agent in ipairs(agents) do " +
-                            "if redis.call('SISMEMBER', KEYS[4], agent) == 1 then selected = agent; break; end; " +
-                            "end; end; " +
-                            "for _, agent in ipairs(agents) do " +
-                            "if selected then break; end; " +
                             "local load = tonumber(redis.call('ZSCORE', KEYS[1], agent)); " +
                             "local vipSkilled = redis.call('SISMEMBER', KEYS[4], agent) == 1; " +
-                            "if isVip then " +
-                            "selected = agent; break; " +
-                            "else " +
-                            "local regularLimit = maxLoad; " +
-                            "if vipSkilled then regularLimit = math.max(0, maxLoad - reserved); end; " +
-                            "if load < regularLimit then selected = agent; break; end; " +
-                            "end; end; " +
+                            "local eligible = agent ~= excludedAgent; " +
+                            "if preferVipSkill and not vipSkilled then eligible = false; end; " +
+                            "if not isVip and vipSkilled and load >= math.max(0, maxLoad - reserved) then eligible = false; end; " +
+                            "if eligible then " +
+                            "local assignedAt = tonumber(redis.call('ZSCORE', KEYS[5], agent) or '0'); " +
+                            "if not selected or load < selectedLoad or (load == selectedLoad and assignedAt < selectedAt) then " +
+                            "selected = agent; selectedLoad = load; selectedAt = assignedAt; end; end; " +
+                            "end; " +
                             "if not selected then return nil; end; " +
                             "redis.call('ZINCRBY', KEYS[1], 1, selected); " +
+                            "redis.call('ZADD', KEYS[5], ARGV[3], selected); " +
                             "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[2]); " +
                             "redis.call('HSET', KEYS[3], ARGV[2], selected .. '|' .. ARGV[3] .. '|' .. ARGV[3]); " +
                             "return selected;",
@@ -112,6 +116,7 @@ public class ChatServiceImpl implements IChatService {
                             "if #users == 0 then return nil; end; " +
                             "local enqueuedAt = redis.call('ZSCORE', KEYS[5], users[1]) or ARGV[3]; " +
                             "redis.call('ZINCRBY', KEYS[1], 1, ARGV[1]); " +
+                            "redis.call('ZADD', KEYS[8], ARGV[3], ARGV[1]); " +
                             "redis.call('ZADD', KEYS[3], ARGV[3], users[1]); " +
                             "redis.call('HSET', KEYS[4], users[1], ARGV[1] .. '|' .. users[2] .. '|' .. enqueuedAt); " +
                             "return users[1];",
@@ -174,6 +179,7 @@ public class ChatServiceImpl implements IChatService {
                             "redis.call('ZREM', KEYS[6], ARGV[2]); " +
                             "redis.call('HDEL', KEYS[7], ARGV[2]); " +
                             "redis.call('ZREM', KEYS[8], ARGV[2]); " +
+                            "redis.call('ZADD', KEYS[9], 'NX', ARGV[7], ARGV[1]); " +
                             "return 1;",
                     Long.class
             );
@@ -215,6 +221,7 @@ public class ChatServiceImpl implements IChatService {
                             "if score then redis.call('ZADD', KEYS[6], math.max(0, tonumber(score) - 1), ARGV[4]); end; end; end; " +
                             "redis.call('ZREM', KEYS[7], ARGV[1]); " +
                             "redis.call('HDEL', KEYS[8], ARGV[1]); " +
+                            "redis.call('ZREM', KEYS[9], ARGV[1]); " +
                             "return 1;",
                     Long.class
             );
@@ -249,6 +256,7 @@ public class ChatServiceImpl implements IChatService {
                             "redis.call('SADD', KEYS[2], ARGV[1]); " +
                             "redis.call('ZADD', KEYS[3], math.max(0, tonumber(sourceLoad) - 1), ARGV[2]); " +
                             "redis.call('ZINCRBY', KEYS[3], 1, ARGV[3]); " +
+                            "redis.call('ZADD', KEYS[6], ARGV[5], ARGV[3]); " +
                             "redis.call('SET', KEYS[4], ARGV[3]); " +
                             "redis.call('HSET', KEYS[5], 'agentId', ARGV[3]); " +
                             "return 1;",
@@ -273,6 +281,7 @@ public class ChatServiceImpl implements IChatService {
     private final StringRedisTemplate redisTemplate;
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
+    private final ChatMessageReadMapper chatMessageReadMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final MessagePersistService messagePersistService;
     private final ObjectMapper objectMapper;
@@ -282,11 +291,14 @@ public class ChatServiceImpl implements IChatService {
     private final int vipReservedSlots;
     private final long averageHandleSeconds;
     private final long vipPriorityStepMillis;
+    private final long messageRecallWindowSeconds;
+    private final long messageEditWindowSeconds;
 
     public ChatServiceImpl(
             StringRedisTemplate redisTemplate,
             ChatSessionMapper chatSessionMapper,
             ChatMessageMapper chatMessageMapper,
+            ChatMessageReadMapper chatMessageReadMapper,
             SimpMessagingTemplate messagingTemplate,
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
@@ -298,12 +310,17 @@ public class ChatServiceImpl implements IChatService {
             int vipReservedSlots,
             @Value("${app.chat.queue.average-handle-seconds:300}")
             long averageHandleSeconds,
-            @Value("${app.chat.queue.vip-priority-step-seconds:30}")
-            long vipPriorityStepSeconds
+            @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
+            long vipPriorityStepSeconds,
+            @Value("${app.chat.message.recall-window-seconds:120}")
+            long messageRecallWindowSeconds,
+            @Value("${app.chat.message.edit-window-seconds:300}")
+            long messageEditWindowSeconds
     ) {
         this.redisTemplate = redisTemplate;
         this.chatSessionMapper = chatSessionMapper;
         this.chatMessageMapper = chatMessageMapper;
+        this.chatMessageReadMapper = chatMessageReadMapper;
         this.messagingTemplate = messagingTemplate;
         this.messagePersistService = messagePersistService;
         this.objectMapper = objectMapper;
@@ -319,6 +336,8 @@ public class ChatServiceImpl implements IChatService {
                 0L,
                 vipPriorityStepSeconds * 1000L
         );
+        this.messageRecallWindowSeconds = Math.max(1L, messageRecallWindowSeconds);
+        this.messageEditWindowSeconds = Math.max(1L, messageEditWindowSeconds);
     }
 
     @Override
@@ -588,7 +607,8 @@ public class ChatServiceImpl implements IChatService {
                         metaKey,
                         RedisConstants.ASSIGNMENT_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
-                        RedisConstants.QUEUE_PENDING
+                        RedisConstants.QUEUE_PENDING,
+                        RedisConstants.SESSION_LAST_ACTIVITY
                 ),
                 sessionId,
                 userId,
@@ -597,7 +617,8 @@ public class ChatServiceImpl implements IChatService {
                 session.getCreateTime() == null
                         ? ""
                         : session.getCreateTime().toString(),
-                String.valueOf(getVipLevel(userId))
+                String.valueOf(getVipLevel(userId)),
+                String.valueOf(System.currentTimeMillis())
         );
         if (!Long.valueOf(1L).equals(committed)) {
             throw new IllegalStateException("提交活动会话Redis状态失败");
@@ -659,6 +680,16 @@ public class ChatServiceImpl implements IChatService {
                 agentId,
                 activeSessions.size()
         );
+        if (redisTemplate.opsForZSet().score(
+                RedisConstants.AGENT_LAST_ASSIGNED,
+                agentId
+        ) == null) {
+            redisTemplate.opsForZSet().add(
+                    RedisConstants.AGENT_LAST_ASSIGNED,
+                    agentId,
+                    System.currentTimeMillis()
+            );
+        }
 
         activeSessions.forEach(
                 this::notifyBothParties
@@ -702,6 +733,10 @@ public class ChatServiceImpl implements IChatService {
                 agentId
         );
         redisTemplate.opsForZSet().remove(
+                RedisConstants.AGENT_LAST_ASSIGNED,
+                agentId
+        );
+        redisTemplate.opsForZSet().remove(
                 RedisConstants.AGENT_RECONNECT_GRACE,
                 agentId
         );
@@ -712,6 +747,13 @@ public class ChatServiceImpl implements IChatService {
     }
     @Override
     public String findIdleAgent(String userId) {
+        return findIdleAgent(userId, null);
+    }
+
+    private String findIdleAgent(
+            String userId,
+            String excludedAgentId
+    ) {
 
         /*
          * 原子查询并占用尚未达到最大并发数的最低负载客服。
@@ -729,7 +771,8 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.AGENT_LOAD,
                         RedisConstants.ASSIGNMENT_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
-                        RedisConstants.AGENT_SKILL_VIP
+                        RedisConstants.AGENT_SKILL_VIP,
+                        RedisConstants.AGENT_LAST_ASSIGNED
                 ),
                 String.valueOf(
                         RedisConstants
@@ -738,7 +781,8 @@ public class ChatServiceImpl implements IChatService {
                 userId,
                 String.valueOf(System.currentTimeMillis()),
                 vipLevel > 0 ? "1" : "0",
-                String.valueOf(vipReservedSlots)
+                String.valueOf(vipReservedSlots),
+                excludedAgentId == null ? "" : excludedAgentId
         );
     }
 
@@ -969,6 +1013,15 @@ public class ChatServiceImpl implements IChatService {
 
             return 0;
         }
+
+        String operationLockToken = acquireSessionOperationLock(
+                message.getSessionId()
+        );
+        if (operationLockToken == null) {
+            redisTemplate.delete(dedupKey);
+            throw new IllegalStateException("会话正在转接、结束或执行超时处理，请稍后重试");
+        }
+        try {
         ChatSession session =
                 chatSessionMapper.selectById(
                         message.getSessionId()
@@ -1030,6 +1083,11 @@ public class ChatServiceImpl implements IChatService {
         message.setCreateTime(
                 LocalDateTime.now()
         );
+        redisTemplate.opsForZSet().add(
+                RedisConstants.SESSION_LAST_ACTIVITY,
+                message.getSessionId(),
+                System.currentTimeMillis()
+        );
 
 
         /*
@@ -1062,6 +1120,12 @@ public class ChatServiceImpl implements IChatService {
 
 
         return 1;
+        } finally {
+            releaseSessionOperationLock(
+                    message.getSessionId(),
+                    operationLockToken
+            );
+        }
     }
     /**
      * 把消息放入Redis热缓存
@@ -1619,6 +1683,283 @@ public class ChatServiceImpl implements IChatService {
                         + receiverId
         );
     }
+
+    @Override
+    @Transactional
+    public MessageReadResult markMessagesRead(
+            String sessionId,
+            String lastReadMessageId,
+            String readerId
+    ) {
+        ChatSession session = requireSessionParticipant(sessionId, readerId);
+        ChatMessage anchorMessage = chatMessageMapper.selectById(lastReadMessageId);
+        if (anchorMessage == null
+                || !sessionId.equals(anchorMessage.getSessionId())) {
+            throw new IllegalArgumentException("最后已读消息不存在或尚未完成持久化");
+        }
+        if (readerId.equals(anchorMessage.getSenderId())) {
+            throw new IllegalArgumentException("最后已读消息必须由会话对方发送");
+        }
+
+        int markedCount = chatMessageReadMapper.markReadThrough(
+                sessionId,
+                readerId,
+                lastReadMessageId,
+                LocalDateTime.now()
+        );
+        long unreadCount = chatMessageReadMapper.countUnread(
+                sessionId,
+                readerId
+        );
+        MessageReadResult result = MessageReadResult.completed(
+                sessionId,
+                readerId,
+                lastReadMessageId,
+                markedCount,
+                unreadCount
+        );
+
+        String counterpartId = readerId.equals(session.getUserId())
+                ? session.getAgentId()
+                : session.getUserId();
+        if (counterpartId != null && !counterpartId.isBlank()) {
+            messagingTemplate.convertAndSendToUser(
+                    counterpartId,
+                    "/queue/messages",
+                    result
+            );
+        }
+        return result;
+    }
+
+    @Override
+    public long countUnreadMessages(
+            String sessionId,
+            String userId
+    ) {
+        requireSessionParticipant(sessionId, userId);
+        return chatMessageReadMapper.countUnread(sessionId, userId);
+    }
+
+    @Override
+    public MessageMutationResult editMessage(
+            String messageId,
+            String newContent,
+            String operatorId
+    ) {
+        ChatMessageContentValidator.validate(ChatMessageType.TEXT.name(), newContent);
+        ChatMessage message = requireMutableOwnMessage(messageId, operatorId);
+        if (!ChatMessageType.TEXT.name().equalsIgnoreCase(message.getType())) {
+            throw new IllegalArgumentException("只有文本消息支持编辑");
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minusSeconds(messageEditWindowSeconds);
+        if (message.getCreateTime().isBefore(cutoff)) {
+            throw new IllegalArgumentException("消息已超过允许编辑的时间");
+        }
+
+        String lockToken = acquireSessionOperationLock(message.getSessionId());
+        if (lockToken == null) {
+            throw new IllegalStateException("当前会话正在执行其他操作，请稍后重试");
+        }
+        try {
+            int updated = chatMessageMapper.editOwnMessage(
+                    messageId,
+                    operatorId,
+                    newContent,
+                    now,
+                    cutoff
+            );
+            if (updated != 1) {
+                throw new IllegalStateException("消息状态已发生变化，请刷新后重试");
+            }
+            if (message.getOriginalContent() == null) {
+                message.setOriginalContent(message.getContent());
+            }
+            message.setContent(newContent);
+            message.setEdited(true);
+            message.setEditedAt(now);
+            synchronizeMutatedMessageCache(message);
+            touchSessionActivity(message.getSessionId());
+
+            MessageMutationResult result = MessageMutationResult.edited(message);
+            notifyMessageMutationCounterpart(message, result);
+            return result;
+        } finally {
+            releaseSessionOperationLock(message.getSessionId(), lockToken);
+        }
+    }
+
+    @Override
+    public MessageMutationResult recallMessage(
+            String messageId,
+            String operatorId
+    ) {
+        ChatMessage message = requireMutableOwnMessage(messageId, operatorId);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime cutoff = now.minusSeconds(messageRecallWindowSeconds);
+        if (message.getCreateTime().isBefore(cutoff)) {
+            throw new IllegalArgumentException("消息已超过允许撤回的时间");
+        }
+
+        String lockToken = acquireSessionOperationLock(message.getSessionId());
+        if (lockToken == null) {
+            throw new IllegalStateException("当前会话正在执行其他操作，请稍后重试");
+        }
+        try {
+            int updated = chatMessageMapper.recallOwnMessage(
+                    messageId,
+                    operatorId,
+                    now,
+                    cutoff
+            );
+            if (updated != 1) {
+                throw new IllegalStateException("消息状态已发生变化，请刷新后重试");
+            }
+            message.setRecalled(true);
+            message.setRecalledAt(now);
+            synchronizeMutatedMessageCache(message);
+            touchSessionActivity(message.getSessionId());
+
+            MessageMutationResult result = MessageMutationResult.recalled(message);
+            notifyMessageMutationCounterpart(message, result);
+            return result;
+        } finally {
+            releaseSessionOperationLock(message.getSessionId(), lockToken);
+        }
+    }
+
+    private ChatMessage requireMutableOwnMessage(
+            String messageId,
+            String operatorId
+    ) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("messageId不能为空");
+        }
+        if (operatorId == null || operatorId.isBlank()) {
+            throw new IllegalArgumentException("当前用户不能为空");
+        }
+        ChatMessage message = chatMessageMapper.selectById(messageId);
+        if (message == null) {
+            throw new IllegalArgumentException("消息不存在或尚未完成持久化");
+        }
+        requireSessionParticipant(message.getSessionId(), operatorId);
+        if (!operatorId.equals(message.getSenderId())) {
+            throw new IllegalArgumentException("只能编辑或撤回自己发送的消息");
+        }
+        if (Boolean.TRUE.equals(message.getRecalled())) {
+            throw new IllegalArgumentException("消息已经撤回");
+        }
+        if (message.getCreateTime() == null) {
+            throw new IllegalStateException("消息创建时间不存在");
+        }
+        return message;
+    }
+
+    private void notifyMessageMutationCounterpart(
+            ChatMessage message,
+            MessageMutationResult result
+    ) {
+        ChatSession session = chatSessionMapper.selectById(message.getSessionId());
+        if (session == null) {
+            return;
+        }
+        String counterpartId = message.getSenderId().equals(session.getUserId())
+                ? session.getAgentId()
+                : session.getUserId();
+        if (counterpartId != null && !counterpartId.isBlank()) {
+            messagingTemplate.convertAndSendToUser(
+                    counterpartId,
+                    "/queue/messages",
+                    result
+            );
+        }
+    }
+
+    private void synchronizeMutatedMessageCache(ChatMessage message) {
+        final String messageJson;
+        try {
+            messageJson = objectMapper.writeValueAsString(message);
+        } catch (Exception exception) {
+            throw new IllegalStateException("更新消息缓存时序列化失败", exception);
+        }
+        replaceMessageInRedisList(
+                RedisConstants.SESSION_MSG + message.getSessionId(),
+                message.getId(),
+                messageJson
+        );
+
+        ChatSession session = chatSessionMapper.selectById(message.getSessionId());
+        if (session == null) {
+            return;
+        }
+        String receiverId = message.getSenderId().equals(session.getUserId())
+                ? session.getAgentId()
+                : session.getUserId();
+        if (receiverId != null && !receiverId.isBlank()) {
+            replaceMessageInRedisList(
+                    RedisConstants.OFFLINE_MSG + receiverId,
+                    message.getId(),
+                    messageJson
+            );
+        }
+    }
+
+    private void replaceMessageInRedisList(
+            String key,
+            String messageId,
+            String replacementJson
+    ) {
+        List<String> cachedMessages = redisTemplate.opsForList().range(key, 0, -1);
+        if (cachedMessages == null || cachedMessages.isEmpty()) {
+            return;
+        }
+        for (int index = 0; index < cachedMessages.size(); index++) {
+            try {
+                ChatMessage cached = objectMapper.readValue(
+                        cachedMessages.get(index),
+                        ChatMessage.class
+                );
+                if (messageId.equals(cached.getId())) {
+                    redisTemplate.opsForList().set(key, index, replacementJson);
+                    return;
+                }
+            } catch (Exception exception) {
+                log.warn("跳过无法解析的消息缓存，key={}，index={}", key, index);
+            }
+        }
+    }
+
+    private void touchSessionActivity(String sessionId) {
+        redisTemplate.opsForZSet().add(
+                RedisConstants.SESSION_LAST_ACTIVITY,
+                sessionId,
+                System.currentTimeMillis()
+        );
+    }
+
+    private ChatSession requireSessionParticipant(
+            String sessionId,
+            String userId
+    ) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("当前用户不能为空");
+        }
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new IllegalArgumentException("聊天会话不存在");
+        }
+        if (!userId.equals(session.getUserId())
+                && !userId.equals(session.getAgentId())) {
+            throw new IllegalArgumentException("当前用户不属于这个聊天会话");
+        }
+        return session;
+    }
+
     @Override
     @Transactional
     public void endSessionByAgent(
@@ -1728,6 +2069,7 @@ public class ChatServiceImpl implements IChatService {
             throw new IllegalStateException("会话正在转接或结束，请稍后重试");
         }
 
+        boolean transactionCompletionRegistered = false;
         try {
 
         ChatSession session = chatSessionMapper.selectById(sessionId);
@@ -1753,26 +2095,37 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.agentSessionsKey(targetAgentId),
                         RedisConstants.AGENT_LOAD,
                         RedisConstants.SESSION_AGENT + sessionId,
-                        RedisConstants.SESSION_META + sessionId
+                        RedisConstants.SESSION_META + sessionId,
+                        RedisConstants.AGENT_LAST_ASSIGNED
                 ),
                 sessionId,
                 sourceAgentId,
                 targetAgentId,
-                String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY)
+                String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY),
+                String.valueOf(System.currentTimeMillis())
         );
         if (!Long.valueOf(1L).equals(transferred)) {
             throw new IllegalArgumentException("目标客服不在线或已达到最大接待数量");
         }
 
-        try {
-            int updatedRows = chatSessionMapper.transferSession(
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            rollbackTransferredSessionInRedis(
                     sessionId,
                     sourceAgentId,
                     targetAgentId
             );
-            if (updatedRows != 1) {
-                throw new IllegalStateException("会话归属已变化，转接失败");
-            }
+            throw new IllegalStateException("会话转接必须在数据库事务中执行");
+        }
+
+        try {
+            registerTransferTransactionSynchronization(
+                    session,
+                    sessionId,
+                    sourceAgentId,
+                    targetAgentId,
+                    operationLockToken
+            );
+            transactionCompletionRegistered = true;
         } catch (RuntimeException exception) {
             rollbackTransferredSessionInRedis(
                     sessionId,
@@ -1782,17 +2135,87 @@ public class ChatServiceImpl implements IChatService {
             throw exception;
         }
 
-        session.setAgentId(targetAgentId);
-        notifySessionTransferred(session, sourceAgentId, targetAgentId);
-        log.info(
-                "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
+        int updatedRows = chatSessionMapper.transferSession(
                 sessionId,
                 sourceAgentId,
                 targetAgentId
         );
-        } finally {
-            releaseSessionOperationLock(sessionId, operationLockToken);
+        if (updatedRows != 1) {
+            throw new IllegalStateException("会话归属已变化，转接失败");
         }
+        } finally {
+            if (!transactionCompletionRegistered) {
+                releaseSessionOperationLock(sessionId, operationLockToken);
+            }
+        }
+    }
+
+    /**
+     * Redis转接完成后一直持有会话锁，直到数据库事务最终提交或回滚。
+     * 只有数据库提交成功才向双方发送转接通知；提交失败则恢复Redis归属。
+     */
+    private void registerTransferTransactionSynchronization(
+            ChatSession session,
+            String sessionId,
+            String sourceAgentId,
+            String targetAgentId,
+            String operationLockToken
+    ) {
+        TransactionSynchronizationManager.registerSynchronization(
+                new TransactionSynchronization() {
+                    @Override
+                    public void afterCommit() {
+                        try {
+                            session.setAgentId(targetAgentId);
+                            notifySessionTransferred(
+                                    session,
+                                    sourceAgentId,
+                                    targetAgentId
+                            );
+                            log.info(
+                                    "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
+                                    sessionId,
+                                    sourceAgentId,
+                                    targetAgentId
+                            );
+                        } catch (RuntimeException exception) {
+                            log.error(
+                                    "会话已经完成转接，但发送转接通知失败，sessionId={}",
+                                    sessionId,
+                                    exception
+                            );
+                        }
+                    }
+
+                    @Override
+                    public void afterCompletion(int status) {
+                        try {
+                            if (status != TransactionSynchronization.STATUS_COMMITTED) {
+                                rollbackTransferredSessionInRedis(
+                                        sessionId,
+                                        sourceAgentId,
+                                        targetAgentId
+                                );
+                                log.warn(
+                                        "数据库事务未提交，已恢复Redis会话归属，sessionId={}",
+                                        sessionId
+                                );
+                            }
+                        } catch (RuntimeException exception) {
+                            log.error(
+                                    "数据库事务未提交且Redis转接回滚失败，等待状态补偿任务修复，sessionId={}",
+                                    sessionId,
+                                    exception
+                            );
+                        } finally {
+                            releaseSessionOperationLock(
+                                    sessionId,
+                                    operationLockToken
+                            );
+                        }
+                    }
+                }
+        );
     }
 
     private void rollbackTransferredSessionInRedis(
@@ -2002,7 +2425,8 @@ public class ChatServiceImpl implements IChatService {
                                     RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
                                     RedisConstants.QUEUE_ENQUEUED_AT,
                                     RedisConstants.QUEUE_VIP_LEVEL,
-                                    RedisConstants.AGENT_SKILL_VIP
+                                    RedisConstants.AGENT_SKILL_VIP,
+                                    RedisConstants.AGENT_LAST_ASSIGNED
                             ),
                             agentId,
                             String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY),
@@ -2371,6 +2795,101 @@ public class ChatServiceImpl implements IChatService {
     }
 
     @Override
+    public void handleSessionInactivityTimeout(
+            String sessionId,
+            long cutoffMillis
+    ) {
+        if (sessionId == null || sessionId.isBlank()) {
+            return;
+        }
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (session == null
+                || !ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
+            redisTemplate.opsForZSet().remove(
+                    RedisConstants.SESSION_LAST_ACTIVITY,
+                    sessionId
+            );
+            return;
+        }
+
+        String userId = session.getUserId();
+        String sourceAgentId = session.getAgentId();
+        String assignmentLockToken = acquireAssignmentLock(userId);
+        if (assignmentLockToken == null) {
+            return;
+        }
+
+        String targetAgentId = null;
+        try {
+            boolean userOnline = Boolean.TRUE.equals(
+                    redisTemplate.hasKey(RedisConstants.USER_WS + userId)
+            );
+            if (userOnline) {
+                targetAgentId = findIdleAgent(userId, sourceAgentId);
+                if (targetAgentId == null) {
+                    return;
+                }
+            }
+
+            boolean finalized = finalizeSession(
+                    session,
+                    sourceAgentId,
+                    cutoffMillis
+            );
+            if (!finalized) {
+                if (targetAgentId != null) {
+                    rollbackAssignmentReservation(
+                            userId,
+                            targetAgentId,
+                            false
+                    );
+                }
+                return;
+            }
+
+            notifySessionClosed(
+                    userId,
+                    sessionId,
+                    ChatConstants.REASON_SESSION_INACTIVITY_TIMEOUT
+            );
+            notifySessionClosed(
+                    sourceAgentId,
+                    sessionId,
+                    ChatConstants.REASON_SESSION_INACTIVITY_TIMEOUT
+            );
+
+            if (targetAgentId != null) {
+                try {
+                    ChatSession reassignedSession = createSession(
+                            userId,
+                            targetAgentId
+                    );
+                    notifyBothParties(reassignedSession);
+                    log.info(
+                            "会话无活动超时后已转分配，oldSessionId={}，newSessionId={}，sourceAgentId={}，targetAgentId={}",
+                            sessionId,
+                            reassignedSession.getId(),
+                            sourceAgentId,
+                            targetAgentId
+                    );
+                } catch (RuntimeException exception) {
+                    handleSessionCreationFailure(
+                            userId,
+                            targetAgentId,
+                            false
+                    );
+                    enqueueWaitingUser(userId);
+                    notifyWaitingUser(userId, getWaitingPosition(userId));
+                    throw exception;
+                }
+            }
+            dequeueAndReassign(sourceAgentId);
+        } finally {
+            releaseAssignmentLock(userId, assignmentLockToken);
+        }
+    }
+
+    @Override
     public ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
@@ -2456,7 +2975,8 @@ public class ChatServiceImpl implements IChatService {
                 historyPage.getTotal(),
                 historyPage.getCurrent(),
                 historyPage.getSize(),
-                historyPage.getPages()
+                historyPage.getPages(),
+                chatMessageReadMapper.countUnread(sessionId, operatorId)
         );
     }
     /**
@@ -2591,6 +3111,10 @@ public class ChatServiceImpl implements IChatService {
         if (isAgent) {
             redisTemplate.opsForZSet().remove(
                     RedisConstants.AGENT_LOAD,
+                    userId
+            );
+            redisTemplate.opsForZSet().remove(
+                    RedisConstants.AGENT_LAST_ASSIGNED,
                     userId
             );
         }
@@ -2822,6 +3346,10 @@ public class ChatServiceImpl implements IChatService {
                 RedisConstants.AGENT_LOAD,
                 agentId
         );
+        redisTemplate.opsForZSet().remove(
+                RedisConstants.AGENT_LAST_ASSIGNED,
+                agentId
+        );
     }
 
     private String acquireAssignmentLock(
@@ -3009,6 +3537,14 @@ public class ChatServiceImpl implements IChatService {
             ChatSession session,
             String expectedAgentId
     ) {
+        return finalizeSession(session, expectedAgentId, null);
+    }
+
+    private boolean finalizeSession(
+            ChatSession session,
+            String expectedAgentId,
+            Long inactivityCutoffMillis
+    ) {
 
         if (session == null) {
 
@@ -3041,6 +3577,15 @@ public class ChatServiceImpl implements IChatService {
         if (expectedAgentId != null
                 && !expectedAgentId.equals(latestSession.getAgentId())) {
             return false;
+        }
+        if (inactivityCutoffMillis != null) {
+            Double lastActivity = redisTemplate.opsForZSet().score(
+                    RedisConstants.SESSION_LAST_ACTIVITY,
+                    latestSession.getId()
+            );
+            if (lastActivity == null || lastActivity > inactivityCutoffMillis) {
+                return false;
+            }
         }
         session = latestSession;
 
@@ -3167,7 +3712,8 @@ public class ChatServiceImpl implements IChatService {
                         RedisConstants.agentSessionsKey(session.getAgentId()),
                         RedisConstants.AGENT_LOAD,
                         RedisConstants.SESSION_FINALIZE_PENDING,
-                        RedisConstants.SESSION_FINALIZE_PENDING_PAYLOAD
+                        RedisConstants.SESSION_FINALIZE_PENDING_PAYLOAD,
+                        RedisConstants.SESSION_LAST_ACTIVITY
                 ),
                 sessionId,
                 endTime.toString(),

@@ -44,7 +44,7 @@ public class QueueTimeoutSweeper {
             IChatService chatService,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds,
-            @Value("${app.chat.queue.vip-priority-step-seconds:30}")
+            @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
             long vipPriorityStepSeconds
     ) {
         this.redisTemplate = redisTemplate;
@@ -110,10 +110,7 @@ public class QueueTimeoutSweeper {
         chatService.refreshWaitingPositions();
     }
 
-    /**
-     * 把历史版本使用的无限VIP偏移量迁移为有限优先窗口。
-     * 普通用户到达时间足够早时，会自然排到后来到达的VIP用户之前。
-     */
+    /** 按文档规定重新计算严格的VIP等级优先分数，同等级仍按入队时间保持FIFO。 */
     private void normalizeFairPriorityScores() {
         Set<String> queuedUserIds = redisTemplate.opsForZSet().range(
                 RedisConstants.QUEUE_PENDING,

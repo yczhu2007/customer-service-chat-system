@@ -18,6 +18,11 @@ public class ChatMessage {
     private String content;
     private String clientMsgId;
     private LocalDateTime createTime;
+    private Boolean edited;
+    private LocalDateTime editedAt;
+    private String originalContent;
+    private Boolean recalled;
+    private LocalDateTime recalledAt;
 
     public String getId() {
         return id;
@@ -83,6 +88,17 @@ public class ChatMessage {
         this.createTime = createTime;
     }
 
+    public Boolean getEdited() { return edited; }
+    public void setEdited(Boolean edited) { this.edited = edited; }
+    public LocalDateTime getEditedAt() { return editedAt; }
+    public void setEditedAt(LocalDateTime editedAt) { this.editedAt = editedAt; }
+    public String getOriginalContent() { return originalContent; }
+    public void setOriginalContent(String originalContent) { this.originalContent = originalContent; }
+    public Boolean getRecalled() { return recalled; }
+    public void setRecalled(Boolean recalled) { this.recalled = recalled; }
+    public LocalDateTime getRecalledAt() { return recalledAt; }
+    public void setRecalledAt(LocalDateTime recalledAt) { this.recalledAt = recalledAt; }
+
     @Override
     public String toString() {
         return "ChatMessage{" +
@@ -94,6 +110,10 @@ public class ChatMessage {
                 ", content='" + content + '\'' +
                 ", clientMsgId='" + clientMsgId + '\'' +
                 ", createTime=" + createTime +
+                ", edited=" + edited +
+                ", editedAt=" + editedAt +
+                ", recalled=" + recalled +
+                ", recalledAt=" + recalledAt +
                 '}';
     }
 }

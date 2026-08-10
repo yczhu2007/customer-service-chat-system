@@ -51,6 +51,11 @@ CREATE TABLE IF NOT EXISTS chat_message
     content       TEXT        NOT NULL COMMENT '消息内容',
     client_msg_id VARCHAR(64) NOT NULL COMMENT '客户端幂等消息ID',
     create_time   DATETIME    NOT NULL COMMENT '服务端接收时间',
+    edited        TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否编辑过',
+    edited_at     DATETIME    NULL COMMENT '最后编辑时间',
+    original_content TEXT     NULL COMMENT '首次编辑前的原始内容，仅供审计',
+    recalled      TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否已撤回',
+    recalled_at   DATETIME    NULL COMMENT '撤回时间',
 
     PRIMARY KEY (id),
     UNIQUE KEY uk_chat_message_client_msg_id (client_msg_id),
@@ -73,3 +78,35 @@ CREATE TABLE IF NOT EXISTS chat_message
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_0900_ai_ci
     COMMENT = '客服聊天消息表';
+
+
+-- ============================================================
+-- 3. 聊天消息已读状态表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS chat_message_read
+(
+    message_id VARCHAR(64) NOT NULL COMMENT '已读消息ID',
+    session_id VARCHAR(64) NOT NULL COMMENT '所属会话ID',
+    user_id    VARCHAR(64) NOT NULL COMMENT '执行已读操作的用户ID',
+    read_time  DATETIME    NOT NULL COMMENT '已读时间',
+
+    PRIMARY KEY (message_id, user_id),
+    KEY idx_chat_message_read_session_user (session_id, user_id, read_time),
+
+    CONSTRAINT fk_chat_message_read_message
+        FOREIGN KEY (message_id)
+            REFERENCES chat_message (id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE,
+
+    CONSTRAINT fk_chat_message_read_session
+        FOREIGN KEY (session_id)
+            REFERENCES chat_session (id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_0900_ai_ci
+    COMMENT = '聊天消息已读状态表';

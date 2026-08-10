@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.ChatMessageReadMapper">
+
+    <insert id="markReadThrough">
+        INSERT IGNORE INTO chat_message_read
+            (message_id, session_id, user_id, read_time)
+        SELECT message.id,
+               message.session_id,
+               #{userId},
+               #{readTime}
+        FROM chat_message message
+        INNER JOIN chat_message anchor
+                ON anchor.id = #{lastReadMessageId}
+               AND anchor.session_id = #{sessionId}
+        WHERE message.session_id = #{sessionId}
+          AND message.sender_id != #{userId}
+          AND (
+                message.create_time &lt; anchor.create_time
+                OR (
+                    message.create_time = anchor.create_time
+                    AND message.id &lt;= anchor.id
+                )
+          )
+    </insert>
+
+    <select id="countUnread" resultType="long">
+        SELECT COUNT(*)
+        FROM chat_message message
+        WHERE message.session_id = #{sessionId}
+          AND message.sender_id != #{userId}
+          AND message.recalled = 0
+          AND NOT EXISTS (
+                SELECT 1
+                FROM chat_message_read read_state
+                WHERE read_state.message_id = message.id
+                  AND read_state.user_id = #{userId}
+          )
+    </select>
+
+</mapper>

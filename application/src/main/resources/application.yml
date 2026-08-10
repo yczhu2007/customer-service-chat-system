@@ -36,9 +36,16 @@ app:
       reserved-slots: ${CHAT_VIP_RESERVED_SLOTS:1}
     persist:
       alert-threshold: ${CHAT_PERSIST_ALERT_THRESHOLD:20}
+    message:
+      recall-window-seconds: ${CHAT_MESSAGE_RECALL_WINDOW_SECONDS:120}
+      edit-window-seconds: ${CHAT_MESSAGE_EDIT_WINDOW_SECONDS:300}
+    session:
+      inactivity-timeout-seconds: ${CHAT_SESSION_INACTIVITY_TIMEOUT_SECONDS:1800}
+      inactivity-sweep-delay-ms: ${CHAT_SESSION_INACTIVITY_SWEEP_DELAY_MS:30000}
     queue:
       timeout-seconds: ${CHAT_QUEUE_TIMEOUT_SECONDS:300}
       vip-timeout-seconds: ${CHAT_VIP_QUEUE_TIMEOUT_SECONDS:120}
       sweep-delay-ms: ${CHAT_QUEUE_SWEEP_DELAY_MS:15000}
       average-handle-seconds: ${CHAT_QUEUE_AVERAGE_HANDLE_SECONDS:300}
-      vip-priority-step-seconds: ${CHAT_VIP_PRIORITY_STEP_SECONDS:30}
+      # 每个VIP等级提前10^12毫秒，严格保持高等级VIP优先；普通用户由排队超时策略兜底。
+      vip-priority-step-seconds: ${CHAT_VIP_PRIORITY_STEP_SECONDS:1000000000}

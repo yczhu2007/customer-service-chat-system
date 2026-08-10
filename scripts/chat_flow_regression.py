@@ -3,6 +3,7 @@
 
 import argparse
 import json
+import os
 import subprocess
 import time
 import urllib.error
@@ -131,12 +132,148 @@ def redis(*arguments):
     return completed.stdout.strip()
 
 
+def mysql_query(sql, user, password, database="springboot"):
+    environment = os.environ.copy()
+    environment["MYSQL_PWD"] = password
+    completed = subprocess.run(
+        [
+            "mysql",
+            "--default-character-set=utf8mb4",
+            "--batch",
+            "--skip-column-names",
+            "-u",
+            user,
+            database,
+            "-e",
+            sql,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=environment,
+    )
+    return completed.stdout.strip()
+
+
+def redis_scan(pattern):
+    completed = subprocess.run(
+        ["redis-cli", "--raw", "--scan", "--pattern", pattern],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return [line for line in completed.stdout.splitlines() if line]
+
+
+def cleanup_test_data(prefix, created_ids, db_user, db_password, db_name):
+    session_ids = mysql_query(
+        "SELECT id FROM chat_session "
+        f"WHERE user_id LIKE '{prefix}%' OR agent_id LIKE '{prefix}%';",
+        db_user,
+        db_password,
+        db_name,
+    ).splitlines()
+    message_ids = []
+    if session_ids:
+        quoted_sessions = ",".join("'" + item + "'" for item in session_ids)
+        message_ids = mysql_query(
+            f"SELECT id FROM chat_message WHERE session_id IN ({quoted_sessions});",
+            db_user,
+            db_password,
+            db_name,
+        ).splitlines()
+        mysql_query(
+            f"DELETE FROM chat_message WHERE session_id IN ({quoted_sessions});"
+            f"DELETE FROM chat_session WHERE id IN ({quoted_sessions});",
+            db_user,
+            db_password,
+            db_name,
+        )
+
+    if created_ids:
+        quoted_users = ",".join("'" + item + "'" for item in created_ids)
+        mysql_query(
+            f"DELETE FROM sys_user_role WHERE user_id IN ({quoted_users});"
+            f"DELETE FROM sys_user WHERE id IN ({quoted_users});",
+            db_user,
+            db_password,
+            db_name,
+        )
+
+    for key in redis_scan("*" + prefix + "*"):
+        redis("DEL", key)
+    for user_id in created_ids:
+        for key in (
+            "user:online:" + user_id,
+            "user:ws:" + user_id,
+            "user:active:session:" + user_id,
+            "offline:msg:" + user_id,
+            "chat:assign:lock:" + user_id,
+        ):
+            redis("DEL", key)
+        redis("SREM", "online:users", user_id)
+        for key in (
+            "online:heartbeat", "agent:load", "agent:last-assigned",
+            "agent:reconnect:grace", "queue:pending", "queue:enqueued-at",
+        ):
+            redis("ZREM", key, user_id)
+        for key in ("queue:vip-level", "queue:sequence"):
+            redis("HDEL", key, user_id)
+    for session_id in session_ids:
+        for key in (
+            "session:user:" + session_id,
+            "session:agent:" + session_id,
+            "session:meta:" + session_id,
+            "session:msg:" + session_id,
+            "session:operation:lock:" + session_id,
+        ):
+            redis("DEL", key)
+        redis("ZREM", "session:last-activity", session_id)
+    for message_id in message_ids:
+        for key in (
+            "msg:ack:" + message_id,
+            "persist:pending:payload:" + message_id,
+            "persist:retry:count:" + message_id,
+            "persist:retry:lease:" + message_id,
+        ):
+            redis("DEL", key)
+        redis("ZREM", "persist:pending", message_id)
+        redis("ZREM", "persist:deadletter", message_id)
+
+
+def wait_until(description, predicate, timeout=10, interval=0.1):
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        value = predicate()
+        if value:
+            return value
+        time.sleep(interval)
+    raise AssertionError("Timed out waiting for " + description)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8080")
     parser.add_argument("--admin-username", default="admin")
     parser.add_argument("--admin-password", required=True)
+    parser.add_argument("--db-user", default="root")
+    parser.add_argument("--db-password", required=True)
+    parser.add_argument("--db-name", default="springboot")
     args = parser.parse_args()
+
+    if redis("PING") != "PONG":
+        raise AssertionError("Redis preflight failed")
+    required_tables = mysql_query(
+        "SELECT COUNT(*) FROM information_schema.tables "
+        "WHERE table_schema = DATABASE() AND table_name IN "
+        "('sys_user','chat_session','chat_message','chat_message_read');",
+        args.db_user,
+        args.db_password,
+        args.db_name,
+    )
+    if required_tables != "4":
+        raise AssertionError("MySQL preflight failed: required chat tables are missing")
 
     api = Api(args.base_url)
     admin_token = api.login(args.admin_username, args.admin_password)
@@ -185,6 +322,7 @@ def main():
             client = StompClient(args.base_url, token)
             clients.append(client)
             client.subscribe("/user/queue/chat")
+            client.subscribe("/user/queue/messages")
             client.subscribe("/user/queue/errors")
             agents.append(client)
         for token in agent_tokens:
@@ -196,6 +334,7 @@ def main():
         if not heartbeat_deadline or int(online_ttl) <= 0:
             raise AssertionError("heartbeat did not renew online state")
         report["heartbeatRenewal"] = True
+        report["realRedis"] = True
 
         assignments = []
         user_clients = []
@@ -204,13 +343,169 @@ def main():
             clients.append(client)
             user_clients.append(client)
             client.subscribe("/user/queue/chat")
+            client.subscribe("/user/queue/messages")
+            client.subscribe("/user/queue/errors")
             notice = client.receive_json(event="SESSION_CREATED")
             assignments.append(notice["session"])
+            assigned_agent_index = agent_ids.index(notice["session"]["agentId"])
+            agents[assigned_agent_index].receive_json(event="SESSION_CREATED")
         sequence = [assignment["agentId"] for assignment in assignments]
         expected = [agent_ids[0], agent_ids[1], agent_ids[0], agent_ids[1]]
         if sequence != expected:
             raise AssertionError(f"round-robin mismatch: {sequence} != {expected}")
         report["roundRobin"] = sequence
+        report["longestIdleLoadBalancing"] = True
+
+        read_session = assignments[0]
+        user_clients[0].send_json(
+            "/app/chat.send",
+            {
+                "sessionId": read_session["sessionId"],
+                "type": "TEXT",
+                "content": "read-state-regression",
+                "clientMsgId": prefix + "-READ-1",
+            },
+        )
+        read_agent_index = agent_ids.index(read_session["agentId"])
+        delivered_message = agents[read_agent_index].receive_json(
+            destination_suffix="/queue/chat"
+        )
+        message_id = delivered_message["id"]
+        deadline = time.time() + 8
+        while time.time() < deadline and redis("ZSCORE", "persist:pending", message_id):
+            time.sleep(0.1)
+        persisted = wait_until(
+            "message persistence in MySQL",
+            lambda: mysql_query(
+                "SELECT CONCAT(id, '|', content) FROM chat_message "
+                f"WHERE id = '{message_id}';",
+                args.db_user,
+                args.db_password,
+                args.db_name,
+            ),
+        )
+        if persisted != message_id + "|read-state-regression":
+            raise AssertionError("MySQL stored message does not match WebSocket message")
+        report["messagePersistence"] = True
+        report["realMySQL"] = True
+        agents[read_agent_index].send_json(
+            "/app/chat.history",
+            {"sessionId": read_session["sessionId"], "pageNo": 1, "pageSize": 20},
+        )
+        unread_history = agents[read_agent_index].receive_json(event="CHAT_HISTORY")
+        if unread_history.get("unreadCount") != 1:
+            raise AssertionError("persisted unread count did not increase")
+        agents[read_agent_index].send_json(
+            "/app/chat.read",
+            {
+                "sessionId": read_session["sessionId"],
+                "lastReadMessageId": message_id,
+            },
+        )
+        read_result = agents[read_agent_index].receive_json(event="MESSAGES_READ")
+        sender_receipt = user_clients[0].receive_json(event="MESSAGES_READ")
+        if read_result.get("unreadCount") != 0 or sender_receipt.get("readerId") != read_session["agentId"]:
+            raise AssertionError("read state or read receipt was not synchronized")
+        read_row_count = mysql_query(
+            "SELECT COUNT(*) FROM chat_message_read "
+            f"WHERE message_id = '{message_id}' "
+            f"AND user_id = '{read_session['agentId']}';",
+            args.db_user,
+            args.db_password,
+            args.db_name,
+        )
+        if read_row_count != "1":
+            raise AssertionError("read state was not persisted in MySQL")
+        report["readStateSynchronization"] = True
+
+        edited_content = "edited-message-regression"
+        user_clients[0].send_json(
+            "/app/chat.message.edit",
+            {"messageId": message_id, "content": edited_content},
+        )
+        sender_edit = user_clients[0].receive_json(event="MESSAGE_EDITED")
+        receiver_edit = agents[read_agent_index].receive_json(event="MESSAGE_EDITED")
+        if sender_edit.get("content") != edited_content or receiver_edit.get("content") != edited_content:
+            raise AssertionError("edited content was not synchronized to both participants")
+
+        agents[read_agent_index].send_json(
+            "/app/chat.message.edit",
+            {"messageId": message_id, "content": "unauthorized-edit"},
+        )
+        unauthorized_edit = agents[read_agent_index].receive_json(event="ERROR")
+        if "只能编辑或撤回自己发送的消息" not in unauthorized_edit.get("message", ""):
+            raise AssertionError("editing another participant's message was not rejected")
+
+        user_clients[0].send_json(
+            "/app/chat.message.recall",
+            {"messageId": message_id},
+        )
+        sender_recall = user_clients[0].receive_json(event="MESSAGE_RECALLED")
+        receiver_recall = agents[read_agent_index].receive_json(event="MESSAGE_RECALLED")
+        if not sender_recall.get("recalled") or receiver_recall.get("content") is not None:
+            raise AssertionError("message recall was not synchronized to both participants")
+        mutation_state = mysql_query(
+            "SELECT CONCAT(edited, '|', recalled, '|', content, '|', original_content) "
+            f"FROM chat_message WHERE id = '{message_id}';",
+            args.db_user,
+            args.db_password,
+            args.db_name,
+        )
+        if mutation_state != "1|1|edited-message-regression|read-state-regression":
+            raise AssertionError("edited/recall state was not persisted correctly in MySQL")
+
+        agents[read_agent_index].send_json(
+            "/app/chat.history",
+            {"sessionId": read_session["sessionId"], "pageNo": 1, "pageSize": 20},
+        )
+        mutation_history = agents[read_agent_index].receive_json(event="CHAT_HISTORY")
+        mutated_message = next(
+            (item for item in mutation_history.get("messages", []) if item.get("id") == message_id),
+            None,
+        )
+        if (mutated_message is None or not mutated_message.get("edited")
+                or not mutated_message.get("recalled") or mutated_message.get("content") is not None):
+            raise AssertionError("history did not reflect the final edited and recalled state")
+
+        user_clients[0].send_json(
+            "/app/chat.message.recall",
+            {"messageId": message_id},
+        )
+        duplicate_recall = user_clients[0].receive_json(event="ERROR")
+        if "消息已经撤回" not in duplicate_recall.get("message", ""):
+            raise AssertionError("duplicate recall was not rejected")
+
+        user_clients[0].send_json(
+            "/app/chat.send",
+            {
+                "sessionId": read_session["sessionId"],
+                "type": "TEXT",
+                "content": "unread-recall-regression",
+                "clientMsgId": prefix + "-RECALL-UNREAD",
+            },
+        )
+        unread_recall_message = agents[read_agent_index].receive_json(
+            destination_suffix="/queue/chat"
+        )
+        unread_recall_id = unread_recall_message["id"]
+        deadline = time.time() + 8
+        while time.time() < deadline and redis("ZSCORE", "persist:pending", unread_recall_id):
+            time.sleep(0.1)
+        user_clients[0].send_json(
+            "/app/chat.message.recall",
+            {"messageId": unread_recall_id},
+        )
+        user_clients[0].receive_json(event="MESSAGE_RECALLED")
+        agents[read_agent_index].receive_json(event="MESSAGE_RECALLED")
+        agents[read_agent_index].send_json(
+            "/app/chat.history",
+            {"sessionId": read_session["sessionId"], "pageNo": 1, "pageSize": 20},
+        )
+        recalled_unread_history = agents[read_agent_index].receive_json(event="CHAT_HISTORY")
+        if recalled_unread_history.get("unreadCount") != 0:
+            raise AssertionError("a recalled message was still counted as unread")
+        report["messageEdit"] = True
+        report["messageRecall"] = True
 
         for assignment in assignments:
             agent_index = agent_ids.index(assignment["agentId"])
@@ -218,6 +513,39 @@ def main():
                 "/app/chat.end", {"sessionId": assignment["sessionId"]}
             )
         time.sleep(1)
+
+        inactivity_client = StompClient(args.base_url, user_tokens[8])
+        clients.append(inactivity_client)
+        inactivity_client.subscribe("/user/queue/chat")
+        inactivity_session = inactivity_client.receive_json(event="SESSION_CREATED")["session"]
+        redis("ZADD", "session:last-activity", 1, inactivity_session["sessionId"])
+        inactivity_client.receive_json(timeout=40, event="SESSION_CLOSED")
+        reassigned_after_timeout = inactivity_client.receive_json(
+            timeout=8,
+            event="SESSION_CREATED",
+        )["session"]
+        if reassigned_after_timeout["agentId"] == inactivity_session["agentId"]:
+            raise AssertionError("inactive session was assigned back to the same agent")
+        session_states = mysql_query(
+            "SELECT CONCAT(id, '|', status, '|', agent_id) FROM chat_session "
+            f"WHERE id IN ('{inactivity_session['sessionId']}', "
+            f"'{reassigned_after_timeout['sessionId']}') ORDER BY id;",
+            args.db_user,
+            args.db_password,
+            args.db_name,
+        )
+        if "|CLOSED|" not in session_states or "|ACTIVE|" not in session_states:
+            raise AssertionError("timeout reassignment was not committed in MySQL")
+        if redis(
+            "GET", "session:agent:" + reassigned_after_timeout["sessionId"]
+        ) != reassigned_after_timeout["agentId"]:
+            raise AssertionError("timeout reassignment Redis ownership is inconsistent")
+        reassigned_agent_index = agent_ids.index(reassigned_after_timeout["agentId"])
+        agents[reassigned_agent_index].send_json(
+            "/app/chat.end",
+            {"sessionId": reassigned_after_timeout["sessionId"]},
+        )
+        report["sessionInactivityReassignment"] = True
 
         for token in agent_tokens:
             api.call("POST", "/chat/agent/offline", token=token)
@@ -336,12 +664,19 @@ def main():
                 api.call("DELETE", "/users/" + user_id, token=admin_token)
             except Exception:
                 pass
-        for key in ("agent:load", "agent:reconnect:grace"):
+        for key in ("agent:load", "agent:reconnect:grace", "agent:last-assigned"):
             for agent_id in agent_ids:
                 try:
                     redis("ZREM", key, agent_id)
                 except Exception:
                     pass
+        cleanup_test_data(
+            prefix,
+            created_ids,
+            args.db_user,
+            args.db_password,
+            args.db_name,
+        )
 
 
 if __name__ == "__main__":

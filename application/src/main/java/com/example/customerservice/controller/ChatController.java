@@ -489,6 +489,7 @@ public class ChatController {
         response.put("pageSize", historyPage.pageSize());
         response.put("total", historyPage.total());
         response.put("pages", historyPage.pages());
+        response.put("unreadCount", historyPage.unreadCount());
 
 
         response.put(
@@ -553,6 +554,66 @@ public class ChatController {
             );
         }
         chatService.handleAck(
+                request.getMessageId(),
+                principal.getName()
+        );
+    }
+
+    /**
+     * 将指定消息及其之前由对方发送的消息批量标记为已读。
+     * 客户端发送地址：/app/chat.read
+     * 当前用户和会话对方均从/user/queue/messages接收MESSAGES_READ事件。
+     */
+    @MessageMapping("/chat.read")
+    @SendToUser("/queue/messages")
+    public MessageReadResult markMessagesRead(
+            @Valid ReadMessagesRequest request,
+            Principal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException("当前用户身份不存在");
+        }
+        return chatService.markMessagesRead(
+                request.getSessionId(),
+                request.getLastReadMessageId(),
+                principal.getName()
+        );
+    }
+
+    /**
+     * 编辑当前用户自己发送且仍在允许时间内的文本消息。
+     * 会话双方均从 /user/queue/messages 接收 MESSAGE_EDITED 事件。
+     */
+    @MessageMapping("/chat.message.edit")
+    @SendToUser("/queue/messages")
+    public MessageMutationResult editMessage(
+            @Valid EditMessageRequest request,
+            Principal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException("当前用户身份不存在");
+        }
+        return chatService.editMessage(
+                request.getMessageId(),
+                request.getContent(),
+                principal.getName()
+        );
+    }
+
+    /**
+     * 撤回当前用户自己发送且仍在允许时间内的消息。
+     * 会话双方均从 /user/queue/messages 接收 MESSAGE_RECALLED 事件。
+     */
+    @MessageMapping("/chat.message.recall")
+    @SendToUser("/queue/messages")
+    public MessageMutationResult recallMessage(
+            @Valid RecallMessageRequest request,
+            Principal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException("当前用户身份不存在");
+        }
+        return chatService.recallMessage(
                 request.getMessageId(),
                 principal.getName()
         );

@@ -10,6 +10,7 @@ public record ChatHistoryPage(
         long total,
         long pageNo,
         long pageSize,
-        long pages
+        long pages,
+        long unreadCount
 ) {
 }
