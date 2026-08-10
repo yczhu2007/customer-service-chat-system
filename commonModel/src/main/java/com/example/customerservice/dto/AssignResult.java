@@ -17,6 +17,7 @@ public class AssignResult {
     private String message;
     private ChatSessionDTO session;
     private Long waitingPosition;
+    private Long estimatedWaitSeconds;
     private Integer vipLevel;
 
     public static AssignResult assigned(
@@ -52,6 +53,13 @@ public class AssignResult {
     }
 
     public static AssignResult waiting(Long waitingPosition) {
+        return waiting(waitingPosition, null);
+    }
+
+    public static AssignResult waiting(
+            Long waitingPosition,
+            Long estimatedWaitSeconds
+    ) {
         AssignResult result = of(
                 "WAITING_FOR_AGENT",
                 WAITING,
@@ -59,6 +67,7 @@ public class AssignResult {
                 null
         );
         result.setWaitingPosition(waitingPosition);
+        result.setEstimatedWaitSeconds(estimatedWaitSeconds);
         return result;
     }
 
@@ -140,6 +149,14 @@ public class AssignResult {
 
     public void setWaitingPosition(Long waitingPosition) {
         this.waitingPosition = waitingPosition;
+    }
+
+    public Long getEstimatedWaitSeconds() {
+        return estimatedWaitSeconds;
+    }
+
+    public void setEstimatedWaitSeconds(Long estimatedWaitSeconds) {
+        this.estimatedWaitSeconds = estimatedWaitSeconds;
     }
 
     public Integer getVipLevel() {
