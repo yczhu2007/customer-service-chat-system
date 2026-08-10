@@ -66,6 +66,13 @@ public interface IChatService {
             String agentId
     );
 
+    /** 将当前客服持有的活动会话转接给目标客服。 */
+    void transferSession(
+            String sessionId,
+            String sourceAgentId,
+            String targetAgentId
+    );
+
 
     /**
      * 通知双方会话已经结束
@@ -127,6 +134,7 @@ public interface IChatService {
     void handleAgentReconnectGraceTimeout(String agentId);
     void reconcilePendingAssignments();
     void reconcilePendingSessionFinalizations();
+    void reconcileActiveSessionState();
     void registerOnline(
             String userId,
             String wsSessionId

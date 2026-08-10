@@ -21,6 +21,11 @@ public class SessionStateReconciliationScheduler {
     @Scheduled(fixedDelay = 30_000)
     public void reconcileSessionState() {
         try {
+            chatService.reconcileActiveSessionState();
+        } catch (Exception exception) {
+            log.error("Active session state reconciliation failed", exception);
+        }
+        try {
             chatService.reconcilePendingAssignments();
         } catch (Exception exception) {
             log.error("会话创建状态对账任务执行失败", exception);

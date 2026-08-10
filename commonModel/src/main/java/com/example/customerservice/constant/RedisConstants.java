@@ -13,8 +13,6 @@ public class RedisConstants {
     public static final String QUEUE_VIP_LEVEL = "queue:vip-level";
     /** 保存上一次入队 score，用于在同一毫秒内生成严格递增的 FIFO score。 */
     public static final String QUEUE_SEQUENCE = "queue:sequence";
-    /** VIP用户排队score的等级偏移量。 */
-    public static final long VIP_QUEUE_PRIORITY_OFFSET = 1_000_000_000_000L;
     private static final String AGENT_PREFIX = "agent:";
     private static final String AGENT_SESSIONS_SUFFIX = ":sessions";
     public static final String AGENT_RECONNECT_GRACE = "agent:reconnect:grace";
@@ -28,6 +26,9 @@ public class RedisConstants {
     public static final String VIP_CALLBACK_PENDING = "vip:callback:pending";
     public static final String CHAT_ASSIGN_LOCK = "chat:assign:lock:";
     public static final long CHAT_ASSIGN_LOCK_TTL_SECONDS = 30L;
+    /** Prevents transfer, close and disconnect cleanup from changing one session concurrently. */
+    public static final String SESSION_OPERATION_LOCK = "session:operation:lock:";
+    public static final long SESSION_OPERATION_LOCK_TTL_SECONDS = 5L;
     public static final String ASSIGNMENT_PENDING = "assignment:pending";
     public static final String ASSIGNMENT_PENDING_PAYLOAD = "assignment:pending:payload";
     public static final String SESSION_FINALIZE_PENDING = "session:finalize:pending";

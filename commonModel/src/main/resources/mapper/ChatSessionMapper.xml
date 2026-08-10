@@ -24,4 +24,14 @@
           AND status = 'ACTIVE'
 
     </update>
+
+    <update id="transferSession">
+
+        UPDATE chat_session
+        SET agent_id = #{targetAgentId}
+        WHERE id = #{id}
+          AND agent_id = #{sourceAgentId}
+          AND status = 'ACTIVE'
+
+    </update>
 </mapper>

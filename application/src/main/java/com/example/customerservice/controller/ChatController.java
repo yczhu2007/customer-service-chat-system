@@ -381,6 +381,28 @@ public class ChatController {
                         + agentId
         );
     }
+
+    /**
+     * 客服转接自己正在处理的会话。
+     * 客户端发送地址：/app/chat.transfer
+     */
+    @MessageMapping("/chat.transfer")
+    public void handleTransferSession(
+            @Valid TransferSessionRequest request,
+            Principal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException("当前STOMP连接没有用户身份");
+        }
+        String sourceAgentId = principal.getName();
+        requireWebSocketRole(sourceAgentId, "AGENT");
+        requireWebSocketPermission(sourceAgentId, "chat:session:transfer");
+        chatService.transferSession(
+                request.getSessionId(),
+                sourceAgentId,
+                request.getTargetAgentId()
+        );
+    }
     /**
      * 查询聊天历史
      *
