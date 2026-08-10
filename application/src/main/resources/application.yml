@@ -40,3 +40,5 @@ app:
       timeout-seconds: ${CHAT_QUEUE_TIMEOUT_SECONDS:300}
       vip-timeout-seconds: ${CHAT_VIP_QUEUE_TIMEOUT_SECONDS:120}
       sweep-delay-ms: ${CHAT_QUEUE_SWEEP_DELAY_MS:15000}
+      average-handle-seconds: ${CHAT_QUEUE_AVERAGE_HANDLE_SECONDS:300}
+      vip-priority-step-seconds: ${CHAT_VIP_PRIORITY_STEP_SECONDS:30}

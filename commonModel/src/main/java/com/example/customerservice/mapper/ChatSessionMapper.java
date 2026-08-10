@@ -14,5 +14,11 @@ public interface ChatSessionMapper extends BaseMapper<ChatSession> {
             @Param("endTime") LocalDateTime endTime
     );
 
+    int transferSession(
+            @Param("id") String id,
+            @Param("sourceAgentId") String sourceAgentId,
+            @Param("targetAgentId") String targetAgentId
+    );
+
 }
 

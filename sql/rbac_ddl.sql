@@ -227,6 +227,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_SESSION_TRANSFER',
+        'chat:session:transfer',
+        '转接聊天会话',
+        'API',
+        NULL,
+        '/app/chat.transfer',
+        '允许客服将自己正在处理的会话转接给其他在线客服',
+        'ENABLED'
+    ),
+    (
         'P_USER_MANAGE',
         'user:manage',
         '用户管理',
@@ -284,7 +294,8 @@ INSERT INTO sys_role_permission
 VALUES
     ('R_AGENT', 'P_CHAT_AGENT_ONLINE'),
     ('R_AGENT', 'P_CHAT_AGENT_OFFLINE'),
-    ('R_AGENT', 'P_CHAT_SESSION_END')
+    ('R_AGENT', 'P_CHAT_SESSION_END'),
+    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 
