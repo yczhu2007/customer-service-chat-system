@@ -2,10 +2,12 @@ package com.example.customerservice.dto;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.io.Serializable;
 /**
  * 创建或修改权限请求。
  */
-public class PermissionCreateDTO {
+public class PermissionCreateDTO implements Serializable {
+    private static final long serialVersionUID = 1L;
     @Size(
             max = 64,
             message = "权限ID长度不能超过64个字符"

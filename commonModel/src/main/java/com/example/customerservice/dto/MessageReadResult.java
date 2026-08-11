@@ -1,5 +1,7 @@
 package com.example.customerservice.dto;
 
+import java.io.Serializable;
+
 /** 消息批量已读结果，同时作为发送给会话双方的已读状态事件。 */
 public record MessageReadResult(
         String event,
@@ -8,7 +10,9 @@ public record MessageReadResult(
         String lastReadMessageId,
         long markedCount,
         long unreadCount
-) {
+) implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static MessageReadResult completed(
             String sessionId,

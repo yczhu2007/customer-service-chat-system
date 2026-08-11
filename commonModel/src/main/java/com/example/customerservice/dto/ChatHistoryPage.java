@@ -3,6 +3,7 @@ package com.example.customerservice.dto;
 import com.example.customerservice.domain.ChatMessage;
 
 import java.util.List;
+import java.io.Serializable;
 
 /** 聊天历史分页查询结果。 */
 public record ChatHistoryPage(
@@ -12,5 +13,7 @@ public record ChatHistoryPage(
         long pageSize,
         long pages,
         long unreadCount
-) {
+) implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 }

@@ -3,11 +3,14 @@ package com.example.customerservice.dto;
 import com.example.customerservice.domain.ChatSession;
 
 import java.time.LocalDateTime;
+import java.io.Serializable;
 
 /**
  * WebSocket会话信息传输对象。
  */
-public class ChatSessionDTO {
+public class ChatSessionDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String event;
     private String sessionId;

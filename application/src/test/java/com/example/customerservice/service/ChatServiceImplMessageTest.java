@@ -13,7 +13,12 @@ import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.impl.ChatServiceImpl;
+import com.example.customerservice.service.impl.ChatMessageService;
+import com.example.customerservice.service.impl.ChatMessageDeliveryService;
+import com.example.customerservice.service.impl.ChatMessageManagementService;
+import com.example.customerservice.service.impl.ChatRoutingSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -57,6 +62,9 @@ class ChatServiceImplMessageTest {
     @Mock private MessagePersistService messagePersistService;
     @Mock private SysUserRoleMapper sysUserRoleMapper;
     @Mock private SysUserMapper sysUserMapper;
+    @Mock private ChatPresenceOperations chatPresenceOperations;
+    @Mock private ChatSessionTransferOperations chatSessionTransferOperations;
+    @Mock private ChatSessionNotificationOperations chatSessionNotificationOperations;
     @Mock private ValueOperations<String, String> valueOperations;
     @Mock private ListOperations<String, String> listOperations;
     @Mock private ZSetOperations<String, String> zSetOperations;
@@ -70,23 +78,18 @@ class ChatServiceImplMessageTest {
         lenient().when(redisTemplate.opsForList()).thenReturn(listOperations);
         lenient().when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
         lenient().when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        service = new ChatServiceImpl(
-                redisTemplate,
-                chatSessionMapper,
-                chatMessageMapper,
-                chatMessageReadMapper,
-                messagingTemplate,
-                messagePersistService,
-                new ObjectMapper(),
-                sysUserRoleMapper,
-                sysUserMapper,
-                20,
-                1,
-                300,
-                1_000_000_000L,
-                120,
-                300
+        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate);
+        ChatMessageOperations messageOperations = newMessageOperations(
+                chatRedisRepository, new ObjectMapper()
         );
+        ChatRoutingSessionService routingSessionService = new ChatRoutingSessionService(
+                chatRedisRepository, messageOperations, chatPresenceOperations,
+                chatSessionTransferOperations, chatSessionNotificationOperations, chatSessionMapper,
+                chatMessageMapper, chatMessageReadMapper, messagingTemplate,
+                messagePersistService, new ObjectMapper(), sysUserRoleMapper,
+                sysUserMapper, 20, 1, 300, 1_000_000_000L, 120, 300
+        );
+        service = new ChatServiceImpl(routingSessionService);
     }
 
     @Test
@@ -208,12 +211,18 @@ class ChatServiceImplMessageTest {
         ChatMessage second = textMessage();
         second.setId("M002");
         ObjectMapper mapper = new ObjectMapper();
-        service = new ChatServiceImpl(
-                redisTemplate, chatSessionMapper, chatMessageMapper,
-                chatMessageReadMapper, messagingTemplate, messagePersistService,
-                mapper, sysUserRoleMapper, sysUserMapper,
+        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate);
+        ChatMessageOperations messageOperations = newMessageOperations(
+                chatRedisRepository, mapper
+        );
+        ChatRoutingSessionService routingSessionService = new ChatRoutingSessionService(
+                chatRedisRepository, messageOperations, chatPresenceOperations,
+                chatSessionTransferOperations, chatSessionNotificationOperations, chatSessionMapper,
+                chatMessageMapper, chatMessageReadMapper, messagingTemplate,
+                messagePersistService, mapper, sysUserRoleMapper, sysUserMapper,
                 20, 1, 300, 1_000_000_000L, 120, 300
         );
+        service = new ChatServiceImpl(routingSessionService);
         when(valueOperations.get(RedisConstants.USER_WS + "U001"))
                 .thenReturn("WS001");
         when(listOperations.range(
@@ -313,6 +322,23 @@ class ChatServiceImplMessageTest {
         assertTrue(keysCaptor.getValue().contains(RedisConstants.AGENT_LAST_ASSIGNED));
         assertEquals("1", argumentsCaptor.getAllValues().get(3));
         assertEquals("1", argumentsCaptor.getAllValues().get(4));
+    }
+
+    private ChatMessageOperations newMessageOperations(
+            ChatRedisRepository chatRedisRepository,
+            ObjectMapper objectMapper
+    ) {
+        return new ChatMessageService(
+                new ChatMessageDeliveryService(
+                        chatRedisRepository, chatSessionMapper, chatMessageMapper,
+                        chatMessageReadMapper, messagingTemplate, messagePersistService,
+                        objectMapper, 120, 300
+                ),
+                new ChatMessageManagementService(
+                        chatRedisRepository, chatSessionMapper, chatMessageMapper,
+                        chatMessageReadMapper, messagingTemplate, objectMapper, 120, 300
+                )
+        );
     }
 
     private static ChatSession activeSession() {

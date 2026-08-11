@@ -2,11 +2,14 @@ package com.example.customerservice.dto;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import java.io.Serializable;
 
 /**
  * 角色返回对象。
  */
-public class RoleVO {
+public class RoleVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String id;
 

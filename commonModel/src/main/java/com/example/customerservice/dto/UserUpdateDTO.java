@@ -4,6 +4,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.io.Serializable;
 
 /**
  * 修改系统用户请求。
@@ -11,7 +12,9 @@ import jakarta.validation.constraints.Min;
  * 修改接口允许只提交需要修改的字段，
  * 但提交的字段必须符合格式要求。
  */
-public class UserUpdateDTO {
+public class UserUpdateDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Pattern(
             regexp = "(?s).*\\S.*",

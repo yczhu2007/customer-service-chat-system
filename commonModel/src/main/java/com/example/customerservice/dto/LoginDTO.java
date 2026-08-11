@@ -5,6 +5,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 
 import java.util.Set;
+import java.io.Serializable;
 
 /**
  * 登录请求和登录成功响应共用的数据传输对象。
@@ -13,7 +14,9 @@ import java.util.Set;
  * 响应字段：token、tokenType、expiresInSeconds、userId、username、roles。
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public class LoginDTO {
+public class LoginDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @NotBlank(message = "用户名不能为空")
     @Size(max = 64, message = "用户名长度不能超过64个字符")

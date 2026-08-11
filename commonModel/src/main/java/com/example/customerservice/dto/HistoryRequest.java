@@ -2,12 +2,20 @@ package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+
+import java.io.Serializable;
 
 /**
  * 查询聊天历史时客户端提交的数据
  */
-public class HistoryRequest {
+public class HistoryRequest implements Serializable {
 
+    private static final long serialVersionUID = 1L;
+
+    @NotBlank(message = "sessionId不能为空")
+    @Size(max = 64, message = "sessionId长度不能超过64个字符")
     private String sessionId;
 
     @Min(value = 1, message = "页码必须大于等于1")

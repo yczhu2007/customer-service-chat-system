@@ -2,6 +2,7 @@ package com.example.customerservice.dto;
 
 import java.time.LocalDateTime;
 import java.util.Set;
+import java.io.Serializable;
 
 
 /**
@@ -9,7 +10,9 @@ import java.util.Set;
  *
  * 不包含password，防止密码哈希通过接口泄露。
  */
-public class UserVO {
+public class UserVO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String id;
 

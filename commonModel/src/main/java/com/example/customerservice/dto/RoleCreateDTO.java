@@ -4,10 +4,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.io.Serializable;
+
 /**
  * 创建角色请求。
  */
-public class RoleCreateDTO {
+public class RoleCreateDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Size(max = 64, message = "角色ID长度不能超过64个字符")
     private String id;

@@ -2,10 +2,14 @@ package com.example.customerservice.dto;
 
 import com.example.customerservice.domain.ChatSession;
 
+import java.io.Serializable;
+
 /**
  * 用户接入客服时的分配结果。
  */
-public class AssignResult {
+public class AssignResult implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     public static final String ASSIGNED = "ASSIGNED";
     public static final String RECONNECTED = "RECONNECTED";

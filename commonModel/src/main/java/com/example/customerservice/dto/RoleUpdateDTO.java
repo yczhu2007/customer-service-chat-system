@@ -3,13 +3,17 @@ package com.example.customerservice.dto;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.io.Serializable;
+
 /**
  * 修改角色请求。
  *
  * 所有字段均允许不提交，
  * 但提交的字段必须符合格式要求。
  */
-public class RoleUpdateDTO {
+public class RoleUpdateDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Pattern(
             regexp = "(?s).*\\S.*",
