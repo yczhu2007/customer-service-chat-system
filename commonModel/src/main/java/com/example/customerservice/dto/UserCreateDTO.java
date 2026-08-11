@@ -5,10 +5,13 @@ import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.io.Serializable;
 /**
  * 创建系统用户请求。
  */
-public class UserCreateDTO {
+public class UserCreateDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Size(max = 64, message = "用户ID长度不能超过64个字符")
     private String id;

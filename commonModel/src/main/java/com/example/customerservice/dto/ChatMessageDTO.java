@@ -3,8 +3,10 @@ package com.example.customerservice.dto;
 import com.example.customerservice.domain.ChatMessage;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDateTime;
+import java.io.Serializable;
 
 /**
  * WebSocket聊天消息传输对象。
@@ -12,11 +14,14 @@ import java.time.LocalDateTime;
  * 客户端发送时只需要填写sessionId、type、content和clientMsgId；
  * 其余字段由服务端生成，客户端传入的值不会被信任。
  */
-public class ChatMessageDTO {
+public class ChatMessageDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String id;
 
     @NotBlank(message = "sessionId不能为空")
+    @Size(max = 64, message = "sessionId长度不能超过64个字符")
     private String sessionId;
 
     private String senderId;
@@ -31,9 +36,11 @@ public class ChatMessageDTO {
     private String type;
 
     @NotBlank(message = "消息内容不能为空")
+    @Size(max = 4000, message = "消息内容不能超过4000个字符")
     private String content;
 
     @NotBlank(message = "clientMsgId不能为空")
+    @Size(max = 64, message = "clientMsgId长度不能超过64个字符")
     private String clientMsgId;
 
     private LocalDateTime createTime;

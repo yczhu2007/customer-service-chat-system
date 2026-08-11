@@ -4,6 +4,9 @@ import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IRoleService;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -20,6 +23,7 @@ import com.example.customerservice.common.Result;
  * 角色与权限CRUD统一由RoleController提供。
  */
 @RestController
+@Validated
 public class RoleController {
 
     @Autowired
@@ -36,7 +40,10 @@ public class RoleController {
 
     @GetMapping("/roles/{id}")
     public Result<RoleVO> findRoleById(
-            @PathVariable String id
+            @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
+            String id
     ) {
         requireRoleManagementPermission();
         return Result.success(roleService.findRoleById(id));
@@ -58,7 +65,10 @@ public class RoleController {
 
     @PutMapping("/roles/{id}")
     public Result<RoleVO> updateRole(
-            @PathVariable String id,
+            @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
+            String id,
             @Valid
             @RequestBody RoleUpdateDTO request
     ) {
@@ -71,6 +81,8 @@ public class RoleController {
     @DeleteMapping("/roles/{id}")
     public Result<Void> deleteRole(
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String id
     ) {
         requireRoleManagementPermission();
@@ -90,7 +102,10 @@ public class RoleController {
 
     @GetMapping("/permissions/{id}")
     public Result<PermissionVO> findPermissionById(
-            @PathVariable String id
+            @PathVariable
+            @NotBlank(message = "权限ID不能为空")
+            @Size(max = 64, message = "权限ID长度不能超过64个字符")
+            String id
     ) {
         requirePermissionManagementPermission();
         return Result.success(roleService.findPermissionById(id));
@@ -115,6 +130,8 @@ public class RoleController {
     @PutMapping("/permissions/{id}")
     public Result<PermissionVO> updatePermission(
             @PathVariable
+            @NotBlank(message = "权限ID不能为空")
+            @Size(max = 64, message = "权限ID长度不能超过64个字符")
             String id,
             @Valid
             @RequestBody
@@ -130,6 +147,8 @@ public class RoleController {
     @DeleteMapping("/permissions/{id}")
     public Result<Void> deletePermission(
             @PathVariable
+            @NotBlank(message = "权限ID不能为空")
+            @Size(max = 64, message = "权限ID长度不能超过64个字符")
             String id
     ) {
         requirePermissionManagementPermission();
@@ -144,6 +163,8 @@ public class RoleController {
     @GetMapping("/roles/{roleId}/permissions")
     public Result<Set<String>> findRolePermissions(
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String roleId
     ) {
         requireRolePermissionManagementPermission();
@@ -158,8 +179,12 @@ public class RoleController {
     )
     public Result<Void> assignPermissionToRole(
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String roleId,
             @PathVariable
+            @NotBlank(message = "权限ID不能为空")
+            @Size(max = 64, message = "权限ID长度不能超过64个字符")
             String permissionId
     ) {
         requireRolePermissionManagementPermission();
@@ -179,8 +204,12 @@ public class RoleController {
     )
     public Result<Void> removePermissionFromRole(
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String roleId,
             @PathVariable
+            @NotBlank(message = "权限ID不能为空")
+            @Size(max = 64, message = "权限ID长度不能超过64个字符")
             String permissionId
     ) {
         requireRolePermissionManagementPermission();

@@ -3,9 +3,12 @@ package com.example.customerservice.dto;
 import com.example.customerservice.domain.ChatMessage;
 
 import java.time.LocalDateTime;
+import java.io.Serializable;
 
 /** 消息编辑或撤回后推送给会话双方的统一事件。 */
-public class MessageMutationResult {
+public class MessageMutationResult implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private String event;
     private String messageId;

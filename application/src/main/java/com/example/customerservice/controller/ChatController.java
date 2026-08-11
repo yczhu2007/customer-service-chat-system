@@ -16,6 +16,9 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.validation.annotation.Validated;
 
 import java.security.Principal;
 import java.util.HashMap;
@@ -27,6 +30,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("/chat")
 @Slf4j
+@Validated
 public class ChatController {
 
     @Autowired
@@ -265,7 +269,10 @@ public class ChatController {
     /** 管理员将指定客服加入VIP坐席技能组。 */
     @PutMapping("/agents/{agentId}/vip-skill")
     public Result<Void> enableAgentVipSkill(
-            @PathVariable String agentId
+            @PathVariable
+            @NotBlank(message = "客服ID不能为空")
+            @Size(max = 64, message = "客服ID长度不能超过64个字符")
+            String agentId
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
@@ -276,7 +283,10 @@ public class ChatController {
     /** 管理员将指定客服移出VIP坐席技能组。 */
     @DeleteMapping("/agents/{agentId}/vip-skill")
     public Result<Void> disableAgentVipSkill(
-            @PathVariable String agentId
+            @PathVariable
+            @NotBlank(message = "客服ID不能为空")
+            @Size(max = 64, message = "客服ID长度不能超过64个字符")
+            String agentId
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
@@ -332,7 +342,7 @@ public class ChatController {
      */
     @MessageMapping("/chat.end")
     public void handleEndSession(
-            EndSessionRequest request,
+            @Valid EndSessionRequest request,
             Principal principal
     ) {
 
@@ -535,7 +545,7 @@ public class ChatController {
      */
     @MessageMapping("/chat.ack")
     public void handleAck(
-            AckRequest request,
+            @Valid AckRequest request,
             Principal principal
     ) {
 

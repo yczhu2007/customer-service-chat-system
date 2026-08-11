@@ -21,6 +21,9 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Set;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import org.springframework.validation.annotation.Validated;
 import com.example.customerservice.common.Result;
 
 /**
@@ -28,6 +31,7 @@ import com.example.customerservice.common.Result;
  */
 @RestController
 @RequestMapping("/users")
+@Validated
 public class UserController {
 
     @Autowired
@@ -49,6 +53,8 @@ public class UserController {
     @GetMapping("/{id}")
     public Result<UserVO> findById(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String id
     ) {
 
@@ -79,6 +85,8 @@ public class UserController {
     @PutMapping("/{id}")
     public Result<UserVO> update(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String id,
             @Valid
             @RequestBody
@@ -96,6 +104,8 @@ public class UserController {
     @PutMapping("/{id}/password")
     public Result<Void> updatePassword(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String id,
             @Valid
             @RequestBody
@@ -117,6 +127,8 @@ public class UserController {
     @DeleteMapping("/{id}")
     public Result<Void> deleteById(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String id
     ) {
         requireUserManagementPermission();
@@ -132,6 +144,8 @@ public class UserController {
     @GetMapping("/{userId}/roles")
     public Result<Set<String>> findUserRoles(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String userId
     ) {
         requireUserRoleManagementPermission();
@@ -144,8 +158,12 @@ public class UserController {
     @PutMapping("/{userId}/roles/{roleId}")
     public Result<Void> assignRoleToUser(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String userId,
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String roleId
     ) {
         requireUserRoleManagementPermission();
@@ -163,8 +181,12 @@ public class UserController {
     @DeleteMapping("/{userId}/roles/{roleId}")
     public Result<Void> removeRoleFromUser(
             @PathVariable
+            @NotBlank(message = "用户ID不能为空")
+            @Size(max = 64, message = "用户ID长度不能超过64个字符")
             String userId,
             @PathVariable
+            @NotBlank(message = "角色ID不能为空")
+            @Size(max = 64, message = "角色ID长度不能超过64个字符")
             String roleId
     ) {
         requireUserRoleManagementPermission();

@@ -1,13 +1,16 @@
 package com.example.customerservice.common;
 
 import java.time.LocalDateTime;
+import java.io.Serializable;
 
 /**
  * HTTP接口统一返回类型。
  *
  * @param <T> 返回数据类型
  */
-public class Result<T> {
+public class Result<T> implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     private int code;
 

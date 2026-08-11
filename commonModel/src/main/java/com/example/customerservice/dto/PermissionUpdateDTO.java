@@ -3,6 +3,8 @@ package com.example.customerservice.dto;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
+import java.io.Serializable;
+
 
 /**
  * 修改权限请求。
@@ -13,7 +15,9 @@ import jakarta.validation.constraints.Size;
  * “至少提供一个修改字段”的判断，
  * 继续由RoleServiceImpl负责。
  */
-public class PermissionUpdateDTO {
+public class PermissionUpdateDTO implements Serializable {
+
+    private static final long serialVersionUID = 1L;
 
     @Pattern(
             regexp = "(?s).*\\S.*",
