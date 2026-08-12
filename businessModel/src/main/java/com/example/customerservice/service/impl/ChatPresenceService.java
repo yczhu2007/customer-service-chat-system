@@ -35,6 +35,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final ObjectProvider<ChatPresenceCallbacks> callbacksProvider;
     private final long agentReconnectGraceMillis;
+    private final ChatPresenceStateStore presenceStateStore;
 
     public ChatPresenceService(
             ChatRedisRepository chatRedisRepository,
@@ -52,6 +53,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.callbacksProvider = callbacksProvider;
         this.agentReconnectGraceMillis = agentReconnectGraceSeconds * 1000L;
+        this.presenceStateStore = new ChatPresenceStateStore(chatRedisRepository);
     }
 
     private ChatPresenceCallbacks callbacks() {
@@ -558,134 +560,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
             String userId,
             String wsSessionId
     ) {
-
-        long nowMillis =
-                System.currentTimeMillis();
-
-
-        long timeoutAt =
-                nowMillis
-                        + RedisConstants
-                        .HEARTBEAT_TIMEOUT_MILLIS;
-
-
-        String userOnlineKey =
-                RedisConstants.USER_ONLINE
-                        + userId;
-
-
-        String userWsKey =
-                RedisConstants.USER_WS
-                        + userId;
-
-
-        String wsSessionKey =
-                RedisConstants.WS_SESSION
-                        + wsSessionId;
-        /*
-         * 查询用户之前保存的WebSocket连接。
-         */
-        String previousWsSessionId =
-                chatRedisRepository.getValue(
-                                userWsKey
-                        );
-
-
-        /*
-         * 用户建立了新连接时，
-         * 删除旧连接的反向映射。
-         *
-         * 防止旧连接以后触发断开事件，
-         * 误结束新连接对应的聊天会话。
-         */
-        if (
-                previousWsSessionId != null &&
-                        !previousWsSessionId.isBlank() &&
-                        !wsSessionId.equals(
-                                previousWsSessionId
-                        )
-        ) {
-
-            chatRedisRepository.delete(
-                    RedisConstants.WS_SESSION
-                            + previousWsSessionId
-            );
-        }
-        chatRedisRepository.hashPut(
-                        userOnlineKey,
-                        "lastHeartbeat",
-                        String.valueOf(
-                                nowMillis
-                        )
-                );
-
-
-        chatRedisRepository.hashPut(
-                        userOnlineKey,
-                        "wsSessionId",
-                        wsSessionId
-                );
-
-        chatRedisRepository.hashPut(
-                        userOnlineKey,
-                        "vipLevel",
-                        String.valueOf(callbacks().resolveVipLevel(userId))
-                );
-
-
-        /*
-         * userId → wsSessionId
-         */
-        chatRedisRepository.setValue(
-                        userWsKey,
-                        wsSessionId,
-                        RedisConstants
-                                .ONLINE_TTL_SECONDS,
-                        TimeUnit.SECONDS
-                );
-
-
-        /*
-         * wsSessionId → userId
-         */
-        chatRedisRepository.setValue(
-                        wsSessionKey,
-                        userId,
-                        RedisConstants
-                                .ONLINE_TTL_SECONDS,
-                        TimeUnit.SECONDS
-                );
-
-
-        /*
-         * Hash也必须单独设置TTL。
-         */
-        chatRedisRepository.expire(
-                userOnlineKey,
-                RedisConstants
-                        .ONLINE_TTL_SECONDS,
-                TimeUnit.SECONDS
+        presenceStateStore.refreshOnlineState(
+                userId,
+                wsSessionId,
+                callbacks().resolveVipLevel(userId)
         );
-
-
-        /*
-         * 记录全局在线用户。
-         */
-        chatRedisRepository.setAdd(
-                        RedisConstants.ONLINE_USERS,
-                        userId
-                );
-
-
-        /*
-         * 当前定时器查询score <= 当前时间，
-         * 所以这里保存的是超时截止时间。
-         */
-        chatRedisRepository.sortedSetAdd(
-                        RedisConstants.ONLINE_HEARTBEAT,
-                        userId,
-                        timeoutAt
-                );
     }
     /**
      * 清理用户或客服的在线状态。
@@ -694,41 +573,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
             String userId,
             String wsSessionId
     ) {
-
-        chatRedisRepository.delete(
-                RedisConstants.USER_ONLINE
-                        + userId
-        );
-
-
-        chatRedisRepository.delete(
-                RedisConstants.USER_WS
-                        + userId
-        );
-
-
-        if (
-                wsSessionId != null &&
-                        !wsSessionId.isBlank()
-        ) {
-
-            chatRedisRepository.delete(
-                    RedisConstants.WS_SESSION
-                            + wsSessionId
-            );
-        }
-
-
-        chatRedisRepository.setRemove(
-                        RedisConstants.ONLINE_USERS,
-                        userId
-                );
-
-
-        chatRedisRepository.sortedSetRemove(
-                        RedisConstants.ONLINE_HEARTBEAT,
-                        userId
-                );
+        presenceStateStore.cleanupOnlineState(userId, wsSessionId);
     }
 
 }

@@ -49,3 +49,5 @@ app:
       average-handle-seconds: ${CHAT_QUEUE_AVERAGE_HANDLE_SECONDS:300}
       # 每个VIP等级提前10^12毫秒，严格保持高等级VIP优先；普通用户由排队超时策略兜底。
       vip-priority-step-seconds: ${CHAT_VIP_PRIORITY_STEP_SECONDS:1000000000}
+      # 普通用户达到该等待时长后进入保障优先层，避免持续被VIP用户插队。
+      anti-starvation-seconds: ${CHAT_QUEUE_ANTI_STARVATION_SECONDS:180}

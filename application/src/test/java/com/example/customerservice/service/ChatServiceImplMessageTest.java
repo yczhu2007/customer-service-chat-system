@@ -18,6 +18,7 @@ import com.example.customerservice.service.impl.ChatServiceImpl;
 import com.example.customerservice.service.impl.ChatMessageService;
 import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
+import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -332,7 +333,13 @@ class ChatServiceImplMessageTest {
                 new ChatMessageDeliveryService(
                         chatRedisRepository, chatSessionMapper, chatMessageMapper,
                         chatMessageReadMapper, messagingTemplate, messagePersistService,
-                        objectMapper, 120, 300
+                        objectMapper,
+                        new ChatOfflineMessageService(
+                                chatRedisRepository,
+                                messagingTemplate,
+                                objectMapper
+                        ),
+                        120, 300
                 ),
                 new ChatMessageManagementService(
                         chatRedisRepository, chatSessionMapper, chatMessageMapper,

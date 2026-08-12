@@ -10,6 +10,7 @@ import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatMessageDeliveryOperations;
 import com.example.customerservice.service.ChatMessageManagementOperations;
+import com.example.customerservice.service.ChatOfflineMessageOperations;
 import com.example.customerservice.service.ChatPresenceCallbacks;
 import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatSessionTransferOperations;
@@ -19,6 +20,7 @@ import com.example.customerservice.service.impl.ChatServiceImpl;
 import com.example.customerservice.service.impl.ChatMessageService;
 import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
+import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatPresenceService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
 import com.example.customerservice.service.impl.ChatSessionTransferService;
@@ -36,6 +38,19 @@ import tools.jackson.databind.ObjectMapper;
 public class ChatServiceConfiguration {
 
     @Bean
+    public ChatOfflineMessageOperations chatOfflineMessageOperations(
+            ChatRedisRepository chatRedisRepository,
+            SimpMessagingTemplate messagingTemplate,
+            ObjectMapper objectMapper
+    ) {
+        return new ChatOfflineMessageService(
+                chatRedisRepository,
+                messagingTemplate,
+                objectMapper
+        );
+    }
+
+    @Bean
     public ChatMessageDeliveryOperations chatMessageDeliveryOperations(
             ChatRedisRepository chatRedisRepository,
             ChatSessionMapper chatSessionMapper,
@@ -44,6 +59,7 @@ public class ChatServiceConfiguration {
             SimpMessagingTemplate messagingTemplate,
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
+            ChatOfflineMessageOperations chatOfflineMessageOperations,
             @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds,
             @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds
     ) {
@@ -55,6 +71,7 @@ public class ChatServiceConfiguration {
                 messagingTemplate,
                 messagePersistService,
                 objectMapper,
+                chatOfflineMessageOperations,
                 messageRecallWindowSeconds,
                 messageEditWindowSeconds
         );

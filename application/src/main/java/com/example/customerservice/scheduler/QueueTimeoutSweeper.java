@@ -36,6 +36,7 @@ public class QueueTimeoutSweeper {
     private final long timeoutMillis;
     private final long vipTimeoutMillis;
     private final long vipPriorityStepMillis;
+    private final QueuePriorityPolicy priorityPolicy;
     private final IChatService chatService;
 
     public QueueTimeoutSweeper(
@@ -45,7 +46,9 @@ public class QueueTimeoutSweeper {
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
-            long vipPriorityStepSeconds
+            long vipPriorityStepSeconds,
+            @Value("${app.chat.queue.anti-starvation-seconds:180}")
+            long antiStarvationSeconds
     ) {
         this.redisTemplate = redisTemplate;
         this.messagingTemplate = messagingTemplate;
@@ -55,14 +58,18 @@ public class QueueTimeoutSweeper {
                 0L,
                 vipPriorityStepSeconds * 1000L
         );
+        this.priorityPolicy = new QueuePriorityPolicy(
+                vipPriorityStepMillis,
+                Math.max(1L, antiStarvationSeconds) * 1000L
+        );
         this.chatService = chatService;
     }
 
     @Scheduled(fixedDelayString = "${app.chat.queue.sweep-delay-ms:15000}")
     public void removeTimedOutUsers() {
         backfillMissingEnqueueTimes();
-        normalizeFairPriorityScores();
         long now = System.currentTimeMillis();
+        normalizeFairPriorityScores(now);
         long earliestDeadline =
                 now - Math.min(timeoutMillis, vipTimeoutMillis);
         Set<String> userIds = redisTemplate.opsForZSet().rangeByScore(
@@ -110,8 +117,8 @@ public class QueueTimeoutSweeper {
         chatService.refreshWaitingPositions();
     }
 
-    /** 按文档规定重新计算严格的VIP等级优先分数，同等级仍按入队时间保持FIFO。 */
-    private void normalizeFairPriorityScores() {
+    /** 重新计算 VIP 权重和普通用户反饥饿保障分数，同一优先层仍保持 FIFO。 */
+    private void normalizeFairPriorityScores(long now) {
         Set<String> queuedUserIds = redisTemplate.opsForZSet().range(
                 RedisConstants.QUEUE_PENDING,
                 0,
@@ -133,8 +140,11 @@ public class QueueTimeoutSweeper {
                     userId
             );
             int vipLevel = parseVipLevel(vipLevelValue);
-            double fairScore = enqueuedAt
-                    - (double) vipLevel * vipPriorityStepMillis;
+            double fairScore = priorityPolicy.score(
+                    enqueuedAt,
+                    vipLevel,
+                    now
+            );
             redisTemplate.opsForZSet().add(
                     RedisConstants.QUEUE_PENDING,
                     userId,
