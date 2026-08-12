@@ -22,7 +22,7 @@ import java.util.UUID;
  * 角色与权限管理实现。
  */
 @Service
-public class RoleServiceImpl implements IRoleService {
+public class RoleServiceImpl extends RbacServiceSupport implements IRoleService {
 
     private final SysRoleMapper sysRoleMapper;
 
@@ -672,119 +672,9 @@ public class RoleServiceImpl implements IRoleService {
         return roleVO;
     }
 
-    private PermissionVO toPermissionVO(
-            SysPermission permission
-    ) {
-        PermissionVO permissionVO =
-                new PermissionVO();
 
-        permissionVO.setId(permission.getId());
-        permissionVO.setPermissionCode(
-                permission.getPermissionCode()
-        );
-        permissionVO.setPermissionName(
-                permission.getPermissionName()
-        );
-        permissionVO.setPermissionType(
-                permission.getPermissionType()
-        );
-        permissionVO.setRequestMethod(
-                permission.getRequestMethod()
-        );
-        permissionVO.setRequestPath(
-                permission.getRequestPath()
-        );
-        permissionVO.setDescription(
-                permission.getDescription()
-        );
-        permissionVO.setStatus(
-                permission.getStatus()
-        );
-        permissionVO.setCreateTime(
-                permission.getCreateTime()
-        );
-        permissionVO.setUpdateTime(
-                permission.getUpdateTime()
-        );
 
-        return permissionVO;
-    }
 
-    private String requireText(
-            String value,
-            String message
-    ) {
-        if (!StringUtils.hasText(value)) {
-            throw new IllegalArgumentException(message);
-        }
 
-        return value.trim();
-    }
 
-    private String normalizeStatus(
-            String status,
-            String defaultStatus
-    ) {
-        if (!StringUtils.hasText(status)) {
-            return defaultStatus;
-        }
-
-        String normalizedStatus =
-                status.trim().toUpperCase(Locale.ROOT);
-
-        if (
-                !"ENABLED".equals(normalizedStatus) &&
-                        !"DISABLED".equals(normalizedStatus)
-        ) {
-            throw new IllegalArgumentException(
-                    "status只能是ENABLED或DISABLED"
-            );
-        }
-
-        return normalizedStatus;
-    }
-
-    private String normalizePermissionType(
-            String permissionType,
-            String defaultType
-    ) {
-        if (!StringUtils.hasText(permissionType)) {
-            return defaultType;
-        }
-
-        String normalizedType =
-                permissionType.trim()
-                        .toUpperCase(Locale.ROOT);
-
-        if (
-                !"API".equals(normalizedType) &&
-                        !"MENU".equals(normalizedType) &&
-                        !"BUTTON".equals(normalizedType)
-        ) {
-            throw new IllegalArgumentException(
-                    "permissionType只能是API、MENU或BUTTON"
-            );
-        }
-
-        return normalizedType;
-    }
-
-    private String normalizeRequestMethod(
-            String requestMethod
-    ) {
-        if (!StringUtils.hasText(requestMethod)) {
-            return null;
-        }
-
-        return requestMethod.trim()
-                .toUpperCase(Locale.ROOT);
-    }
-
-    private String normalizeNullableText(String value) {
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-
-        return value.trim();
-    }
 }

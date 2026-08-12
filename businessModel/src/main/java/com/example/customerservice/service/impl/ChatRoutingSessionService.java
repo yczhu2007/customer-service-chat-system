@@ -47,6 +47,9 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupport implements IChatService, ChatPresenceCallbacks {
 
+    private final ChatSessionReconciliationService reconciliationService;
+    private final ChatSessionInactivityService inactivityService;
+
     public ChatRoutingSessionService(
             ChatRedisRepository chatRedisRepository,
             ChatMessageOperations chatMessageOperations,
@@ -76,6 +79,16 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                 sysUserRoleMapper, sysUserMapper, agentReconnectGraceSeconds,
                 vipReservedSlots, averageHandleSeconds, vipPriorityStepSeconds,
                 messageRecallWindowSeconds, messageEditWindowSeconds
+        );
+        this.reconciliationService = new ChatSessionReconciliationService(
+                chatRedisRepository,
+                chatSessionMapper,
+                this
+        );
+        this.inactivityService = new ChatSessionInactivityService(
+                chatRedisRepository,
+                chatSessionMapper,
+                this
         );
     }
     @Override
@@ -310,7 +323,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     /**
      * 将活动会话状态写入Redis
      */
-    private void cacheActiveSessionState(
+    void cacheActiveSessionState(
             ChatSession session
     ) {
 
@@ -487,7 +500,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
         return findIdleAgent(userId, null);
     }
 
-    private String findIdleAgent(
+    String findIdleAgent(
             String userId,
             String excludedAgentId
     ) {
@@ -615,103 +628,14 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     }
     @Override
     public void reconcilePendingAssignments() {
-        Set<String> userIds = chatRedisRepository.sortedSetRangeByScore(
-                RedisConstants.ASSIGNMENT_PENDING,
-                0,
-                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(60),
-                0,
-                100
-        );
-        if (userIds == null || userIds.isEmpty()) {
-            return;
-        }
-        for (String userId : userIds) {
-            Object rawPayload = chatRedisRepository.hashGet(
-                    RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
-                    userId
-            );
-            if (rawPayload == null) {
-                chatRedisRepository.sortedSetRemove(
-                        RedisConstants.ASSIGNMENT_PENDING,
-                        userId
-                );
-                continue;
-            }
-            String payload = String.valueOf(rawPayload);
-            int separatorIndex = payload.indexOf('|');
-            if (separatorIndex <= 0) {
-                clearAssignmentReservation(userId);
-                continue;
-            }
-            String reservedAgentId = payload.substring(0, separatorIndex);
-            ChatSession activeSession =
-                    chatSessionMapper.findActiveByUserId(userId);
-            if (activeSession == null) {
-                rollbackAssignmentReservation(userId, reservedAgentId, true);
-            } else if (reservedAgentId.equals(activeSession.getAgentId())) {
-                cacheActiveSessionState(activeSession);
-                synchronizeAgentLoad(reservedAgentId);
-                clearAssignmentReservation(userId);
-            } else {
-                rollbackAssignmentReservation(userId, reservedAgentId, false);
-            }
-        }
-        refreshWaitingPositions();
+        reconciliationService.reconcilePendingAssignments();
     }
 
     @Override
     public void reconcileActiveSessionState() {
-        List<ChatSession> activeSessions = chatSessionMapper.selectList(
-                Wrappers.<ChatSession>lambdaQuery()
-                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
-        );
-
-        Map<String, Long> activeCountByAgent = new HashMap<>();
-        for (ChatSession session : activeSessions) {
-            String cachedAgentId = chatRedisRepository.getValue(
-                    RedisConstants.SESSION_AGENT + session.getId()
-            );
-            if (cachedAgentId != null
-                    && !cachedAgentId.equals(session.getAgentId())) {
-                chatRedisRepository.setRemove(
-                        RedisConstants.agentSessionsKey(cachedAgentId),
-                        session.getId()
-                );
-            }
-            cacheActiveSessionState(session);
-            recordVipWaitTime(session);
-            activeCountByAgent.merge(session.getAgentId(), 1L, Long::sum);
-        }
-
-        Set<String> onlineAgentIds = chatRedisRepository.sortedSetRange(
-                RedisConstants.AGENT_LOAD,
-                0,
-                -1
-        );
-        if (onlineAgentIds == null) {
-            return;
-        }
-        for (String agentId : onlineAgentIds) {
-            chatRedisRepository.sortedSetAdd(
-                    RedisConstants.AGENT_LOAD,
-                    agentId,
-                    activeCountByAgent.getOrDefault(agentId, 0L)
-            );
-        }
+        reconciliationService.reconcileActiveSessionState();
     }
 
-    private void synchronizeAgentLoad(String agentId) {
-        Long activeSessionCount = chatSessionMapper.selectCount(
-                Wrappers.<ChatSession>lambdaQuery()
-                        .eq(ChatSession::getAgentId, agentId)
-                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
-        );
-        chatRedisRepository.sortedSetAdd(
-                RedisConstants.AGENT_LOAD,
-                agentId,
-                activeSessionCount == null ? 0 : activeSessionCount
-        );
-    }
 
     /**
      * MySQL 已结束但 Redis 尚未收尾，或结束流程在数据库更新前异常退出时，
@@ -719,72 +643,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
      */
     @Override
     public void reconcilePendingSessionFinalizations() {
-        Set<String> sessionIds = chatRedisRepository.sortedSetRangeByScore(
-                RedisConstants.SESSION_FINALIZE_PENDING,
-                0,
-                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(10),
-                0,
-                100
-        );
-        if (sessionIds == null || sessionIds.isEmpty()) {
-            return;
-        }
-        for (String sessionId : sessionIds) {
-            try {
-                Object rawPayload = chatRedisRepository.hashGet(
-                        RedisConstants.SESSION_FINALIZE_PENDING_PAYLOAD,
-                        sessionId
-                );
-                if (rawPayload == null) {
-                    clearSessionFinalizePending(sessionId);
-                    continue;
-                }
-                String[] payloadParts =
-                        String.valueOf(rawPayload).split("\\|", 3);
-                if (payloadParts.length != 3) {
-                    clearSessionFinalizePending(sessionId);
-                    continue;
-                }
-                LocalDateTime requestedEndTime =
-                        LocalDateTime.parse(payloadParts[2]);
-                ChatSession session =
-                        chatSessionMapper.selectById(sessionId);
-                if (session == null) {
-                    clearSessionFinalizePending(sessionId);
-                    continue;
-                }
-                if (!ChatConstants.SESSION_STATUS_CLOSED.equals(
-                        session.getStatus()
-                )) {
-                    chatSessionMapper.endSession(
-                            sessionId,
-                            requestedEndTime
-                    );
-                    session = chatSessionMapper.selectById(sessionId);
-                    if (session == null
-                            || !ChatConstants.SESSION_STATUS_CLOSED.equals(
-                            session.getStatus()
-                    )) {
-                        continue;
-                    }
-                }
-                LocalDateTime effectiveEndTime =
-                        session.getEndTime() == null
-                                ? requestedEndTime
-                                : session.getEndTime();
-                applySessionFinalizationRedis(
-                        session,
-                        effectiveEndTime,
-                        false
-                );
-            } catch (Exception exception) {
-                log.error(
-                        "会话结束状态对账失败，sessionId={}",
-                        sessionId,
-                        exception
-                );
-            }
-        }
+        reconciliationService.reconcilePendingSessionFinalizations();
     }
 
     @Override
@@ -792,94 +651,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             String sessionId,
             long cutoffMillis
     ) {
-        if (sessionId == null || sessionId.isBlank()) {
-            return;
-        }
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null
-                || !ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
-            chatRedisRepository.sortedSetRemove(
-                    RedisConstants.SESSION_LAST_ACTIVITY,
-                    sessionId
-            );
-            return;
-        }
-
-        String userId = session.getUserId();
-        String sourceAgentId = session.getAgentId();
-        String assignmentLockToken = acquireAssignmentLock(userId);
-        if (assignmentLockToken == null) {
-            return;
-        }
-
-        String targetAgentId = null;
-        try {
-            boolean userOnline = Boolean.TRUE.equals(
-                    chatRedisRepository.hasKey(RedisConstants.USER_WS + userId)
-            );
-            if (userOnline) {
-                targetAgentId = findIdleAgent(userId, sourceAgentId);
-                if (targetAgentId == null) {
-                    return;
-                }
-            }
-
-            boolean finalized = finalizeSession(
-                    session,
-                    sourceAgentId,
-                    cutoffMillis
-            );
-            if (!finalized) {
-                if (targetAgentId != null) {
-                    rollbackAssignmentReservation(
-                            userId,
-                            targetAgentId,
-                            false
-                    );
-                }
-                return;
-            }
-
-            notifySessionClosed(
-                    userId,
-                    sessionId,
-                    ChatConstants.REASON_SESSION_INACTIVITY_TIMEOUT
-            );
-            notifySessionClosed(
-                    sourceAgentId,
-                    sessionId,
-                    ChatConstants.REASON_SESSION_INACTIVITY_TIMEOUT
-            );
-
-            if (targetAgentId != null) {
-                try {
-                    ChatSession reassignedSession = createSession(
-                            userId,
-                            targetAgentId
-                    );
-                    notifyBothParties(reassignedSession);
-                    log.info(
-                            "会话无活动超时后已转分配，oldSessionId={}，newSessionId={}，sourceAgentId={}，targetAgentId={}",
-                            sessionId,
-                            reassignedSession.getId(),
-                            sourceAgentId,
-                            targetAgentId
-                    );
-                } catch (RuntimeException exception) {
-                    handleSessionCreationFailure(
-                            userId,
-                            targetAgentId,
-                            false
-                    );
-                    enqueueWaitingUser(userId);
-                    notifyWaitingUser(userId, getWaitingPosition(userId));
-                    throw exception;
-                }
-            }
-            dequeueAndReassign(sourceAgentId);
-        } finally {
-            releaseAssignmentLock(userId, assignmentLockToken);
-        }
+        inactivityService.handleSessionInactivityTimeout(sessionId, cutoffMillis);
     }
 
     @Override
