@@ -170,6 +170,7 @@
 <script>
 
     let socket = null;
+    let loggedInRoles = [];
     /*
      * 是否自动发送业务ACK
      *
@@ -249,18 +250,16 @@
 
             document.getElementById("token").value = result.data.token;
             document.title = "客服聊天系统 - " + result.data.username;
-            const roles = Array.isArray(result.data.roles)
-                ? result.data.roles.join(", ")
-                : "";
+            loggedInRoles = Array.isArray(result.data.roles)
+                ? result.data.roles
+                : [];
+            const roles = loggedInRoles.join(", ");
             loginStatus.textContent = "登录成功：" + result.data.username
                 + "（" + result.data.userId + "）"
                 + (roles ? "，角色：" + roles : "");
             writeLog("网页登录成功，正在自动连接WebSocket：" + result.data.userId);
 
-            if (socket && socket.readyState !== WebSocket.CLOSED) {
-                disconnectStomp();
-            }
-            connectStomp();
+            reconnectStomp();
         } catch (error) {
             loginStatus.textContent = "登录失败：" + error.message;
             writeLog("网页登录失败：" + error.message);
@@ -281,6 +280,21 @@
 
 
     function connectStomp() {
+
+        if (socket != null) {
+            if (socket.readyState === WebSocket.CONNECTING) {
+                writeLog("WebSocket正在连接，请勿重复点击连接");
+                return;
+            }
+            if (socket.readyState === WebSocket.OPEN) {
+                writeLog("WebSocket已经连接，无需重复连接");
+                return;
+            }
+            if (socket.readyState === WebSocket.CLOSING) {
+                writeLog("WebSocket正在关闭，请稍后再连接");
+                return;
+            }
+        }
 
         const token =
             document.getElementById("token")
@@ -463,6 +477,11 @@
  * STOMP连接成功后启动心跳
  */
                 startHeartbeat();
+
+                if (loggedInRoles.includes("AGENT")) {
+                    writeLog("检测到客服角色，正在自动上线");
+                    void setAgentOnline(true);
+                }
             }
             /*
  * 收到普通MESSAGE帧时，
@@ -489,6 +508,20 @@
 
 
                         /*
+                         * 会话创建通知的sessionId位于body.session.sessionId，
+                         * 聊天消息、历史记录和会话事件则直接使用body.sessionId。
+                         */
+                        const receivedSessionId =
+                            body["sessionId"] ||
+                            (body["session"] && body["session"]["sessionId"]);
+
+                        if (receivedSessionId) {
+                            document.getElementById("sessionId").value =
+                                receivedSessionId;
+                        }
+
+
+                        /*
                          * 真正的ChatMessage同时包含：
                          * id
                          * sessionId
@@ -504,7 +537,6 @@
                         ) {
 
                             document.getElementById("messageId").value = body["id"];
-                            document.getElementById("sessionId").value = body["sessionId"];
 
                             /* RECEIVED/STORED是发送方状态回执，不能再当成接收消息ACK。 */
                             if (AUTO_ACK && !body["ackStatus"]) {
@@ -558,6 +590,26 @@
                 "连接发生错误"
             );
         };
+    }
+
+    /** 账号重新登录时，等待旧连接完全关闭后再使用新Token连接。 */
+    function reconnectStomp() {
+        if (socket == null || socket.readyState === WebSocket.CLOSED) {
+            connectStomp();
+            return;
+        }
+
+        const previousSocket = socket;
+        previousSocket.addEventListener(
+            "close",
+            function () {
+                if (socket == null || socket === previousSocket) {
+                    connectStomp();
+                }
+            },
+            {once: true}
+        );
+        disconnectStomp();
     }
     /*
      * 发送业务消息ACK
@@ -1114,15 +1166,23 @@
 
     function disconnectStomp() {
         stopHeartbeat();
-        if (
-            socket == null ||
-            socket.readyState !== WebSocket.OPEN
-        ) {
+        if (socket == null || socket.readyState === WebSocket.CLOSED) {
 
             writeLog(
                 "当前没有已连接的STOMP会话"
             );
 
+            return;
+        }
+
+        if (socket.readyState === WebSocket.CONNECTING) {
+            socket.close();
+            writeLog("正在取消WebSocket连接");
+            return;
+        }
+
+        if (socket.readyState === WebSocket.CLOSING) {
+            writeLog("WebSocket正在关闭");
             return;
         }
 
