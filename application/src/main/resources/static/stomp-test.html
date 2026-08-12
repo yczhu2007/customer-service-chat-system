@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>STOMP连接测试</title>
+    <title>客服聊天系统测试页面</title>
 
     <style>
         body {
@@ -24,9 +24,13 @@
         #log {
             margin-top: 20px;
             padding: 15px;
-            min-height: 300px;
+            height: 420px;
             background: #eeeeee;
             white-space: pre-wrap;
+            overflow-y: auto;
+            overflow-x: hidden;
+            overflow-wrap: anywhere;
+            box-sizing: border-box;
         }
 
         .panel {
@@ -49,7 +53,25 @@
 
 <body>
 
-<h2>STOMP连接测试</h2>
+<h2>客服聊天系统测试页面</h2>
+
+<div class="panel">
+    <h3>网页登录</h3>
+    <p>
+        <label>
+            用户名：
+            <input id="loginUsername" autocomplete="username" placeholder="例如 U001、A001 或 admin">
+        </label>
+    </p>
+    <p>
+        <label>
+            密码：
+            <input id="loginPassword" type="password" autocomplete="current-password" value="123456">
+        </label>
+        <button id="loginButton" onclick="loginAndConnect()">登录并连接</button>
+    </p>
+    <p id="loginStatus" class="hint">当前未登录</p>
+</div>
 
 <label>
     登录Token：
@@ -71,7 +93,6 @@
 
 <div class="panel">
     <h3>VIP客户与客服状态</h3>
-    <p class="hint">REST操作使用上方Token。设置VIP和管理VIP技能组需要管理员Token；客服上线、离线需要客服Token。</p>
     <p>
         <label>用户ID：<input id="vipUserId" placeholder="例如 U001"></label>
         <label>VIP等级：<input id="vipLevel" type="number" min="0" max="5" value="1"></label>
@@ -132,7 +153,6 @@
 
 <div class="panel">
     <h3>消息已读、编辑和撤回</h3>
-    <p class="hint">收到或发送消息后，可把服务端消息ID填入下方。页面收到聊天消息时也会自动填入最近的消息ID。</p>
     <p>
         <label>消息ID：<input id="messageId" placeholder="服务端返回的消息id"></label>
     </p>
@@ -142,14 +162,6 @@
     <button onclick="markMessageRead()">标记已读</button>
     <button onclick="editChatMessage()">编辑消息</button>
     <button onclick="recallChatMessage()">撤回消息</button>
-</div>
-
-<div class="panel">
-    <h3>自动分配策略测试入口</h3>
-    <p class="hint">这些策略由后端自动执行，页面提供准备入口和测试步骤。多坐席测试需要分别打开多个浏览器窗口并使用不同账号Token。</p>
-    <button onclick="showStrategyGuide('load')">最长空闲客服测试步骤</button>
-    <button onclick="showStrategyGuide('vip')">VIP优先分配测试步骤</button>
-    <button onclick="showStrategyGuide('timeout')">超时自动转分配测试步骤</button>
 </div>
 
 <div id="log"></div>
@@ -183,7 +195,89 @@
 
         log.textContent +=
             message + "\n";
+
+        log.scrollTop = log.scrollHeight;
     }
+
+    async function loginAndConnect() {
+        const usernameInput = document.getElementById("loginUsername");
+        const passwordInput = document.getElementById("loginPassword");
+        const loginButton = document.getElementById("loginButton");
+        const loginStatus = document.getElementById("loginStatus");
+        const username = usernameInput.value.trim();
+        const password = passwordInput.value;
+
+        if (!username) {
+            writeLog("请输入用户名");
+            usernameInput.focus();
+            return;
+        }
+        if (!password) {
+            writeLog("请输入密码");
+            passwordInput.focus();
+            return;
+        }
+
+        loginButton.disabled = true;
+        loginStatus.textContent = "正在登录……";
+
+        try {
+            const response = await fetch("/chat/login", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password
+                })
+            });
+            const responseText = await response.text();
+            let result = null;
+            try {
+                result = responseText ? JSON.parse(responseText) : null;
+            } catch (ignored) {
+                throw new Error("登录接口返回内容不是有效JSON");
+            }
+
+            if (!response.ok || !result || !result.data || !result.data.token) {
+                const errorMessage = result && result.message
+                    ? result.message
+                    : "用户名或密码错误";
+                throw new Error(errorMessage);
+            }
+
+            document.getElementById("token").value = result.data.token;
+            document.title = "客服聊天系统 - " + result.data.username;
+            const roles = Array.isArray(result.data.roles)
+                ? result.data.roles.join(", ")
+                : "";
+            loginStatus.textContent = "登录成功：" + result.data.username
+                + "（" + result.data.userId + "）"
+                + (roles ? "，角色：" + roles : "");
+            writeLog("网页登录成功，正在自动连接WebSocket：" + result.data.userId);
+
+            if (socket && socket.readyState !== WebSocket.CLOSED) {
+                disconnectStomp();
+            }
+            connectStomp();
+        } catch (error) {
+            loginStatus.textContent = "登录失败：" + error.message;
+            writeLog("网页登录失败：" + error.message);
+        } finally {
+            loginButton.disabled = false;
+        }
+    }
+
+    document.getElementById("loginPassword").addEventListener(
+        "keydown",
+        function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                loginAndConnect();
+            }
+        }
+    );
 
 
     function connectStomp() {
@@ -710,6 +804,9 @@
             sendFrame
         );
 
+        /* 当前消息发送后清空，下次发送时自动生成新的幂等消息ID。 */
+        clientMsgIdInput.value = "";
+
 
         writeLog(
             "已发送聊天消息：\n"
@@ -1013,30 +1110,6 @@
             {messageId: input.messageId},
             "已发送消息撤回请求"
         );
-    }
-
-    function showStrategyGuide(type) {
-        const guides = {
-            load:
-                "最长空闲客服测试：\n"
-                + "1. 分别打开两个页面，使用两个客服Token连接。\n"
-                + "2. 两个页面分别点击‘当前客服上线’。\n"
-                + "3. 再打开多个用户页面并依次连接。\n"
-                + "4. 查看SESSION_CREATED中的agentId；同负载时应分给最久未接待的客服。",
-            vip:
-                "VIP优先分配测试：\n"
-                + "1. 使用管理员Token为用户设置vipLevel，并按需配置VIP技能客服。\n"
-                + "2. 先让普通用户和VIP用户在无客服时进入等待队列。\n"
-                + "3. 客服上线后，VIP等级更高的用户应优先收到SESSION_CREATED。",
-            timeout:
-                "会话超时自动转分配测试：\n"
-                + "1. 启动前设置 CHAT_SESSION_INACTIVITY_TIMEOUT_SECONDS=60，便于测试。\n"
-                + "2. 准备两个在线客服并创建一个用户会话。\n"
-                + "3. 60秒内不要发送消息。\n"
-                + "4. 用户应先收到SESSION_CLOSED，再收到由另一客服创建的SESSION_CREATED。\n"
-                + "5. 没有其他可用客服时系统会保留原会话。"
-        };
-        writeLog(guides[type] || "未知测试类型");
     }
 
     function disconnectStomp() {
