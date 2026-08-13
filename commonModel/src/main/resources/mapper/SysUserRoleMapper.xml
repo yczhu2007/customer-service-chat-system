@@ -66,12 +66,4 @@
 
     </delete>
 
-
-    <delete id="deleteByUserId">
-
-        DELETE FROM sys_user_role
-        WHERE user_id = #{userId}
-
-    </delete>
-
 </mapper>

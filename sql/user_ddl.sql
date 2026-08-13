@@ -36,5 +36,5 @@ CREATE TABLE IF NOT EXISTS sys_user
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
+    COLLATE = utf8mb4_unicode_ci
     COMMENT = '系统用户表';

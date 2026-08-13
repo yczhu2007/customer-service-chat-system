@@ -18,6 +18,7 @@
                AND anchor.session_id = #{sessionId}
         WHERE message.session_id = #{sessionId}
           AND message.sender_id != #{userId}
+          AND message.recalled = 0
           AND (
                 message.create_time &lt; anchor.create_time
                 OR (

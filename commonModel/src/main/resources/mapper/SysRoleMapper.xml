@@ -31,6 +31,8 @@
 
         <set>
 
+            id = id,
+
             <if test="roleCode != null and roleCode != ''">
                 role_code = #{roleCode},
             </if>

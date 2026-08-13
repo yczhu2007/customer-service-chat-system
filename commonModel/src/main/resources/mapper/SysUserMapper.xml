@@ -31,6 +31,8 @@
 
         <set>
 
+            id = id,
+
             <if test="username != null and username != ''">
                 username = #{username},
             </if>

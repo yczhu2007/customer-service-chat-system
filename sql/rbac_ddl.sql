@@ -38,7 +38,7 @@ CREATE TABLE IF NOT EXISTS sys_role
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
+    COLLATE = utf8mb4_unicode_ci
     COMMENT = '系统角色表';
 
 
@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS sys_permission
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
+    COLLATE = utf8mb4_unicode_ci
     COMMENT = '系统权限表';
 
 
@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS sys_user_role
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
+    COLLATE = utf8mb4_unicode_ci
     COMMENT = '用户角色关联表';
 
 
@@ -140,7 +140,7 @@ CREATE TABLE IF NOT EXISTS sys_role_permission
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4
-    COLLATE = utf8mb4_0900_ai_ci
+    COLLATE = utf8mb4_unicode_ci
     COMMENT = '角色权限关联表';
 
 
