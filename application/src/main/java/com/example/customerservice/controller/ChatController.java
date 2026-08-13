@@ -194,6 +194,51 @@ public class ChatController {
         );
     }
 
+    /**
+     * 已结束会话的普通用户在保持WebSocket连接的情况下重新发起咨询。
+     * 客户端发送地址：/app/chat.start
+     */
+    @MessageMapping("/chat.start")
+    public void startConsultation(
+            Principal principal
+    ) {
+        if (principal == null) {
+            throw new IllegalArgumentException(
+                    "当前STOMP连接没有用户身份"
+            );
+        }
+
+        String userId = principal.getName();
+        Set<String> roleCodes =
+                authenticationService.findRoleCodesByUserId(
+                        userId
+                );
+
+        if (
+                roleCodes == null ||
+                        !roleCodes.contains("USER") ||
+                        roleCodes.contains("AGENT") ||
+                        roleCodes.contains("ADMIN")
+        ) {
+            throw new IllegalArgumentException(
+                    "只有普通用户可以重新发起咨询"
+            );
+        }
+
+        requireWebSocketPermission(
+                userId,
+                "chat:user:access"
+        );
+        chatService.onUserConnected(
+                userId
+        );
+
+        log.info(
+                "用户重新发起咨询，userId：{}",
+                userId
+        );
+    }
+
 
     /**
      * 当前登录客服上线。

@@ -469,14 +469,27 @@ public class ChatPresenceService implements ChatPresenceOperations {
             ChatSessionDTO notice =
                     ChatSessionDTO.fromEntity(
                             session,
-                            ChatConstants.REASON_AGENT_DISCONNECTED
+                            ChatConstants.EVENT_SESSION_CLOSED
                     );
             notice.setReason(
                     reason
             );
+            notice.setStatus(
+                    ChatConstants.SESSION_STATUS_CLOSED
+            );
 
             messagingTemplate.convertAndSendToUser(
                     userId,
+                    "/queue/chat",
+                    notice
+            );
+
+            /*
+             * 手动离线不会关闭客服的WebSocket连接，因此也要立即通知
+             * 当前客服清空已结束的会话，避免客服继续在失效会话中操作。
+             */
+            messagingTemplate.convertAndSendToUser(
+                    agentId,
                     "/queue/chat",
                     notice
             );
