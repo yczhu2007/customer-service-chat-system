@@ -1,6 +1,5 @@
 package com.example.customerservice.service;
 
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
@@ -8,13 +7,13 @@ import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
 import com.example.customerservice.dto.ChatHistoryPage;
+import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.service.impl.ChatServiceImpl;
 import com.example.customerservice.service.impl.ChatMessageService;
 import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
@@ -53,7 +52,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-class ChatServiceImplMessageTest {
+class ChatMessageServiceTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ChatSessionMapper chatSessionMapper;
@@ -71,7 +70,7 @@ class ChatServiceImplMessageTest {
     @Mock private ZSetOperations<String, String> zSetOperations;
     @Mock private SetOperations<String, String> setOperations;
 
-    private ChatServiceImpl service;
+    private IChatService service;
 
     @BeforeEach
     void setUp() {
@@ -90,7 +89,7 @@ class ChatServiceImplMessageTest {
                 messagePersistService, new ObjectMapper(), sysUserRoleMapper,
                 sysUserMapper, 20, 1, 300, 1_000_000_000L, 120, 300
         );
-        service = new ChatServiceImpl(routingSessionService);
+        service = routingSessionService;
     }
 
     @Test
@@ -223,7 +222,7 @@ class ChatServiceImplMessageTest {
                 messagePersistService, mapper, sysUserRoleMapper, sysUserMapper,
                 20, 1, 300, 1_000_000_000L, 120, 300
         );
-        service = new ChatServiceImpl(routingSessionService);
+        service = routingSessionService;
         when(valueOperations.get(RedisConstants.USER_WS + "U001"))
                 .thenReturn("WS001");
         when(listOperations.range(
@@ -268,24 +267,91 @@ class ChatServiceImplMessageTest {
     }
 
     @Test
-    @SuppressWarnings("unchecked")
-    void historyQueryIsPagedAndIncludesUnreadCount() {
+    void historyQueryUsesCursorAndIncludesUnreadCount() {
         ChatMessage message = textMessage();
-        Page<ChatMessage> databasePage = new Page<>(2, 10, 21);
-        databasePage.setRecords(List.of(message));
         when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
-        when(chatMessageMapper.selectPage(any(Page.class), any()))
-                .thenReturn(databasePage);
+        when(chatMessageMapper.selectLatestHistory("S001", 11)).thenReturn(List.of(message));
+        when(chatMessageMapper.selectCount(any())).thenReturn(21L);
         when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(4L);
 
-        ChatHistoryPage result = service.getHistory("S001", "U001", 2, 10);
+        ChatHistoryPage result = service.getHistory("S001", "U001", null, 10);
 
         assertEquals(1, result.records().size());
         assertEquals(21, result.total());
-        assertEquals(2, result.pageNo());
         assertEquals(10, result.pageSize());
-        assertEquals(3, result.pages());
+        assertEquals(false, result.hasMore());
         assertEquals(4, result.unreadCount());
+    }
+
+    @Test
+    void historyCursorUsesSeparateIndexRangeQueries() {
+        ChatMessage cursor = textMessage();
+        cursor.setId("M010");
+        ChatMessage sameTimeMessage = textMessage();
+        sameTimeMessage.setId("M009");
+        ChatMessage olderMessage = textMessage();
+        olderMessage.setId("M008");
+        olderMessage.setCreateTime(cursor.getCreateTime().minusSeconds(1));
+
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(chatMessageMapper.selectById("M010")).thenReturn(cursor);
+        when(chatMessageMapper.selectHistoryAtCursorTime(
+                "S001", cursor.getCreateTime(), "M010", 3
+        )).thenReturn(List.of(sameTimeMessage));
+        when(chatMessageMapper.selectHistoryBeforeTime(
+                "S001", cursor.getCreateTime(), 2
+        )).thenReturn(List.of(olderMessage));
+        when(chatMessageMapper.selectCount(any())).thenReturn(10L);
+        when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(0L);
+
+        ChatHistoryPage result = service.getHistory("S001", "U001", "M010", 2);
+
+        assertEquals(List.of("M008", "M009"), result.records().stream()
+                .map(ChatMessage::getId)
+                .toList());
+        assertEquals(false, result.hasMore());
+        verify(chatMessageMapper).selectHistoryAtCursorTime(
+                "S001", cursor.getCreateTime(), "M010", 3
+        );
+        verify(chatMessageMapper).selectHistoryBeforeTime(
+                "S001", cursor.getCreateTime(), 2
+        );
+        verify(chatMessageMapper, never()).selectList(any());
+    }
+
+    @Test
+    void duplicateAcknowledgementUsesCompleteStoredMessage() {
+        ChatMessage existingMessage = textMessage();
+        existingMessage.setClientMsgId("CLIENT-001");
+        ChatMessage duplicateRequest = textMessage();
+        duplicateRequest.setId(null);
+        duplicateRequest.setClientMsgId("CLIENT-001");
+
+        String dedupKey = RedisConstants.CLIENT_MSG_DEDUP
+                + "S001:A001:CLIENT-001";
+        when(valueOperations.setIfAbsent(
+                eq(dedupKey),
+                anyString(),
+                eq(24L),
+                eq(TimeUnit.HOURS)
+        )).thenReturn(false);
+        when(valueOperations.get(dedupKey)).thenReturn("M001");
+        when(chatMessageMapper.selectById("M001")).thenReturn(existingMessage);
+
+        int result = service.handleMessage(duplicateRequest);
+
+        assertEquals(0, result);
+        ArgumentCaptor<ChatMessageDTO> acknowledgement =
+                ArgumentCaptor.forClass(ChatMessageDTO.class);
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("A001"),
+                eq("/queue/chat"),
+                acknowledgement.capture()
+        );
+        assertEquals("DUPLICATE", acknowledgement.getValue().getAckStatus());
+        assertEquals("M001", acknowledgement.getValue().getId());
+        assertEquals("AGENT", acknowledgement.getValue().getSenderRole());
+        assertEquals(existingMessage.getCreateTime(), acknowledgement.getValue().getCreateTime());
     }
 
     @Test

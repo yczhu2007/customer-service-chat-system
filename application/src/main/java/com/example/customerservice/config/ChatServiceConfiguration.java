@@ -6,7 +6,6 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatMessageDeliveryOperations;
 import com.example.customerservice.service.ChatMessageManagementOperations;
@@ -16,7 +15,6 @@ import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatSessionTransferOperations;
 import com.example.customerservice.service.ChatSessionNotificationOperations;
 import com.example.customerservice.service.MessagePersistService;
-import com.example.customerservice.service.impl.ChatServiceImpl;
 import com.example.customerservice.service.impl.ChatMessageService;
 import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
@@ -29,13 +27,21 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.context.annotation.Primary;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 /** 聊天业务服务的显式装配配置。 */
 @Configuration
 public class ChatServiceConfiguration {
+
+    @Bean
+    public TransactionTemplate chatTransactionTemplate(
+            PlatformTransactionManager transactionManager
+    ) {
+        return new TransactionTemplate(transactionManager);
+    }
 
     @Bean
     public ChatOfflineMessageOperations chatOfflineMessageOperations(
@@ -138,7 +144,8 @@ public class ChatServiceConfiguration {
             ChatSessionMapper chatSessionMapper,
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
-            SimpMessagingTemplate messagingTemplate
+            SimpMessagingTemplate messagingTemplate,
+            TransactionTemplate chatTransactionTemplate
     ) {
         return new ChatSessionTransferService(
                 chatRedisRepository,
@@ -146,6 +153,7 @@ public class ChatServiceConfiguration {
                 sysUserMapper,
                 sysUserRoleMapper,
                 messagingTemplate,
+                chatTransactionTemplate,
                 com.example.customerservice.constant.RedisConstants.AGENT_MAX_CONCURRENCY
         );
     }
@@ -202,11 +210,4 @@ public class ChatServiceConfiguration {
         );
     }
 
-    @Bean
-    @Primary
-    public ChatServiceImpl chatService(
-            ChatRoutingSessionService chatRoutingSessionService
-    ) {
-        return new ChatServiceImpl(chatRoutingSessionService);
-    }
 }

@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.service.impl.ChatRedisScripts.*;
+
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -35,7 +37,6 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
@@ -658,11 +659,11 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     public ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
-            int pageNo,
+            String beforeMessageId,
             int pageSize
     ) {
         return chatMessageOperations.getHistory(
-                sessionId, operatorId, pageNo, pageSize
+                sessionId, operatorId, beforeMessageId, pageSize
         );
     }
     @Override

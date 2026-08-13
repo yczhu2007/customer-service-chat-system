@@ -58,8 +58,8 @@ CREATE TABLE IF NOT EXISTS chat_message
     recalled_at   DATETIME    NULL COMMENT '撤回时间',
 
     PRIMARY KEY (id),
-    UNIQUE KEY uk_chat_message_client_msg_id (client_msg_id),
-    KEY idx_chat_message_session_time (session_id, create_time),
+    UNIQUE KEY uk_chat_message_client (session_id, sender_id, client_msg_id),
+    KEY idx_chat_message_session_time (session_id, create_time, id),
     KEY idx_chat_message_sender_time (sender_id, create_time),
 
     CONSTRAINT fk_chat_message_session

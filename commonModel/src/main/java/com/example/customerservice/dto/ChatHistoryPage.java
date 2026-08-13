@@ -9,9 +9,9 @@ import java.io.Serializable;
 public record ChatHistoryPage(
         List<ChatMessage> records,
         long total,
-        long pageNo,
         long pageSize,
-        long pages,
+        String nextCursor,
+        boolean hasMore,
         long unreadCount
 ) implements Serializable {
 
