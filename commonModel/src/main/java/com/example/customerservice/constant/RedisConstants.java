@@ -54,7 +54,6 @@ public class RedisConstants {
     public static final String PERSIST_PENDING_PAYLOAD = "persist:pending:payload:";
     /** 达到最大重试次数后等待人工处理的消息 ZSET。 */
     public static final String PERSIST_DEADLETTER = "persist:deadletter";
-    public static final String PERSIST_RETRY_COUNT = "persist:retry:count:";
     public static final String PERSIST_RETRY_LEASE = "persist:retry:lease:";
     public static final long PERSIST_RETRY_LEASE_SECONDS = 180L;
     //websocket

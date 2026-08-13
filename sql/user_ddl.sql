@@ -9,6 +9,8 @@
 
 SET NAMES utf8mb4;
 
+-- 本脚本用于全新安装。CREATE TABLE IF NOT EXISTS 不会升级已经存在的表结构。
+
 CREATE TABLE IF NOT EXISTS sys_user
 (
     id          VARCHAR(64)  NOT NULL COMMENT '用户ID，例如U001、A001',

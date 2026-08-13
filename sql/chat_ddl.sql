@@ -5,7 +5,9 @@
 --   2. rbac_ddl.sql
 --   3. chat_ddl.sql
 --
--- 本脚本只使用 CREATE TABLE IF NOT EXISTS，不会删除已有数据。
+-- 本脚本用于全新安装，只使用 CREATE TABLE IF NOT EXISTS，不会删除已有数据。
+-- CREATE TABLE IF NOT EXISTS 不会修改已存在表的字段精度或排序规则；
+-- 旧数据库必须先人工核对表结构，再执行对应 ALTER TABLE，不要依赖本脚本自动升级。
 
 SET NAMES utf8mb4;
 
