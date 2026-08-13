@@ -3,9 +3,12 @@ package com.example.customerservice.service.impl;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 
 /** Redis Lua scripts used by routing and session lifecycle services. */
-abstract class ChatRedisScriptSupport {
+final class ChatRedisScripts {
 
-    protected static final DefaultRedisScript<String>
+    private ChatRedisScripts() {
+    }
+
+    static final DefaultRedisScript<String>
             RESERVE_IDLE_AGENT_SCRIPT =
             new DefaultRedisScript<>(
                     "local maxLoad = tonumber(ARGV[1]); " +
@@ -36,18 +39,7 @@ abstract class ChatRedisScriptSupport {
                     String.class
             );
 
-    protected static final DefaultRedisScript<Long>
-            RESERVE_SPECIFIC_AGENT_SCRIPT =
-            new DefaultRedisScript<>(
-                    "local score = redis.call('ZSCORE', KEYS[1], ARGV[1]); " +
-                            "local maxLoad = tonumber(ARGV[2]); " +
-                            "if not score or tonumber(score) >= maxLoad then return 0; end; " +
-                            "redis.call('ZINCRBY', KEYS[1], 1, ARGV[1]); " +
-                            "return 1;",
-                    Long.class
-            );
-
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             RELEASE_ASSIGNMENT_LOCK_SCRIPT =
             new DefaultRedisScript<>(
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then " +
@@ -60,7 +52,7 @@ abstract class ChatRedisScriptSupport {
      * 原子执行“检查客服容量 + 队首出队 + 增加客服负载”。
      * 会话落库失败时调用方会将用户重新入队并释放这一次负载。
      */
-    protected static final DefaultRedisScript<String>
+    static final DefaultRedisScript<String>
             RESERVE_AGENT_AND_DEQUEUE_SCRIPT =
             new DefaultRedisScript<>(
                             "local score = redis.call('ZSCORE', KEYS[1], ARGV[1]); " +
@@ -86,7 +78,7 @@ abstract class ChatRedisScriptSupport {
     /**
      * 分配失败时原子恢复原排队位置、客服负载和待确认分配记录。
      */
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             ROLLBACK_ASSIGNMENT_SCRIPT =
             new DefaultRedisScript<>(
                     "local payload = redis.call('HGET', KEYS[4], ARGV[1]); " +
@@ -110,7 +102,7 @@ abstract class ChatRedisScriptSupport {
                     Long.class
             );
 
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             CLEAR_ASSIGNMENT_PENDING_SCRIPT =
             new DefaultRedisScript<>(
                     "redis.call('ZREM', KEYS[1], ARGV[1]); " +
@@ -123,7 +115,7 @@ abstract class ChatRedisScriptSupport {
      * MySQL会话创建成功后，原子提交全部Redis会话索引，
      * 并在同一次脚本中清除待确认分配记录。
      */
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             COMMIT_ACTIVE_SESSION_SCRIPT =
             new DefaultRedisScript<>(
                     "redis.call('SET', KEYS[1], ARGV[1]); " +
@@ -148,7 +140,7 @@ abstract class ChatRedisScriptSupport {
      * 同一VIP等级内按入队时间保持FIFO；VIP等级越高，score越小。
      * 真实入队时间单独写入QUEUE_ENQUEUED_AT，供超时清扫和等待时长统计使用。
      */
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             ENQUEUE_WAITING_USER_SCRIPT =
             new DefaultRedisScript<>(
                     "local now = tonumber(ARGV[2]); " +
@@ -166,7 +158,7 @@ abstract class ChatRedisScriptSupport {
             );
 
     /** 在 Redis 中原子完成会话索引、状态和客服负载的收敛。 */
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             FINALIZE_SESSION_REDIS_SCRIPT =
             new DefaultRedisScript<>(
                     "local alreadyClosed = redis.call('HGET', KEYS[4], 'status') == 'CLOSED'; " +
@@ -186,7 +178,7 @@ abstract class ChatRedisScriptSupport {
                     Long.class
             );
 
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             MARK_SESSION_FINALIZE_PENDING_SCRIPT =
             new DefaultRedisScript<>(
                     "redis.call('ZADD', KEYS[1], ARGV[2], ARGV[1]); " +
@@ -195,7 +187,7 @@ abstract class ChatRedisScriptSupport {
                     Long.class
             );
 
-    protected static final DefaultRedisScript<Long>
+    static final DefaultRedisScript<Long>
             CLEAR_SESSION_FINALIZE_PENDING_SCRIPT =
             new DefaultRedisScript<>(
                     "redis.call('ZREM', KEYS[1], ARGV[1]); " +
@@ -204,37 +196,4 @@ abstract class ChatRedisScriptSupport {
                     Long.class
             );
 
-    /** 原子切换会话所属客服，并同步两端客服负载与反向索引。 */
-    protected static final DefaultRedisScript<Long>
-            TRANSFER_SESSION_REDIS_SCRIPT =
-            new DefaultRedisScript<>(
-                    "local targetLoad = redis.call('ZSCORE', KEYS[3], ARGV[3]); " +
-                            "if not targetLoad or tonumber(targetLoad) >= tonumber(ARGV[4]) then return 0; end; " +
-                            "local sourceLoad = redis.call('ZSCORE', KEYS[3], ARGV[2]); " +
-                            "if not sourceLoad then return 0; end; " +
-                            "redis.call('SREM', KEYS[1], ARGV[1]); " +
-                            "redis.call('SADD', KEYS[2], ARGV[1]); " +
-                            "redis.call('ZADD', KEYS[3], math.max(0, tonumber(sourceLoad) - 1), ARGV[2]); " +
-                            "redis.call('ZINCRBY', KEYS[3], 1, ARGV[3]); " +
-                            "redis.call('ZADD', KEYS[6], ARGV[5], ARGV[3]); " +
-                            "redis.call('SET', KEYS[4], ARGV[3]); " +
-                            "redis.call('HSET', KEYS[5], 'agentId', ARGV[3]); " +
-                            "return 1;",
-                    Long.class
-            );
-
-    /** 数据库转接失败时恢复Redis中的会话归属和客服负载。 */
-    protected static final DefaultRedisScript<Long>
-            ROLLBACK_TRANSFER_SESSION_REDIS_SCRIPT =
-            new DefaultRedisScript<>(
-                    "redis.call('SREM', KEYS[1], ARGV[1]); " +
-                            "redis.call('SADD', KEYS[2], ARGV[1]); " +
-                            "local targetLoad = redis.call('ZSCORE', KEYS[3], ARGV[2]); " +
-                            "if targetLoad then redis.call('ZADD', KEYS[3], math.max(0, tonumber(targetLoad) - 1), ARGV[2]); end; " +
-                            "redis.call('ZINCRBY', KEYS[3], 1, ARGV[3]); " +
-                            "redis.call('SET', KEYS[4], ARGV[3]); " +
-                            "redis.call('HSET', KEYS[5], 'agentId', ARGV[3]); " +
-                            "return 1;",
-                    Long.class
-            );
 }

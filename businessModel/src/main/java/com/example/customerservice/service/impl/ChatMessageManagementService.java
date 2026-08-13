@@ -1,7 +1,6 @@
 package com.example.customerservice.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
-import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.ChatMessageType;
 import com.example.customerservice.constant.RedisConstants;
@@ -22,10 +21,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.Objects;
 
 @Slf4j
 public class ChatMessageManagementService implements ChatMessageManagementOperations {
@@ -58,6 +57,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
         this.messageRecallWindowSeconds = Math.max(1L, messageRecallWindowSeconds);
         this.messageEditWindowSeconds = Math.max(1L, messageEditWindowSeconds);
     }
+
     @Override
     @Transactional
     public MessageReadResult markMessagesRead(
@@ -338,93 +338,99 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
     public ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
-            int pageNo,
+            String beforeMessageId,
             int pageSize
     ) {
-        if (
-                sessionId == null ||
-                        sessionId.isBlank()
-        ) {
-            throw new IllegalArgumentException(
-                    "sessionId不能为空"
-            );
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("sessionId不能为空");
         }
-
-
-        if (
-                operatorId == null ||
-                        operatorId.isBlank()
-        ) {
-            throw new IllegalArgumentException(
-                    "当前查询用户不能为空"
-            );
+        if (operatorId == null || operatorId.isBlank()) {
+            throw new IllegalArgumentException("当前查询用户不能为空");
         }
-
-        if (pageNo < 1) {
-            throw new IllegalArgumentException("页码必须大于等于1");
-        }
-
         if (pageSize < 1 || pageSize > 100) {
             throw new IllegalArgumentException("每页数量必须在1到100之间");
         }
-        ChatSession session =
-                chatSessionMapper.selectById(
-                        sessionId
-                );
 
-
+        ChatSession session = chatSessionMapper.selectById(sessionId);
         if (session == null) {
-            throw new IllegalArgumentException(
-                    "聊天会话不存在"
-            );
+            throw new IllegalArgumentException("聊天会话不存在");
         }
-        boolean isUser =
-                operatorId.equals(
-                        session.getUserId()
-                );
-
-
-        boolean isAgent =
-                operatorId.equals(
-                        session.getAgentId()
-                );
-
-
+        boolean isUser = operatorId.equals(session.getUserId());
+        boolean isAgent = operatorId.equals(session.getAgentId());
         if (!isUser && !isAgent) {
-            throw new IllegalArgumentException(
-                    "当前用户无权查看这个会话的聊天记录"
-            );
+            throw new IllegalArgumentException("当前用户无权查看这个会话的聊天记录");
         }
-        Page<ChatMessage> historyPage = chatMessageMapper.selectPage(
-                new Page<>(pageNo, pageSize),
+
+        ChatMessage cursorMessage = null;
+        if (beforeMessageId != null && !beforeMessageId.isBlank()) {
+            cursorMessage = chatMessageMapper.selectById(beforeMessageId);
+            if (cursorMessage == null
+                    || cursorMessage.getCreateTime() == null
+                    || !sessionId.equals(cursorMessage.getSessionId())) {
+                throw new IllegalArgumentException("历史消息游标无效");
+            }
+        }
+
+        List<ChatMessage> queriedMessages = loadHistoryPage(
+                sessionId,
+                cursorMessage,
+                pageSize + 1
+        );
+        boolean hasMore = queriedMessages.size() > pageSize;
+        List<ChatMessage> records = new ArrayList<>(
+                queriedMessages.subList(0, Math.min(pageSize, queriedMessages.size()))
+        );
+        String nextCursor = hasMore && !records.isEmpty()
+                ? records.get(records.size() - 1).getId()
+                : null;
+        Collections.reverse(records);
+        long total = chatMessageMapper.selectCount(
                 Wrappers.<ChatMessage>lambdaQuery()
                         .eq(ChatMessage::getSessionId, sessionId)
-                        .orderByAsc(ChatMessage::getCreateTime)
         );
-
 
         log.info(
-                "聊天历史查询成功，sessionId："
-                        + sessionId
-                        + "，查询者："
-                        + operatorId
-                        + "，页码："
-                        + pageNo
-                        + "，本页消息数量："
-                        + historyPage.getRecords().size()
+                "聊天历史查询成功，sessionId={}，查询者={}，游标={}，本次消息数量={}",
+                sessionId,
+                operatorId,
+                beforeMessageId,
+                records.size()
         );
-
-
         return new ChatHistoryPage(
-                historyPage.getRecords(),
-                historyPage.getTotal(),
-                historyPage.getCurrent(),
-                historyPage.getSize(),
-                historyPage.getPages(),
+                records,
+                total,
+                pageSize,
+                nextCursor,
+                hasMore,
                 chatMessageReadMapper.countUnread(sessionId, operatorId)
         );
     }
-    /**
-     * 接收客户端心跳并续期在线状态。
-     */
+
+    private List<ChatMessage> loadHistoryPage(
+            String sessionId,
+            ChatMessage cursorMessage,
+            int limit
+    ) {
+        if (cursorMessage == null) {
+            return chatMessageMapper.selectLatestHistory(sessionId, limit);
+        }
+
+        List<ChatMessage> messages = new ArrayList<>(
+                chatMessageMapper.selectHistoryAtCursorTime(
+                        sessionId,
+                        cursorMessage.getCreateTime(),
+                        cursorMessage.getId(),
+                        limit
+                )
+        );
+        int remaining = limit - messages.size();
+        if (remaining > 0) {
+            messages.addAll(chatMessageMapper.selectHistoryBeforeTime(
+                    sessionId,
+                    cursorMessage.getCreateTime(),
+                    remaining
+            ));
+        }
+        return messages;
+    }
 }

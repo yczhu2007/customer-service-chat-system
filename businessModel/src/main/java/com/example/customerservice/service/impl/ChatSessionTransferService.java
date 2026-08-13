@@ -13,9 +13,7 @@ import com.example.customerservice.service.ChatSessionTransferOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.util.List;
 import java.util.Set;
@@ -58,6 +56,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SimpMessagingTemplate messagingTemplate;
+    private final TransactionTemplate transactionTemplate;
     private final int agentMaxConcurrency;
 
     public ChatSessionTransferService(
@@ -66,6 +65,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SimpMessagingTemplate messagingTemplate,
+            TransactionTemplate transactionTemplate,
             int agentMaxConcurrency
     ) {
         this.chatRedisRepository = chatRedisRepository;
@@ -73,10 +73,10 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.messagingTemplate = messagingTemplate;
+        this.transactionTemplate = transactionTemplate;
         this.agentMaxConcurrency = agentMaxConcurrency;
     }
     @Override
-    @Transactional
     public void transferSession(
             String sessionId,
             String sourceAgentId,
@@ -100,7 +100,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             throw new IllegalStateException("会话正在转接或结束，请稍后重试");
         }
 
-        boolean transactionCompletionRegistered = false;
+        boolean redisTransferred = false;
         try {
 
         ChatSession session = chatSessionMapper.selectById(sessionId);
@@ -138,115 +138,49 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
         if (!Long.valueOf(1L).equals(transferred)) {
             throw new IllegalArgumentException("目标客服不在线或已达到最大接待数量");
         }
+        redisTransferred = true;
 
-        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            rollbackTransferredSessionInRedis(
-                    sessionId,
-                    sourceAgentId,
-                    targetAgentId
-            );
-            throw new IllegalStateException("会话转接必须在数据库事务中执行");
+        Integer updatedRows = transactionTemplate.execute(status ->
+                chatSessionMapper.transferSession(
+                        sessionId,
+                        sourceAgentId,
+                        targetAgentId
+                )
+        );
+        if (updatedRows == null || updatedRows != 1) {
+            throw new IllegalStateException("会话归属已变化，转接失败");
         }
+        // 数据库事务已经提交，之后即使通知失败也不能再回滚 Redis 归属。
+        redisTransferred = false;
 
+        session.setAgentId(targetAgentId);
         try {
-            registerTransferTransactionSynchronization(
-                    session,
-                    sessionId,
-                    sourceAgentId,
-                    targetAgentId,
-                    operationLockToken
-            );
-            transactionCompletionRegistered = true;
+            notifySessionTransferred(session, sourceAgentId, targetAgentId);
         } catch (RuntimeException exception) {
-            rollbackTransferredSessionInRedis(
-                    sessionId,
-                    sourceAgentId,
-                    targetAgentId
-            );
-            throw exception;
+            log.error("会话已完成转接，但发送转接通知失败，sessionId={}", sessionId, exception);
         }
-
-        int updatedRows = chatSessionMapper.transferSession(
+        log.info(
+                "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
                 sessionId,
                 sourceAgentId,
                 targetAgentId
         );
-        if (updatedRows != 1) {
-            throw new IllegalStateException("会话归属已变化，转接失败");
-        }
-        } finally {
-            if (!transactionCompletionRegistered) {
-                chatRedisRepository.releaseSessionOperationLock(sessionId, operationLockToken);
-            }
-        }
-    }
-
-    /**
-     * Redis转接完成后一直持有会话锁，直到数据库事务最终提交或回滚。
-     * 只有数据库提交成功才向双方发送转接通知；提交失败则恢复Redis归属。
-     */
-    private void registerTransferTransactionSynchronization(
-            ChatSession session,
-            String sessionId,
-            String sourceAgentId,
-            String targetAgentId,
-            String operationLockToken
-    ) {
-        TransactionSynchronizationManager.registerSynchronization(
-                new TransactionSynchronization() {
-                    @Override
-                    public void afterCommit() {
-                        try {
-                            session.setAgentId(targetAgentId);
-                            notifySessionTransferred(
-                                    session,
-                                    sourceAgentId,
-                                    targetAgentId
-                            );
-                            log.info(
-                                    "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
-                                    sessionId,
-                                    sourceAgentId,
-                                    targetAgentId
-                            );
-                        } catch (RuntimeException exception) {
-                            log.error(
-                                    "会话已经完成转接，但发送转接通知失败，sessionId={}",
-                                    sessionId,
-                                    exception
-                            );
-                        }
-                    }
-
-                    @Override
-                    public void afterCompletion(int status) {
-                        try {
-                            if (status != TransactionSynchronization.STATUS_COMMITTED) {
-                                rollbackTransferredSessionInRedis(
-                                        sessionId,
-                                        sourceAgentId,
-                                        targetAgentId
-                                );
-                                log.warn(
-                                        "数据库事务未提交，已恢复Redis会话归属，sessionId={}",
-                                        sessionId
-                                );
-                            }
-                        } catch (RuntimeException exception) {
-                            log.error(
-                                    "数据库事务未提交且Redis转接回滚失败，等待状态补偿任务修复，sessionId={}",
-                                    sessionId,
-                                    exception
-                            );
-                        } finally {
-                            chatRedisRepository.releaseSessionOperationLock(
-                                    sessionId,
-                                    operationLockToken
-                            );
-                        }
-                    }
+        } catch (RuntimeException exception) {
+            if (redisTransferred) {
+                try {
+                    rollbackTransferredSessionInRedis(sessionId, sourceAgentId, targetAgentId);
+                } catch (RuntimeException rollbackException) {
+                    log.error(
+                            "会话转接失败且Redis回滚失败，等待对账任务修复，sessionId={}",
+                            sessionId,
+                            rollbackException
+                    );
                 }
-        );
+            }
+            throw exception;
+        } finally {
+            chatRedisRepository.releaseSessionOperationLock(sessionId, operationLockToken);
+        }
     }
 
     private void rollbackTransferredSessionInRedis(

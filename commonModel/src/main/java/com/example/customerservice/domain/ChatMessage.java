@@ -4,8 +4,8 @@ import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
-import java.time.LocalDateTime;
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 @TableName("chat_message")
 public class ChatMessage implements Serializable {
@@ -91,16 +91,45 @@ public class ChatMessage implements Serializable {
         this.createTime = createTime;
     }
 
-    public Boolean getEdited() { return edited; }
-    public void setEdited(Boolean edited) { this.edited = edited; }
-    public LocalDateTime getEditedAt() { return editedAt; }
-    public void setEditedAt(LocalDateTime editedAt) { this.editedAt = editedAt; }
-    public String getOriginalContent() { return originalContent; }
-    public void setOriginalContent(String originalContent) { this.originalContent = originalContent; }
-    public Boolean getRecalled() { return recalled; }
-    public void setRecalled(Boolean recalled) { this.recalled = recalled; }
-    public LocalDateTime getRecalledAt() { return recalledAt; }
-    public void setRecalledAt(LocalDateTime recalledAt) { this.recalledAt = recalledAt; }
+    public Boolean getEdited() {
+        return edited;
+    }
+
+    public void setEdited(Boolean edited) {
+        this.edited = edited;
+    }
+
+    public LocalDateTime getEditedAt() {
+        return editedAt;
+    }
+
+    public void setEditedAt(LocalDateTime editedAt) {
+        this.editedAt = editedAt;
+    }
+
+    public String getOriginalContent() {
+        return originalContent;
+    }
+
+    public void setOriginalContent(String originalContent) {
+        this.originalContent = originalContent;
+    }
+
+    public Boolean getRecalled() {
+        return recalled;
+    }
+
+    public void setRecalled(Boolean recalled) {
+        this.recalled = recalled;
+    }
+
+    public LocalDateTime getRecalledAt() {
+        return recalledAt;
+    }
+
+    public void setRecalledAt(LocalDateTime recalledAt) {
+        this.recalledAt = recalledAt;
+    }
 
     @Override
     public String toString() {

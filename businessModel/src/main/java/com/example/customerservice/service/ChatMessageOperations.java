@@ -37,7 +37,7 @@ public interface ChatMessageOperations {
     ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
-            int pageNo,
+            String beforeMessageId,
             int pageSize
     );
 

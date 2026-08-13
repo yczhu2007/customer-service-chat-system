@@ -26,7 +26,8 @@ class TransportObjectSerializationTest {
                 EditMessageRequest.class,
                 EndSessionRequest.class,
                 HistoryRequest.class,
-                LoginDTO.class,
+                LoginRequest.class,
+                LoginResponse.class,
                 MessageMutationResult.class,
                 MessageReadResult.class,
                 PasswordUpdateDTO.class,
@@ -55,7 +56,7 @@ class TransportObjectSerializationTest {
         ChatMessage message = new ChatMessage();
         message.setId("M001");
         ChatHistoryPage result = new ChatHistoryPage(
-                List.of(message), 1, 1, 20, 1, 0
+                List.of(message), 1, 20, null, false, 0
         );
 
         assertDoesNotThrow(() -> serialize(result));

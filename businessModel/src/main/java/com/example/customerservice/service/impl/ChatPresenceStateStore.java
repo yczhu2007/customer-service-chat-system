@@ -2,11 +2,26 @@ package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.repository.ChatRedisRepository;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 
 /** Maintains WebSocket mappings, online hashes, TTL and heartbeat indexes. */
 final class ChatPresenceStateStore {
+
+    private static final DefaultRedisScript<Long> CLEANUP_ONLINE_STATE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "local mappedWs = redis.call('GET', KEYS[2]); "
+                            + "if not mappedWs or mappedWs ~= ARGV[1] then return 0; end; "
+                            + "local mappedUser = redis.call('GET', KEYS[3]); "
+                            + "if mappedUser == ARGV[2] then redis.call('DEL', KEYS[3]); end; "
+                            + "redis.call('DEL', KEYS[1], KEYS[2]); "
+                            + "redis.call('SREM', KEYS[4], ARGV[2]); "
+                            + "redis.call('ZREM', KEYS[5], ARGV[2]); "
+                            + "return 1;",
+                    Long.class
+            );
 
     private final ChatRedisRepository chatRedisRepository;
 
@@ -153,40 +168,27 @@ final class ChatPresenceStateStore {
             String userId,
             String wsSessionId
     ) {
-
-        chatRedisRepository.delete(
-                RedisConstants.USER_ONLINE
-                        + userId
-        );
-
-
-        chatRedisRepository.delete(
-                RedisConstants.USER_WS
-                        + userId
-        );
-
-
-        if (
-                wsSessionId != null &&
-                        !wsSessionId.isBlank()
-        ) {
-
-            chatRedisRepository.delete(
-                    RedisConstants.WS_SESSION
-                            + wsSessionId
+        String effectiveWsSessionId = wsSessionId;
+        if (effectiveWsSessionId == null || effectiveWsSessionId.isBlank()) {
+            effectiveWsSessionId = chatRedisRepository.getValue(
+                    RedisConstants.USER_WS + userId
             );
         }
+        if (effectiveWsSessionId == null || effectiveWsSessionId.isBlank()) {
+            return;
+        }
 
-
-        chatRedisRepository.setRemove(
+        chatRedisRepository.execute(
+                CLEANUP_ONLINE_STATE_SCRIPT,
+                List.of(
+                        RedisConstants.USER_ONLINE + userId,
+                        RedisConstants.USER_WS + userId,
+                        RedisConstants.WS_SESSION + effectiveWsSessionId,
                         RedisConstants.ONLINE_USERS,
-                        userId
-                );
-
-
-        chatRedisRepository.sortedSetRemove(
-                        RedisConstants.ONLINE_HEARTBEAT,
-                        userId
-                );
+                        RedisConstants.ONLINE_HEARTBEAT
+                ),
+                effectiveWsSessionId,
+                userId
+        );
     }
 }

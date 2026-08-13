@@ -8,11 +8,13 @@ SET NAMES utf8mb4;
 -- 执行唯一索引前先检查是否存在重复client_msg_id。
 -- 查询结果应当为空；如果有结果，需要先处理重复数据。
 SELECT
+    session_id,
+    sender_id,
     client_msg_id,
     COUNT(*) AS duplicate_count
 FROM chat_message
 WHERE client_msg_id IS NOT NULL
-GROUP BY client_msg_id
+GROUP BY session_id, sender_id, client_msg_id
 HAVING COUNT(*) > 1;
 
 
@@ -26,9 +28,9 @@ ALTER TABLE chat_session
 
 
 ALTER TABLE chat_message
-    ADD UNIQUE INDEX uk_chat_message_client_msg_id
-        (client_msg_id),
+    ADD UNIQUE INDEX uk_chat_message_client
+        (session_id, sender_id, client_msg_id),
     ADD INDEX idx_chat_message_session_time
-        (session_id, create_time),
+        (session_id, create_time, id),
     ADD INDEX idx_chat_message_sender_time
         (sender_id, create_time);
