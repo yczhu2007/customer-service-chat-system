@@ -36,9 +36,4 @@ public interface SysUserRoleMapper {
             String roleId
     );
 
-
-    int deleteByUserId(
-            @Param("userId")
-            String userId
-    );
 }
