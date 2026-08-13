@@ -2,7 +2,8 @@ package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.SysUser;
-import com.example.customerservice.dto.LoginDTO;
+import com.example.customerservice.dto.LoginRequest;
+import com.example.customerservice.dto.LoginResponse;
 import com.example.customerservice.mapper.SysRolePermissionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -36,7 +37,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     private TokenService tokenService;
 
     @Override
-    public LoginDTO login(LoginDTO request) {
+    public LoginResponse login(LoginRequest request) {
         if (request == null
                 || !StringUtils.hasText(request.getUsername())
                 || !StringUtils.hasText(request.getPassword())) {
@@ -70,19 +71,9 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
             );
         }
 
-        if (PasswordUtil.needsUpgrade(user.getPassword())) {
-            String hashedPassword = PasswordUtil.hash(request.getPassword());
-            if (sysUserMapper.updatePassword(user.getId(), hashedPassword) != 1) {
-                throw new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR,
-                        "密码安全升级失败"
-                );
-            }
-        }
-
         Set<String> roleCodes = findRoleCodesByUserId(user.getId());
         String token = tokenService.issueToken(user.getId());
-        return LoginDTO.success(
+        return new LoginResponse(
                 token,
                 "Bearer",
                 RedisConstants.TOKEN_TTL_MINUTES * 60,

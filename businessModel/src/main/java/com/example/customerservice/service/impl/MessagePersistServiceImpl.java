@@ -148,6 +148,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 markStored(message);
                 return true;
             } catch (Exception exception) {
+                recordRetryAttempt(message.getId());
                 log.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
                 if (attempt < MAX_ATTEMPTS && !waitBeforeRetry(attempt)) {
                     return false;
@@ -166,6 +167,12 @@ public class MessagePersistServiceImpl implements MessagePersistService {
             Thread.currentThread().interrupt();
             return false;
         }
+    }
+
+    private void recordRetryAttempt(String messageId) {
+        String retryCountKey = RedisConstants.PERSIST_RETRY_COUNT + messageId;
+        redisTemplate.opsForValue().increment(retryCountKey);
+        redisTemplate.expire(retryCountKey, 7, TimeUnit.DAYS);
     }
 
     private void markStored(ChatMessage message) {

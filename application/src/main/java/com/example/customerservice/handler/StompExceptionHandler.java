@@ -110,7 +110,7 @@ public class StompExceptionHandler {
         );
 
 
-        exception.printStackTrace();
+        log.error("STOMP消息处理异常", exception);
 
 
         return response;

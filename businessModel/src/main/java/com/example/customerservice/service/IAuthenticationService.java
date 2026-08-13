@@ -1,6 +1,7 @@
 package com.example.customerservice.service;
 
-import com.example.customerservice.dto.LoginDTO;
+import com.example.customerservice.dto.LoginRequest;
+import com.example.customerservice.dto.LoginResponse;
 
 import java.util.Set;
 
@@ -9,7 +10,7 @@ import java.util.Set;
  */
 public interface IAuthenticationService {
 
-    LoginDTO login(LoginDTO request);
+    LoginResponse login(LoginRequest request);
 
     Set<String> findRoleCodesByUserId(String userId);
 
