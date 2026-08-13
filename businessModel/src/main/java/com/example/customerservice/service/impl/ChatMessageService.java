@@ -79,9 +79,9 @@ public class ChatMessageService implements ChatMessageOperations {
     public ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
-            int pageNo,
+            String beforeMessageId,
             int pageSize
     ) {
-        return managementOperations.getHistory(sessionId, operatorId, pageNo, pageSize);
+        return managementOperations.getHistory(sessionId, operatorId, beforeMessageId, pageSize);
     }
 }

@@ -15,5 +15,5 @@ public interface ChatMessageManagementOperations {
 
     MessageMutationResult recallMessage(String messageId, String operatorId);
 
-    ChatHistoryPage getHistory(String sessionId, String operatorId, int pageNo, int pageSize);
+    ChatHistoryPage getHistory(String sessionId, String operatorId, String beforeMessageId, int pageSize);
 }

@@ -94,7 +94,7 @@ public interface IChatService {
     ChatHistoryPage getHistory(
             String sessionId,
             String operatorId,
-            int pageNo,
+            String beforeMessageId,
             int pageSize
     );
 

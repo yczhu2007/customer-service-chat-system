@@ -118,21 +118,36 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                         message.getContent()
                 );
         message.setType(messageType.name());
+        message.setId(UUID.randomUUID().toString());
         String dedupKey =
                 RedisConstants.CLIENT_MSG_DEDUP
+                        + message.getSessionId()
+                        + ":"
+                        + message.getSenderId()
+                        + ":"
                         + message.getClientMsgId();
 
 
         Boolean firstSend =
                 chatRedisRepository.setValueIfAbsent(
-                                dedupKey,
-                                "1",
+                                 dedupKey,
+                                 message.getId(),
                                 24,
                                 TimeUnit.HOURS
                         );
 
 
         if (!Boolean.TRUE.equals(firstSend)) {
+
+            String existingMessageId = chatRedisRepository.getValue(dedupKey);
+            ChatMessage existingMessage = loadExistingMessage(existingMessageId, message);
+            ChatMessageDTO duplicateAcknowledgement = ChatMessageDTO.fromEntity(existingMessage);
+            duplicateAcknowledgement.setAckStatus("DUPLICATE");
+            messagingTemplate.convertAndSendToUser(
+                    message.getSenderId(),
+                    "/queue/chat",
+                    duplicateAcknowledgement
+            );
 
             log.info(
                     "检测到重复消息，clientMsgId："
@@ -201,11 +216,6 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                     "当前用户不属于这个聊天会话"
             );
         }
-        message.setId(
-                UUID.randomUUID().toString()
-        );
-
-
         message.setCreateTime(
                 LocalDateTime.now()
         );
@@ -329,6 +339,46 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             ChatMessage message
     ) {
         return offlineMessageOperations.cacheForReceiver(receiverId, message);
+    }
+
+    private ChatMessage loadExistingMessage(
+            String existingMessageId,
+            ChatMessage fallbackMessage
+    ) {
+        if (existingMessageId == null || existingMessageId.isBlank()) {
+            return fallbackMessage;
+        }
+
+        try {
+            ChatMessage storedMessage = chatMessageMapper.selectById(existingMessageId);
+            if (storedMessage != null) {
+                return storedMessage;
+            }
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "查询重复消息的数据库记录失败，继续读取待落库记录，messageId={}",
+                    existingMessageId,
+                    exception
+            );
+        }
+
+        String pendingPayload = chatRedisRepository.getValue(
+                RedisConstants.PERSIST_PENDING_PAYLOAD + existingMessageId
+        );
+        if (pendingPayload != null && !pendingPayload.isBlank()) {
+            try {
+                return objectMapper.readValue(pendingPayload, ChatMessage.class);
+            } catch (Exception exception) {
+                log.warn(
+                        "重复消息的待落库记录解析失败，messageId={}",
+                        existingMessageId,
+                        exception
+                );
+            }
+        }
+
+        fallbackMessage.setId(existingMessageId);
+        return fallbackMessage;
     }
     @Override
     public void routeAndPush(

@@ -18,8 +18,8 @@ public class HistoryRequest implements Serializable {
     @Size(max = 64, message = "sessionId长度不能超过64个字符")
     private String sessionId;
 
-    @Min(value = 1, message = "页码必须大于等于1")
-    private Integer pageNo = 1;
+    @Size(max = 64, message = "历史消息游标长度不能超过64个字符")
+    private String beforeMessageId;
 
     @Min(value = 1, message = "每页数量必须大于等于1")
     @Max(value = 100, message = "每页数量不能超过100")
@@ -36,13 +36,12 @@ public class HistoryRequest implements Serializable {
     }
 
 
-    public Integer getPageNo() {
-        return pageNo;
+    public String getBeforeMessageId() {
+        return beforeMessageId;
     }
 
-
-    public void setPageNo(Integer pageNo) {
-        this.pageNo = pageNo;
+    public void setBeforeMessageId(String beforeMessageId) {
+        this.beforeMessageId = beforeMessageId;
     }
 
 

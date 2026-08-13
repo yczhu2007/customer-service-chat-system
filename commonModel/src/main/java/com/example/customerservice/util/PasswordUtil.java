@@ -3,7 +3,6 @@ package com.example.customerservice.util;
 import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.PBEKeySpec;
 
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
@@ -94,12 +93,7 @@ public final class PasswordUtil {
     }
 
 
-    /**
-     * 校验用户输入的密码。
-     *
-     * 同时暂时兼容数据库里已有的明文密码。
-     * 兼容逻辑只用于旧数据迁移。
-     */
+    /** 校验用户输入的密码，只接受 PBKDF2 格式的数据库密码。 */
     public static boolean matches(
             String rawPassword,
             String storedPassword
@@ -114,53 +108,10 @@ public final class PasswordUtil {
         }
 
 
-        /*
-         * 新格式密码：
-         * pbkdf2$iterations$salt$hash
-         */
-        if (
-                storedPassword.startsWith(
-                        PREFIX + "$"
-                )
-        ) {
-
-            return matchesHashedPassword(
-                    rawPassword,
-                    storedPassword
-            );
+        if (!storedPassword.startsWith(PREFIX + "$")) {
+            return false;
         }
-
-
-        /*
-         * 兼容现有数据库中的明文密码。
-         *
-         * 用户第一次登录成功后，
-         * AuthenticationService会把它升级成哈希密码。
-         */
-        return MessageDigest.isEqual(
-
-                rawPassword.getBytes(
-                        StandardCharsets.UTF_8
-                ),
-
-                storedPassword.getBytes(
-                        StandardCharsets.UTF_8
-                )
-        );
-    }
-
-
-    /**
-     * 判断数据库密码是否需要升级。
-     */
-    public static boolean needsUpgrade(
-            String storedPassword
-    ) {
-
-        return storedPassword == null ||
-                !storedPassword.startsWith(
-                        PREFIX + "$"
-                );
+        return matchesHashedPassword(rawPassword, storedPassword);
     }
 
 

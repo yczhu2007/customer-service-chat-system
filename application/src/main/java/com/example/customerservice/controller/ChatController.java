@@ -44,10 +44,10 @@ public class ChatController {
 
 
     @PostMapping("/login")
-    public Result<LoginDTO> login(
+    public Result<LoginResponse> login(
             @Valid
             @RequestBody
-            LoginDTO request
+            LoginRequest request
     ) {
         return Result.success(
                 authenticationService.login(request)
@@ -504,7 +504,7 @@ public class ChatController {
         ChatHistoryPage historyPage = chatService.getHistory(
                         request.getSessionId(),
                         principal.getName(),
-                        request.getPageNo(),
+                        request.getBeforeMessageId(),
                         request.getPageSize()
         );
 
@@ -540,10 +540,10 @@ public class ChatController {
                 messages.size()
         );
 
-        response.put("pageNo", historyPage.pageNo());
         response.put("pageSize", historyPage.pageSize());
         response.put("total", historyPage.total());
-        response.put("pages", historyPage.pages());
+        response.put("nextCursor", historyPage.nextCursor());
+        response.put("hasMore", historyPage.hasMore());
         response.put("unreadCount", historyPage.unreadCount());
 
 

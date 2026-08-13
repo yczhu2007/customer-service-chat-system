@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.service.impl.ChatRedisScripts.*;
+
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
@@ -34,7 +36,6 @@ import org.springframework.data.redis.connection.DataType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
@@ -44,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 
 
 @Slf4j
-abstract class ChatRoutingSessionSupport extends ChatRedisScriptSupport
+abstract class ChatRoutingSessionSupport
         implements IChatService, ChatPresenceCallbacks {
 
 
@@ -309,20 +310,9 @@ abstract class ChatRoutingSessionSupport extends ChatRedisScriptSupport
             return false;
         }
 
-        String operationLockToken = null;
-        for (int attempt = 0; attempt < 100 && operationLockToken == null; attempt++) {
-            operationLockToken = acquireSessionOperationLock(session.getId());
-            if (operationLockToken == null) {
-                try {
-                    Thread.sleep(50L);
-                } catch (InterruptedException interruptedException) {
-                    Thread.currentThread().interrupt();
-                    return false;
-                }
-            }
-        }
+        String operationLockToken = acquireSessionOperationLock(session.getId());
         if (operationLockToken == null) {
-            log.warn("Session operation lock did not become available: {}", session.getId());
+            log.info("Session is being changed; defer finalization to reconciliation: {}", session.getId());
             return false;
         }
 
