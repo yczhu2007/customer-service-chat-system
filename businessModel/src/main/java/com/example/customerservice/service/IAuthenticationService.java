@@ -2,6 +2,7 @@ package com.example.customerservice.service;
 
 import com.example.customerservice.dto.LoginRequest;
 import com.example.customerservice.dto.LoginResponse;
+import com.example.customerservice.dto.WebSocketTicketResponse;
 
 import java.util.Set;
 
@@ -11,6 +12,13 @@ import java.util.Set;
 public interface IAuthenticationService {
 
     LoginResponse login(LoginRequest request);
+
+    void logout(String authorization, String currentUserId);
+
+    WebSocketTicketResponse issueWebSocketTicket(
+            String authorization,
+            String currentUserId
+    );
 
     Set<String> findRoleCodesByUserId(String userId);
 

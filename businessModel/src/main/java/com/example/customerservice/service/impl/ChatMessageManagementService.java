@@ -8,6 +8,7 @@ import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
+import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
 import com.example.customerservice.mapper.ChatMessageMapper;
@@ -135,7 +136,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
 
         String lockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
         if (lockToken == null) {
-            throw new IllegalStateException("当前会话正在执行其他操作，请稍后重试");
+            throw new BusinessStateException("当前会话正在执行其他操作，请稍后重试");
         }
         try {
             int updated = chatMessageMapper.editOwnMessage(
@@ -146,7 +147,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                     cutoff
             );
             if (updated != 1) {
-                throw new IllegalStateException("消息状态已发生变化，请刷新后重试");
+                throw new BusinessStateException("消息状态已发生变化，请刷新后重试");
             }
             if (message.getOriginalContent() == null) {
                 message.setOriginalContent(message.getContent());
@@ -179,7 +180,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
 
         String lockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
         if (lockToken == null) {
-            throw new IllegalStateException("当前会话正在执行其他操作，请稍后重试");
+            throw new BusinessStateException("当前会话正在执行其他操作，请稍后重试");
         }
         try {
             int updated = chatMessageMapper.recallOwnMessage(
@@ -189,7 +190,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                     cutoff
             );
             if (updated != 1) {
-                throw new IllegalStateException("消息状态已发生变化，请刷新后重试");
+                throw new BusinessStateException("消息状态已发生变化，请刷新后重试");
             }
             message.setRecalled(true);
             message.setRecalledAt(now);

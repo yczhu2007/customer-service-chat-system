@@ -1,6 +1,7 @@
 package com.example.customerservice.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.domain.SysPermission;
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.dto.*;
@@ -41,14 +42,20 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
     }
 
     @Override
-    public List<RoleVO> findAllRoles() {
-        return sysRoleMapper.selectList(
-                        Wrappers.<SysRole>lambdaQuery()
-                                .orderByAsc(SysRole::getCreateTime)
-                )
-                .stream()
-                .map(this::toRoleVO)
-                .toList();
+    public PageResult<RoleVO> findRolePage(long pageNo, long pageSize) {
+        Page<SysRole> page = sysRoleMapper.selectPage(
+                new Page<>(pageNo, pageSize),
+                Wrappers.<SysRole>lambdaQuery()
+                        .orderByAsc(SysRole::getCreateTime)
+                        .orderByAsc(SysRole::getId)
+        );
+        return new PageResult<>(
+                page.getCurrent(),
+                page.getSize(),
+                page.getTotal(),
+                page.getPages(),
+                page.getRecords().stream().map(this::toRoleVO).toList()
+        );
     }
 
     @Override
@@ -234,14 +241,20 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
     }
 
     @Override
-    public List<PermissionVO> findAllPermissions() {
-        return sysPermissionMapper.selectList(
-                        Wrappers.<SysPermission>lambdaQuery()
-                                .orderByAsc(SysPermission::getCreateTime)
-                )
-                .stream()
-                .map(this::toPermissionVO)
-                .toList();
+    public PageResult<PermissionVO> findPermissionPage(long pageNo, long pageSize) {
+        Page<SysPermission> page = sysPermissionMapper.selectPage(
+                new Page<>(pageNo, pageSize),
+                Wrappers.<SysPermission>lambdaQuery()
+                        .orderByAsc(SysPermission::getCreateTime)
+                        .orderByAsc(SysPermission::getId)
+        );
+        return new PageResult<>(
+                page.getCurrent(),
+                page.getSize(),
+                page.getTotal(),
+                page.getPages(),
+                page.getRecords().stream().map(this::toPermissionVO).toList()
+        );
     }
 
     @Override

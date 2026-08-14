@@ -17,4 +17,5 @@ public final class ChatConstants {
     public static final String REASON_HEARTBEAT_TIMEOUT = "HEARTBEAT_TIMEOUT";
     public static final String REASON_AGENT_DISCONNECTED = "AGENT_DISCONNECTED";
     public static final String REASON_SESSION_INACTIVITY_TIMEOUT = "SESSION_INACTIVITY_TIMEOUT";
+    public static final String AGENT_SKILL_VIP_CODE = "VIP";
 }

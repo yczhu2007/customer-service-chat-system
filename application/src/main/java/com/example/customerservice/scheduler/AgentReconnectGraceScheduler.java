@@ -14,17 +14,27 @@ public class AgentReconnectGraceScheduler {
 
     private final StringRedisTemplate redisTemplate;
     private final ChatPresenceOperations chatPresenceOperations;
+    private final DistributedSchedulerLock schedulerLock;
 
     public AgentReconnectGraceScheduler(
             StringRedisTemplate redisTemplate,
-            ChatPresenceOperations chatPresenceOperations
+            ChatPresenceOperations chatPresenceOperations,
+            DistributedSchedulerLock schedulerLock
     ) {
         this.redisTemplate = redisTemplate;
         this.chatPresenceOperations = chatPresenceOperations;
+        this.schedulerLock = schedulerLock;
     }
 
     @Scheduled(fixedDelay = 5_000)
     public void handleExpiredGracePeriods() {
+        schedulerLock.execute(
+                "agent-reconnect-grace",
+                this::handleExpiredGracePeriodsLocked
+        );
+    }
+
+    private void handleExpiredGracePeriodsLocked() {
         Set<String> agentIds = redisTemplate.opsForZSet().rangeByScore(
                 RedisConstants.AGENT_RECONNECT_GRACE,
                 0,

@@ -5,6 +5,7 @@ import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.mapper.ChatAgentSkillMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatAgentOperations;
@@ -204,7 +205,9 @@ public class ChatServiceConfiguration {
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}") long vipPriorityStepSeconds,
             @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds,
-            @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds
+            @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds,
+            @Value("${app.chat.reconciliation.active-session-batch-size:200}")
+            int activeSessionReconciliationBatchSize
     ) {
         return new ChatRoutingSessionService(
                 chatRedisRepository,
@@ -226,7 +229,8 @@ public class ChatServiceConfiguration {
                 averageHandleSeconds,
                 vipPriorityStepSeconds,
                 messageRecallWindowSeconds,
-                messageEditWindowSeconds
+                messageEditWindowSeconds,
+                activeSessionReconciliationBatchSize
         );
     }
 
@@ -238,7 +242,8 @@ public class ChatServiceConfiguration {
             ChatPresenceOperations chatPresenceOperations,
             ChatSessionNotificationOperations notificationOperations,
             SysUserMapper sysUserMapper,
-            SysUserRoleMapper sysUserRoleMapper
+            SysUserRoleMapper sysUserRoleMapper,
+            ChatAgentSkillMapper chatAgentSkillMapper
     ) {
         return new ChatAgentService(
                 chatRedisRepository,
@@ -247,7 +252,8 @@ public class ChatServiceConfiguration {
                 chatPresenceOperations,
                 notificationOperations,
                 sysUserMapper,
-                sysUserRoleMapper
+                sysUserRoleMapper,
+                chatAgentSkillMapper
         );
     }
 

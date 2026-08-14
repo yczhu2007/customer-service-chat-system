@@ -4,6 +4,8 @@ import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
+import com.example.customerservice.domain.ChatAgentSkill;
+import com.example.customerservice.mapper.ChatAgentSkillMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
@@ -12,9 +14,14 @@ import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.ChatSessionNotificationOperations;
 import lombok.extern.slf4j.Slf4j;
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /** 客服可用状态、上线恢复、接待容量和技能组领域服务。 */
 @Slf4j
@@ -27,6 +34,7 @@ public class ChatAgentService implements ChatAgentOperations {
     private final ChatSessionNotificationOperations notificationOperations;
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final ChatAgentSkillMapper chatAgentSkillMapper;
 
     public ChatAgentService(
             ChatRedisRepository chatRedisRepository,
@@ -35,7 +43,8 @@ public class ChatAgentService implements ChatAgentOperations {
             ChatPresenceOperations chatPresenceOperations,
             ChatSessionNotificationOperations notificationOperations,
             SysUserMapper sysUserMapper,
-            SysUserRoleMapper sysUserRoleMapper
+            SysUserRoleMapper sysUserRoleMapper,
+            ChatAgentSkillMapper chatAgentSkillMapper
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.sessionRecoveryService = sessionRecoveryService;
@@ -44,6 +53,7 @@ public class ChatAgentService implements ChatAgentOperations {
         this.notificationOperations = notificationOperations;
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
+        this.chatAgentSkillMapper = chatAgentSkillMapper;
     }
 
     @Override
@@ -100,6 +110,7 @@ public class ChatAgentService implements ChatAgentOperations {
     }
 
     @Override
+    @Transactional
     public void setAgentVipSkill(String agentId, boolean enabled) {
         requireAgentId(agentId);
         SysUser agent = sysUserMapper.selectById(agentId);
@@ -111,10 +122,32 @@ public class ChatAgentService implements ChatAgentOperations {
             throw new IllegalArgumentException("该用户不具有AGENT角色");
         }
         if (enabled) {
-            chatRedisRepository.setAdd(RedisConstants.AGENT_SKILL_VIP, agentId);
+            Long existingCount = chatAgentSkillMapper.selectCount(
+                    Wrappers.<ChatAgentSkill>lambdaQuery()
+                            .eq(ChatAgentSkill::getAgentId, agentId)
+                            .eq(
+                                    ChatAgentSkill::getSkillCode,
+                                    ChatConstants.AGENT_SKILL_VIP_CODE
+                            )
+            );
+            if (existingCount == null || existingCount == 0L) {
+                ChatAgentSkill skill = new ChatAgentSkill();
+                skill.setId(UUID.randomUUID().toString().replace("-", ""));
+                skill.setAgentId(agentId);
+                skill.setSkillCode(ChatConstants.AGENT_SKILL_VIP_CODE);
+                chatAgentSkillMapper.insert(skill);
+            }
         } else {
-            chatRedisRepository.setRemove(RedisConstants.AGENT_SKILL_VIP, agentId);
+            chatAgentSkillMapper.delete(
+                    Wrappers.<ChatAgentSkill>lambdaQuery()
+                            .eq(ChatAgentSkill::getAgentId, agentId)
+                            .eq(
+                                    ChatAgentSkill::getSkillCode,
+                                    ChatConstants.AGENT_SKILL_VIP_CODE
+                            )
+            );
         }
+        refreshVipSkillCacheAfterCommit();
     }
 
     @Override
@@ -122,7 +155,70 @@ public class ChatAgentService implements ChatAgentOperations {
         Set<String> agentIds = chatRedisRepository.setMembers(
                 RedisConstants.AGENT_SKILL_VIP
         );
-        return agentIds == null ? Set.of() : agentIds;
+        if (agentIds != null && !agentIds.isEmpty()) {
+            return Set.copyOf(agentIds);
+        }
+        List<String> persistedAgentIds = chatAgentSkillMapper.selectList(
+                        Wrappers.<ChatAgentSkill>lambdaQuery()
+                                .eq(
+                                        ChatAgentSkill::getSkillCode,
+                                        ChatConstants.AGENT_SKILL_VIP_CODE
+                                )
+                )
+                .stream()
+                .map(ChatAgentSkill::getAgentId)
+                .distinct()
+                .toList();
+        if (!persistedAgentIds.isEmpty()) {
+            chatRedisRepository.setAdd(
+                    RedisConstants.AGENT_SKILL_VIP,
+                    persistedAgentIds.toArray(String[]::new)
+            );
+        }
+        return Set.copyOf(persistedAgentIds);
+    }
+
+    private void refreshVipSkillCacheAfterCommit() {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            rebuildVipSkillCacheSafely();
+                        }
+                    }
+            );
+            return;
+        }
+        rebuildVipSkillCacheSafely();
+    }
+
+    private void rebuildVipSkillCacheSafely() {
+        try {
+            List<String> persistedAgentIds = chatAgentSkillMapper.selectList(
+                            Wrappers.<ChatAgentSkill>lambdaQuery()
+                                    .eq(
+                                            ChatAgentSkill::getSkillCode,
+                                            ChatConstants.AGENT_SKILL_VIP_CODE
+                                    )
+                    )
+                    .stream()
+                    .map(ChatAgentSkill::getAgentId)
+                    .distinct()
+                    .toList();
+            chatRedisRepository.delete(RedisConstants.AGENT_SKILL_VIP);
+            if (!persistedAgentIds.isEmpty()) {
+                chatRedisRepository.setAdd(
+                        RedisConstants.AGENT_SKILL_VIP,
+                        persistedAgentIds.toArray(String[]::new)
+                );
+            }
+        } catch (RuntimeException exception) {
+            log.error(
+                    "数据库已更新，但VIP客服技能缓存重建失败；后续空缓存回源或应用重启将继续修复",
+                    exception
+            );
+        }
     }
 
     private void fillAvailableCapacity(String agentId) {

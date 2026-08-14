@@ -7,11 +7,14 @@ import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
+import com.example.customerservice.dto.PageResult;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.SysRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.service.IUserService;
+import com.example.customerservice.service.TokenService;
 import com.example.customerservice.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -36,6 +39,7 @@ public class UserServiceImpl
     private final SysRoleMapper sysRoleMapper;
 
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final TokenService tokenService;
 
     @Value("${app.bootstrap.admin.id:admin}")
     private String bootstrapAdminId;
@@ -47,26 +51,35 @@ public class UserServiceImpl
     public UserServiceImpl(
             SysUserMapper sysUserMapper,
             SysRoleMapper sysRoleMapper,
-            SysUserRoleMapper sysUserRoleMapper
+            SysUserRoleMapper sysUserRoleMapper,
+            TokenService tokenService
     ) {
         this.sysUserMapper = sysUserMapper;
         this.sysRoleMapper = sysRoleMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
+        this.tokenService = tokenService;
     }
 
 
     @Override
-    public List<UserVO> findAll() {
-
-        return sysUserMapper.selectList(
-                        Wrappers.<SysUser>lambdaQuery()
-                                .orderByDesc(SysUser::getCreateTime)
-                )
+    public PageResult<UserVO> findPage(long pageNo, long pageSize) {
+        Page<SysUser> page = sysUserMapper.selectPage(
+                new Page<>(pageNo, pageSize),
+                Wrappers.<SysUser>lambdaQuery()
+                        .orderByDesc(SysUser::getCreateTime)
+                        .orderByDesc(SysUser::getId)
+        );
+        List<UserVO> records = page.getRecords()
                 .stream()
-                .map(
-                        this::toUserVO
-                )
+                .map(this::toUserVO)
                 .toList();
+        return new PageResult<>(
+                page.getCurrent(),
+                page.getSize(),
+                page.getTotal(),
+                page.getPages(),
+                records
+        );
     }
 
 
@@ -333,6 +346,10 @@ public class UserServiceImpl
                 user
         );
 
+        if ("DISABLED".equals(user.getStatus())) {
+            tokenService.revokeAllForUser(currentUser.getId());
+        }
+
 
         return findById(
                 currentUser.getId()
@@ -382,6 +399,8 @@ public class UserServiceImpl
                     "修改密码失败"
             );
         }
+
+        tokenService.revokeAllForUser(id);
     }
 
 
@@ -416,6 +435,8 @@ public class UserServiceImpl
                     "删除用户失败"
             );
         }
+
+        tokenService.revokeAllForUser(id);
     }
 
     @Override

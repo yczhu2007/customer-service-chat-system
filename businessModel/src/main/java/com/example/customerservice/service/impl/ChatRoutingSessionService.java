@@ -75,7 +75,8 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             long averageHandleSeconds,
             long vipPriorityStepSeconds,
             long messageRecallWindowSeconds,
-            long messageEditWindowSeconds
+            long messageEditWindowSeconds,
+            int activeSessionReconciliationBatchSize
     ) {
         super(
                 chatRedisRepository, chatMessageOperations, chatPresenceOperations,
@@ -89,7 +90,8 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
         this.reconciliationService = new ChatSessionReconciliationService(
                 chatRedisRepository,
                 chatSessionMapper,
-                this
+                this,
+                activeSessionReconciliationBatchSize
         );
         this.inactivityService = new ChatSessionInactivityService(
                 chatRedisRepository,

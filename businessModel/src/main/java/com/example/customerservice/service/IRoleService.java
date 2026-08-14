@@ -2,7 +2,6 @@ package com.example.customerservice.service;
 
 import com.example.customerservice.dto.*;
 
-import java.util.List;
 import java.util.Set;
 
 /**
@@ -10,7 +9,7 @@ import java.util.Set;
  */
 public interface IRoleService {
 
-    List<RoleVO> findAllRoles();
+    PageResult<RoleVO> findRolePage(long pageNo, long pageSize);
 
     RoleVO findRoleById(String id);
 
@@ -20,7 +19,7 @@ public interface IRoleService {
 
     void deleteRole(String id);
 
-    List<PermissionVO> findAllPermissions();
+    PageResult<PermissionVO> findPermissionPage(long pageNo, long pageSize);
 
     PermissionVO findPermissionById(String id);
 

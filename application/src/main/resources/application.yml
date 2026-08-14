@@ -41,6 +41,9 @@ app:
       reserved-slots: ${CHAT_VIP_RESERVED_SLOTS:1}
     persist:
       alert-threshold: ${CHAT_PERSIST_ALERT_THRESHOLD:20}
+    reconciliation:
+      active-session-batch-size: ${CHAT_ACTIVE_SESSION_RECONCILIATION_BATCH_SIZE:200}
+    redis-retention-sweep-delay-ms: ${CHAT_REDIS_RETENTION_SWEEP_DELAY_MS:3600000}
     message:
       recall-window-seconds: ${CHAT_MESSAGE_RECALL_WINDOW_SECONDS:120}
       edit-window-seconds: ${CHAT_MESSAGE_EDIT_WINDOW_SECONDS:300}

@@ -9,9 +9,7 @@ import com.example.customerservice.repository.ChatRedisRepository;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -22,15 +20,18 @@ final class ChatSessionReconciliationService {
     private final ChatRedisRepository chatRedisRepository;
     private final ChatSessionMapper chatSessionMapper;
     private final ChatRoutingSessionService routingSupport;
+    private final int activeSessionBatchSize;
 
     ChatSessionReconciliationService(
             ChatRedisRepository chatRedisRepository,
             ChatSessionMapper chatSessionMapper,
-            ChatRoutingSessionService routingSupport
+            ChatRoutingSessionService routingSupport,
+            int activeSessionBatchSize
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.chatSessionMapper = chatSessionMapper;
         this.routingSupport = routingSupport;
+        this.activeSessionBatchSize = Math.max(1, Math.min(500, activeSessionBatchSize));
     }
 
     void reconcilePendingAssignments() {
@@ -79,12 +80,19 @@ final class ChatSessionReconciliationService {
     }
 
     void reconcileActiveSessionState() {
+        String cursor = chatRedisRepository.getValue(
+                RedisConstants.ACTIVE_SESSION_RECONCILIATION_CURSOR
+        );
+        var query = Wrappers.<ChatSession>lambdaQuery()
+                .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE);
+        if (cursor != null && !cursor.isBlank()) {
+            query.gt(ChatSession::getId, cursor);
+        }
         List<ChatSession> activeSessions = chatSessionMapper.selectList(
-                Wrappers.<ChatSession>lambdaQuery()
-                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
+                query.orderByAsc(ChatSession::getId)
+                        .last("LIMIT " + activeSessionBatchSize)
         );
 
-        Map<String, Long> activeCountByAgent = new HashMap<>();
         for (ChatSession session : activeSessions) {
             String cachedAgentId = chatRedisRepository.getValue(
                     RedisConstants.SESSION_AGENT + session.getId()
@@ -98,7 +106,17 @@ final class ChatSessionReconciliationService {
             }
             routingSupport.cacheActiveSessionState(session);
             routingSupport.recordVipWaitTime(session);
-            activeCountByAgent.merge(session.getAgentId(), 1L, Long::sum);
+        }
+        if (activeSessions.isEmpty()
+                || activeSessions.size() < activeSessionBatchSize) {
+            chatRedisRepository.delete(
+                    RedisConstants.ACTIVE_SESSION_RECONCILIATION_CURSOR
+            );
+        } else {
+            chatRedisRepository.setValue(
+                    RedisConstants.ACTIVE_SESSION_RECONCILIATION_CURSOR,
+                    activeSessions.get(activeSessions.size() - 1).getId()
+            );
         }
 
         Set<String> onlineAgentIds = chatRedisRepository.sortedSetRange(
@@ -110,11 +128,7 @@ final class ChatSessionReconciliationService {
             return;
         }
         for (String agentId : onlineAgentIds) {
-            chatRedisRepository.sortedSetAdd(
-                    RedisConstants.AGENT_LOAD,
-                    agentId,
-                    activeCountByAgent.getOrDefault(agentId, 0L)
-            );
+            synchronizeAgentLoad(agentId);
         }
     }
 

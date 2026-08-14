@@ -13,6 +13,34 @@ SET NAMES utf8mb4;
 
 
 -- ============================================================
+-- 0. 客服技能表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS chat_agent_skill
+(
+    id          VARCHAR(64) NOT NULL COMMENT '技能记录ID',
+    agent_id    VARCHAR(64) NOT NULL COMMENT '客服用户ID',
+    skill_code  VARCHAR(64) NOT NULL COMMENT '技能编码，例如VIP',
+    create_time DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+        COMMENT '创建时间',
+
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_chat_agent_skill (agent_id, skill_code),
+    KEY idx_chat_agent_skill_code (skill_code, agent_id),
+
+    CONSTRAINT fk_chat_agent_skill_user
+        FOREIGN KEY (agent_id)
+            REFERENCES sys_user (id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+    COMMENT = '客服技能表';
+
+
+-- ============================================================
 -- 1. 聊天会话表
 -- ============================================================
 

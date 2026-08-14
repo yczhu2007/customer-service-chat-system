@@ -1,6 +1,7 @@
 package com.example.customerservice.handler;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthenticatedException;
@@ -88,6 +89,19 @@ public class WebExceptionAdvice {
         return buildResponse(
                 HttpStatus.NOT_FOUND,
                 exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(BusinessStateException.class)
+    public ResponseEntity<Result<Void>> handleBusinessStateException(
+            BusinessStateException exception
+    ) {
+        log.warn("业务状态冲突：{}", exception.getMessage());
+        return buildResponse(
+                HttpStatus.CONFLICT,
+                exception.getMessage() == null
+                        ? "当前业务状态不允许执行该操作"
+                        : exception.getMessage()
         );
     }
 

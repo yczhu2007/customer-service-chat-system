@@ -50,7 +50,7 @@ public class WebSocketHandshakeInterceptor
             WebSocketHandler wsHandler,
             Map<String, Object> attributes
     ) {
-        String token = extractToken(request);
+        String token = extractAccessToken(request);
 
         if (token == null || token.isBlank()) {
             response.setStatusCode(
@@ -116,7 +116,7 @@ public class WebSocketHandshakeInterceptor
         // 握手完成后无需额外处理。
     }
 
-    private String extractToken(
+    private String extractAccessToken(
             ServerHttpRequest request
     ) {
         String authorization =
@@ -141,15 +141,15 @@ public class WebSocketHandshakeInterceptor
                         instanceof ServletServerHttpRequest
                         servletRequest
         ) {
-            String token =
+            String ticket =
                     servletRequest
                             .getServletRequest()
                             .getParameter(
-                                    "token"
+                                    "ticket"
                             );
 
-            if (token != null) {
-                return token.trim();
+            if (ticket != null && !ticket.isBlank()) {
+                return tokenService.consumeWebSocketTicket(ticket.trim());
             }
         }
 

@@ -10,6 +10,7 @@ import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
 import com.example.customerservice.dto.ChatMessageDTO;
+import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
@@ -160,7 +161,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         String operationLockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
         if (operationLockToken == null) {
             chatRedisRepository.delete(dedupKey);
-            throw new IllegalStateException("会话正在转接、结束或执行超时处理，请稍后重试");
+            throw new BusinessStateException("会话正在转接、结束或执行超时处理，请稍后重试");
         }
         try {
         ChatSession session =

@@ -1,6 +1,8 @@
 package com.example.customerservice.service;
 
 import com.example.customerservice.domain.ChatMessage;
+import com.example.customerservice.dto.DeadLetterMessageVO;
+import com.example.customerservice.dto.PageResult;
 
 public interface MessagePersistService {
 
@@ -9,5 +11,11 @@ public interface MessagePersistService {
     void persistMessageAsync(ChatMessage message);
 
     void retryFailedMessages();
+
+    PageResult<DeadLetterMessageVO> findDeadLetters(long pageNo, long pageSize);
+
+    void replayDeadLetter(String messageId);
+
+    int cleanupExpiredDeadLetters(long cutoffEpochMillis, int batchSize);
 
 }

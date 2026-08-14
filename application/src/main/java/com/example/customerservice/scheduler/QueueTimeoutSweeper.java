@@ -38,11 +38,13 @@ public class QueueTimeoutSweeper {
     private final long vipPriorityStepMillis;
     private final QueuePriorityPolicy priorityPolicy;
     private final ChatRoutingOperations chatRoutingOperations;
+    private final DistributedSchedulerLock schedulerLock;
 
     public QueueTimeoutSweeper(
             StringRedisTemplate redisTemplate,
             SimpMessagingTemplate messagingTemplate,
             ChatRoutingOperations chatRoutingOperations,
+            DistributedSchedulerLock schedulerLock,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
@@ -63,10 +65,18 @@ public class QueueTimeoutSweeper {
                 Math.max(1L, antiStarvationSeconds) * 1000L
         );
         this.chatRoutingOperations = chatRoutingOperations;
+        this.schedulerLock = schedulerLock;
     }
 
     @Scheduled(fixedDelayString = "${app.chat.queue.sweep-delay-ms:15000}")
     public void removeTimedOutUsers() {
+        schedulerLock.execute(
+                "queue-timeout",
+                this::removeTimedOutUsersLocked
+        );
+    }
+
+    private void removeTimedOutUsersLocked() {
         backfillMissingEnqueueTimes();
         long now = System.currentTimeMillis();
         normalizeFairPriorityScores(now);

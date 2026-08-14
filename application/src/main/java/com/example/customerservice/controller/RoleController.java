@@ -6,6 +6,8 @@ import com.example.customerservice.service.IRoleService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -33,9 +35,17 @@ public class RoleController {
     private CurrentUser currentUser;
 
     @GetMapping("/roles")
-    public Result<List<RoleVO>> findAllRoles() {
+    public Result<PageResult<RoleVO>> findAllRoles(
+            @RequestParam(defaultValue = "1")
+            @Min(value = 1, message = "pageNo不能小于1")
+            long pageNo,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "pageSize不能小于1")
+            @Max(value = 100, message = "pageSize不能大于100")
+            long pageSize
+    ) {
         requireRoleManagementPermission();
-        return Result.success(roleService.findAllRoles());
+        return Result.success(roleService.findRolePage(pageNo, pageSize));
     }
 
     @GetMapping("/roles/{id}")
@@ -95,9 +105,17 @@ public class RoleController {
     }
 
     @GetMapping("/permissions")
-    public Result<List<PermissionVO>> findAllPermissions() {
+    public Result<PageResult<PermissionVO>> findAllPermissions(
+            @RequestParam(defaultValue = "1")
+            @Min(value = 1, message = "pageNo不能小于1")
+            long pageNo,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "pageSize不能小于1")
+            @Max(value = 100, message = "pageSize不能大于100")
+            long pageSize
+    ) {
         requirePermissionManagementPermission();
-        return Result.success(roleService.findAllPermissions());
+        return Result.success(roleService.findPermissionPage(pageNo, pageSize));
     }
 
     @GetMapping("/permissions/{id}")

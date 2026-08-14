@@ -219,6 +219,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_MESSAGE_DEADLETTER_MANAGE',
+        'chat:message:deadletter:manage',
+        '聊天消息死信管理',
+        'API',
+        NULL,
+        '/chat/admin/deadletters/**',
+        '允许管理员查询并重放消息落库死信',
+        'ENABLED'
+    ),
+    (
         'P_CHAT_SESSION_END',
         'chat:session:end',
         '结束聊天会话',

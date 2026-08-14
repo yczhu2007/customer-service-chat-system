@@ -22,8 +22,10 @@ public class RedisConstants {
     public static final String AGENT_SKILL_VIP = "agent:skill:vip";
     /** VIP用户等待时长统计，member为sessionId，score为毫秒。 */
     public static final String STATS_VIP_WAIT = "stats:vip:wait";
+    public static final String STATS_VIP_WAIT_CREATED_AT = "stats:vip:wait:created-at";
     /** VIP用户会话解决时长统计，member为sessionId，score为毫秒。 */
     public static final String STATS_VIP_RESOLVE = "stats:vip:resolve";
+    public static final String STATS_VIP_RESOLVE_CREATED_AT = "stats:vip:resolve:created-at";
     /** 全部客服离线时等待回呼的VIP用户。 */
     public static final String VIP_CALLBACK_PENDING = "vip:callback:pending";
     public static final String CHAT_ASSIGN_LOCK = "chat:assign:lock:";
@@ -56,6 +58,15 @@ public class RedisConstants {
     public static final String PERSIST_DEADLETTER = "persist:deadletter";
     public static final String PERSIST_RETRY_LEASE = "persist:retry:lease:";
     public static final long PERSIST_RETRY_LEASE_SECONDS = 180L;
+    public static final long PERSIST_PAYLOAD_TTL_DAYS = 30L;
+    public static final long PERSIST_DEADLETTER_RETENTION_DAYS = 30L;
+    public static final long VIP_STATS_RETENTION_DAYS = 90L;
+    public static final String SCHEDULER_LOCK = "scheduler:lock:";
+    public static final long SCHEDULER_LOCK_TTL_SECONDS = 120L;
+    public static final String PRESENCE_OPERATION_LOCK = "presence:operation:lock:";
+    public static final long PRESENCE_OPERATION_LOCK_TTL_SECONDS = 10L;
+    public static final String ACTIVE_SESSION_RECONCILIATION_CURSOR =
+            "reconcile:active-session:cursor";
     //websocket
     public static final String USER_WS = "user:ws:";
     public static final String WS_SESSION = "ws:session:";
@@ -145,6 +156,7 @@ public class RedisConstants {
      */
     public static final String MSG_ACK =
             "msg:ack:";
+    public static final long MSG_ACK_TTL_DAYS = 7L;
     /**
      * 心跳超时时间表。
      *
@@ -179,6 +191,9 @@ public class RedisConstants {
      */
     public static final String TOKEN_PREFIX =
             "token:";
+    public static final String USER_TOKENS_PREFIX = "user:tokens:";
+    public static final String WEBSOCKET_TICKET_PREFIX = "ws:ticket:";
+    public static final long WEBSOCKET_TICKET_TTL_SECONDS = 30L;
 
 
     /**
@@ -189,6 +204,14 @@ public class RedisConstants {
     ) {
 
         return TOKEN_PREFIX + token;
+    }
+
+    public static String userTokensKey(String userId) {
+        return USER_TOKENS_PREFIX + userId;
+    }
+
+    public static String webSocketTicketKey(String ticket) {
+        return WEBSOCKET_TICKET_PREFIX + ticket;
     }
 
     /**

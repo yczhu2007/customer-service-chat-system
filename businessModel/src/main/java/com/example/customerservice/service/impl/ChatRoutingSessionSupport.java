@@ -632,6 +632,11 @@ abstract class ChatRoutingSessionSupport
                 session.getId(),
                 waitMillis
         );
+        chatRedisRepository.sortedSetAdd(
+                RedisConstants.STATS_VIP_WAIT_CREATED_AT,
+                session.getId(),
+                System.currentTimeMillis()
+        );
     }
 
     protected void recordVipResolveTime(
@@ -654,6 +659,11 @@ abstract class ChatRoutingSessionSupport
                 RedisConstants.STATS_VIP_RESOLVE,
                 session.getId(),
                 resolveMillis
+        );
+        chatRedisRepository.sortedSetAdd(
+                RedisConstants.STATS_VIP_RESOLVE_CREATED_AT,
+                session.getId(),
+                System.currentTimeMillis()
         );
     }
 

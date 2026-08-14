@@ -4,6 +4,7 @@ import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
+import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IUserService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +16,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,6 +25,8 @@ import java.util.Set;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Max;
 import org.springframework.validation.annotation.Validated;
 import com.example.customerservice.common.Result;
 
@@ -42,11 +46,19 @@ public class UserController {
 
 
     @GetMapping
-    public Result<List<UserVO>> findAll() {
+    public Result<PageResult<UserVO>> findAll(
+            @RequestParam(defaultValue = "1")
+            @Min(value = 1, message = "pageNo不能小于1")
+            long pageNo,
+            @RequestParam(defaultValue = "20")
+            @Min(value = 1, message = "pageSize不能小于1")
+            @Max(value = 100, message = "pageSize不能大于100")
+            long pageSize
+    ) {
 
         requireUserManagementPermission();
 
-        return Result.success(userService.findAll());
+        return Result.success(userService.findPage(pageNo, pageSize));
     }
 
 

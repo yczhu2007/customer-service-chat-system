@@ -304,6 +304,11 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
                                 ackKey,
                                 receiverId
                         );
+                chatRedisRepository.expire(
+                        ackKey,
+                        RedisConstants.MSG_ACK_TTL_DAYS,
+                        TimeUnit.DAYS
+                );
                 return;
             }
         }
@@ -387,6 +392,11 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
                         ackKey,
                         receiverId
                 );
+        chatRedisRepository.expire(
+                ackKey,
+                RedisConstants.MSG_ACK_TTL_DAYS,
+                TimeUnit.DAYS
+        );
 
 
         log.info(

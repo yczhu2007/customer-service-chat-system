@@ -9,6 +9,7 @@ import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.ChatSessionOperations;
+import com.example.customerservice.service.MessagePersistService;
 import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -53,6 +54,9 @@ public class ChatController {
     private IAuthenticationService authenticationService;
 
     @Autowired
+    private MessagePersistService messagePersistService;
+
+    @Autowired
     private CurrentUser currentUser;
 
 
@@ -64,6 +68,29 @@ public class ChatController {
     ) {
         return Result.success(
                 authenticationService.login(request)
+        );
+    }
+
+    @PostMapping("/logout")
+    public Result<Void> logout(
+            @RequestHeader("Authorization") String authorization
+    ) {
+        authenticationService.logout(
+                authorization,
+                currentUser.getUserId()
+        );
+        return Result.successMessage("退出登录成功");
+    }
+
+    @PostMapping("/ws-ticket")
+    public Result<WebSocketTicketResponse> issueWebSocketTicket(
+            @RequestHeader("Authorization") String authorization
+    ) {
+        return Result.success(
+                authenticationService.issueWebSocketTicket(
+                        authorization,
+                        currentUser.getUserId()
+                )
         );
     }
     /**
@@ -217,6 +244,41 @@ public class ChatController {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
         return Result.success(chatAgentOperations.findVipSkillAgentIds());
+    }
+
+    /** 管理员分页查看消息落库死信。 */
+    @GetMapping("/admin/deadletters")
+    public Result<PageResult<DeadLetterMessageVO>> findDeadLetters(
+            @RequestParam(defaultValue = "1")
+            long pageNo,
+            @RequestParam(defaultValue = "20")
+            long pageSize
+    ) {
+        requireDeadLetterManagementPermission();
+        if (pageNo < 1 || pageSize < 1 || pageSize > 100) {
+            throw new IllegalArgumentException("pageNo必须大于0，pageSize必须在1到100之间");
+        }
+        return Result.success(
+                messagePersistService.findDeadLetters(pageNo, pageSize)
+        );
+    }
+
+    /** 管理员手工重放指定死信消息。 */
+    @PostMapping("/admin/deadletters/{messageId}/replay")
+    public Result<Void> replayDeadLetter(
+            @PathVariable
+            @NotBlank(message = "消息ID不能为空")
+            @Size(max = 64, message = "消息ID长度不能超过64个字符")
+            String messageId
+    ) {
+        requireDeadLetterManagementPermission();
+        messagePersistService.replayDeadLetter(messageId);
+        return Result.successMessage("死信消息已提交重放");
+    }
+
+    private void requireDeadLetterManagementPermission() {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:message:deadletter:manage");
     }
 
     @MessageMapping("/chat.send")

@@ -19,15 +19,18 @@ public class SessionInactivityScheduler {
     private final StringRedisTemplate redisTemplate;
     private final ChatMaintenanceOperations chatMaintenanceOperations;
     private final long inactivityTimeoutMillis;
+    private final DistributedSchedulerLock schedulerLock;
 
     public SessionInactivityScheduler(
             StringRedisTemplate redisTemplate,
             ChatMaintenanceOperations chatMaintenanceOperations,
+            DistributedSchedulerLock schedulerLock,
             @Value("${app.chat.session.inactivity-timeout-seconds:1800}")
             long inactivityTimeoutSeconds
     ) {
         this.redisTemplate = redisTemplate;
         this.chatMaintenanceOperations = chatMaintenanceOperations;
+        this.schedulerLock = schedulerLock;
         this.inactivityTimeoutMillis = TimeUnit.SECONDS.toMillis(
                 Math.max(60L, inactivityTimeoutSeconds)
         );
@@ -37,6 +40,13 @@ public class SessionInactivityScheduler {
             fixedDelayString = "${app.chat.session.inactivity-sweep-delay-ms:30000}"
     )
     public void reassignInactiveSessions() {
+        schedulerLock.execute(
+                "session-inactivity",
+                this::reassignInactiveSessionsLocked
+        );
+    }
+
+    private void reassignInactiveSessionsLocked() {
         long cutoffMillis = System.currentTimeMillis() - inactivityTimeoutMillis;
         Set<String> sessionIds = redisTemplate.opsForZSet().rangeByScore(
                 RedisConstants.SESSION_LAST_ACTIVITY,

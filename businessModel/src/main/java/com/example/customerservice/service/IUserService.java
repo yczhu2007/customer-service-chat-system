@@ -4,8 +4,8 @@ import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
+import com.example.customerservice.dto.PageResult;
 
-import java.util.List;
 import java.util.Set;
 
 
@@ -14,7 +14,7 @@ import java.util.Set;
  */
 public interface IUserService {
 
-    List<UserVO> findAll();
+    PageResult<UserVO> findPage(long pageNo, long pageSize);
 
     UserVO findById(
             String id

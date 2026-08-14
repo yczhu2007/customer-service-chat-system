@@ -28,6 +28,13 @@ public class ChatRedisRepository {
                             + "else return 0; end;",
                     Long.class
             );
+    private static final DefaultRedisScript<Long> RENEW_LOCK_SCRIPT =
+            new DefaultRedisScript<>(
+                    "if redis.call('GET', KEYS[1]) == ARGV[1] then "
+                            + "return redis.call('EXPIRE', KEYS[1], ARGV[2]); "
+                            + "else return 0; end;",
+                    Long.class
+            );
 
     private final StringRedisTemplate redisTemplate;
 
@@ -62,6 +69,19 @@ public class ChatRedisRepository {
             return;
         }
         execute(RELEASE_LOCK_SCRIPT, java.util.Collections.singletonList(key), token);
+    }
+
+    public boolean renewLock(String key, String token, long timeoutSeconds) {
+        if (key == null || token == null || timeoutSeconds <= 0) {
+            return false;
+        }
+        Long renewed = execute(
+                RENEW_LOCK_SCRIPT,
+                java.util.Collections.singletonList(key),
+                token,
+                String.valueOf(timeoutSeconds)
+        );
+        return Long.valueOf(1L).equals(renewed);
     }
 
     public String acquireSessionOperationLock(String sessionId) {

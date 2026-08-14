@@ -13,15 +13,25 @@ import org.springframework.stereotype.Component;
 public class SessionStateReconciliationScheduler {
 
     private final ChatMaintenanceOperations chatMaintenanceOperations;
+    private final DistributedSchedulerLock schedulerLock;
 
     public SessionStateReconciliationScheduler(
-            ChatMaintenanceOperations chatMaintenanceOperations
+            ChatMaintenanceOperations chatMaintenanceOperations,
+            DistributedSchedulerLock schedulerLock
     ) {
         this.chatMaintenanceOperations = chatMaintenanceOperations;
+        this.schedulerLock = schedulerLock;
     }
 
     @Scheduled(fixedDelay = 30_000)
     public void reconcileSessionState() {
+        schedulerLock.execute(
+                "session-state-reconciliation",
+                this::reconcileSessionStateLocked
+        );
+    }
+
+    private void reconcileSessionStateLocked() {
         try {
             chatMaintenanceOperations.reconcileActiveSessionState();
         } catch (Exception exception) {

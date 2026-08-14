@@ -6,6 +6,7 @@ import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
+import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
@@ -92,7 +93,7 @@ class ChatMessageServiceTest {
                 messagePersistService, new ObjectMapper(), sysUserRoleMapper,
                 sysUserMapper,
                 agentOperationsProvider,
-                20, 1, 300, 1_000_000_000L, 120, 300
+                20, 1, 300, 1_000_000_000L, 120, 300, 200
         );
         service = messageOperations;
         routingOperations = routingSessionService;
@@ -263,6 +264,11 @@ class ChatMessageServiceTest {
         verify(setOperations).add(
                 RedisConstants.MSG_ACK + "M001", "U001"
         );
+        verify(redisTemplate).expire(
+                RedisConstants.MSG_ACK + "M001",
+                RedisConstants.MSG_ACK_TTL_DAYS,
+                TimeUnit.DAYS
+        );
     }
 
     @Test
@@ -388,6 +394,22 @@ class ChatMessageServiceTest {
         assertTrue(keysCaptor.getValue().contains(RedisConstants.AGENT_LAST_ASSIGNED));
         assertEquals("1", argumentsCaptor.getAllValues().get(3));
         assertEquals("1", argumentsCaptor.getAllValues().get(4));
+    }
+
+    @Test
+    void userEntersWaitingStateWhenNoAgentCanBeReserved() {
+        when(valueOperations.setIfAbsent(
+                anyString(),
+                anyString(),
+                anyLong(),
+                any(TimeUnit.class)
+        )).thenReturn(true);
+
+        AssignResult result = routingOperations.onUserConnected("U001");
+
+        assertEquals(AssignResult.WAITING, result.getAssignmentStatus());
+        assertEquals("WAITING_FOR_AGENT", result.getEvent());
+        verify(chatSessionMapper).findActiveByUserId("U001");
     }
 
     private ChatMessageOperations newMessageOperations(

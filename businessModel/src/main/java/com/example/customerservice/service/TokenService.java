@@ -41,4 +41,13 @@ public interface TokenService {
     void revokeToken(
             String token
     );
+
+    /** 吊销某个用户当前签发的全部Token。 */
+    void revokeAllForUser(String userId);
+
+    /** 为已经认证的访问Token签发一次性WebSocket握手票据。 */
+    String issueWebSocketTicket(String accessToken, String userId);
+
+    /** 原子消费一次性票据并返回其绑定的访问Token。 */
+    String consumeWebSocketTicket(String ticket);
 }

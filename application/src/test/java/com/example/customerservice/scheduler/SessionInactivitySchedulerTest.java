@@ -18,6 +18,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 
 @ExtendWith(MockitoExtension.class)
 class SessionInactivitySchedulerTest {
@@ -25,15 +28,21 @@ class SessionInactivitySchedulerTest {
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ZSetOperations<String, String> zSetOperations;
     @Mock private ChatMaintenanceOperations chatMaintenanceOperations;
+    @Mock private DistributedSchedulerLock schedulerLock;
 
     private SessionInactivityScheduler scheduler;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
+        doAnswer(invocation -> {
+            ((Runnable) invocation.getArgument(1)).run();
+            return true;
+        }).when(schedulerLock).execute(anyString(), any(Runnable.class));
         scheduler = new SessionInactivityScheduler(
                 redisTemplate,
                 chatMaintenanceOperations,
+                schedulerLock,
                 60
         );
     }

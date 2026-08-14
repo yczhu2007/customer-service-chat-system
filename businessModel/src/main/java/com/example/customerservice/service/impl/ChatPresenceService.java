@@ -90,6 +90,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
              */
             return;
         }
+        String presenceLockToken = acquirePresenceLock(userId);
+        if (presenceLockToken == null) {
+            return;
+        }
+        try {
         String currentWsSessionId =
                 chatRedisRepository.getValue(
                                 RedisConstants.USER_WS
@@ -139,12 +144,15 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 wsSessionId,
                 ChatConstants.REASON_WEBSOCKET_DISCONNECT
         );
+        } finally {
+            releasePresenceLock(userId, presenceLockToken);
+        }
     }
     /**
      * 处理聊天消息
      */
     @Override
-    public synchronized void handleHeartbeat(
+    public void handleHeartbeat(
             String userId,
             String wsSessionId
     ) {
@@ -157,6 +165,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
 
             return;
         }
+        String presenceLockToken = acquirePresenceLock(userId);
+        if (presenceLockToken == null) {
+            return;
+        }
+        try {
         String currentWsSessionId =
                 chatRedisRepository.getValue(
                                 RedisConstants.USER_WS
@@ -183,12 +196,15 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 userId,
                 wsSessionId
         );
+        } finally {
+            releasePresenceLock(userId, presenceLockToken);
+        }
     }
 
 
     @Override
     @Transactional
-    public synchronized void handleHeartbeatTimeout(
+    public void handleHeartbeatTimeout(
             String userId
     ) {
 
@@ -199,6 +215,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
 
             return;
         }
+        String presenceLockToken = acquirePresenceLock(userId);
+        if (presenceLockToken == null) {
+            return;
+        }
+        try {
 
 
         /*
@@ -206,8 +227,8 @@ public class ChatPresenceService implements ChatPresenceOperations {
          * 用户可能已经发送了新的心跳。
          * 必须在执行清理前读取最新超时时间。
          *
-         * 本方法与handleHeartbeat使用同一对象锁，
-         * 避免心跳刷新与超时清理并发执行。
+         * 本方法与handleHeartbeat使用同一Redis分布式锁，
+         * 避免多实例下心跳刷新与超时清理并发执行。
          */
         Double timeoutAt =
                 chatRedisRepository.sortedSetScore(
@@ -238,6 +259,24 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 userId,
                 wsSessionId,
                 ChatConstants.REASON_HEARTBEAT_TIMEOUT
+        );
+        } finally {
+            releasePresenceLock(userId, presenceLockToken);
+        }
+    }
+
+    private String acquirePresenceLock(String userId) {
+        return chatRedisRepository.acquireLock(
+                RedisConstants.PRESENCE_OPERATION_LOCK + userId,
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
+    }
+
+    private void releasePresenceLock(String userId, String token) {
+        chatRedisRepository.releaseLock(
+                RedisConstants.PRESENCE_OPERATION_LOCK + userId,
+                token
         );
     }
     /**

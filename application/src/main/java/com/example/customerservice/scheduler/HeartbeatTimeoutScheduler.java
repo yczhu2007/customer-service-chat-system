@@ -19,11 +19,13 @@ public class HeartbeatTimeoutScheduler {
     private final StringRedisTemplate redisTemplate;
 
     private final ChatPresenceOperations chatPresenceOperations;
+    private final DistributedSchedulerLock schedulerLock;
 
 
     public HeartbeatTimeoutScheduler(
             StringRedisTemplate redisTemplate,
-            ChatPresenceOperations chatPresenceOperations
+            ChatPresenceOperations chatPresenceOperations,
+            DistributedSchedulerLock schedulerLock
     ) {
 
         this.redisTemplate =
@@ -31,6 +33,7 @@ public class HeartbeatTimeoutScheduler {
 
         this.chatPresenceOperations =
                 chatPresenceOperations;
+        this.schedulerLock = schedulerLock;
     }
 
 
@@ -44,6 +47,13 @@ public class HeartbeatTimeoutScheduler {
             fixedDelay = 10_000
     )
     public void scanHeartbeatTimeout() {
+        schedulerLock.execute(
+                "heartbeat-timeout",
+                this::scanHeartbeatTimeoutLocked
+        );
+    }
+
+    private void scanHeartbeatTimeoutLocked() {
 
         long nowMillis =
                 System.currentTimeMillis();

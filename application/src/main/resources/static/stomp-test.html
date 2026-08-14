@@ -359,6 +359,7 @@
     let manualDisconnectRequested = false;
     let reconnectBlockedByStompError = false;
     let reconnectTimer = null;
+    let webSocketTicketRequestInFlight = false;
     let reconnectAttempts = 0;
     let disconnectFallbackTimer = null;
     let stompHeartbeatSendTimer = null;
@@ -901,8 +902,20 @@
         }
     );
 
-    function switchAccount() {
-        window.location.reload();
+    async function switchAccount() {
+        const token = document.getElementById("token").value.trim();
+        try {
+            if (token) {
+                await fetch("/chat/logout", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": "Bearer " + token
+                    }
+                });
+            }
+        } finally {
+            window.location.reload();
+        }
     }
 
     function cancelReconnect() {
@@ -941,7 +954,7 @@
     }
 
 
-    function connectStomp(isAutomaticReconnect) {
+    async function connectStomp(isAutomaticReconnect) {
 
         if (!isAutomaticReconnect) {
             reconnectAttempts = 0;
@@ -973,6 +986,11 @@
             }
         }
 
+        if (webSocketTicketRequestInFlight) {
+            writeLog("正在申请安全连接票据，请稍候");
+            return;
+        }
+
         const token =
             document.getElementById("token")
                 .value
@@ -988,24 +1006,50 @@
         }
 
 
+        webSocketTicketRequestInFlight = true;
+        let ticket;
+        try {
+            const ticketResponse = await fetch("/chat/ws-ticket", {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token
+                }
+            });
+            const ticketResult = await ticketResponse.json();
+            if (!ticketResponse.ok || !ticketResult.data || !ticketResult.data.ticket) {
+                throw new Error(ticketResult.message || "无法获取WebSocket连接票据");
+            }
+            ticket = ticketResult.data.ticket;
+        } catch (error) {
+            writeLog("获取WebSocket连接票据失败：" + error.message);
+            showChatError("建立聊天连接失败：" + error.message);
+            if (isAutomaticReconnect) {
+                scheduleReconnect();
+            }
+            return;
+        } finally {
+            webSocketTicketRequestInFlight = false;
+        }
+
+        if (manualDisconnectRequested) {
+            return;
+        }
+
         const websocketProtocol =
             window.location.protocol === "https:"
                 ? "wss://"
                 : "ws://";
 
 
-        /*
-         * 浏览器原生WebSocket不能设置Authorization请求头，因此握手Token使用查询参数。
-         * 页面日志不输出完整URL；部署时应使用HTTPS/WSS并保持Token短有效期。
-         */
+        /* 浏览器使用30秒内有效且只能消费一次的ticket进行握手。 */
         const websocketUrl =
             websocketProtocol +
             window.location.host +
-            "/ws/chat?token=" +
-            encodeURIComponent(token);
+            "/ws/chat?ticket=" +
+            encodeURIComponent(ticket);
 
 
-        writeLog("开始连接WebSocket（Token已隐藏）");
+        writeLog("开始连接WebSocket（一次性票据已隐藏）");
         setConnectionStatus("连接中", false);
         setConnectionDescription("正在建立消息连接……");
 

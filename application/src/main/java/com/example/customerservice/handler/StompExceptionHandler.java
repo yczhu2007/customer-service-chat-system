@@ -1,5 +1,6 @@
 package com.example.customerservice.handler;
 
+import com.example.customerservice.exception.BusinessStateException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.simp.annotation.SendToUser;
@@ -16,6 +17,27 @@ import java.util.Map;
 @ControllerAdvice
 @Slf4j
 public class StompExceptionHandler {
+
+    @MessageExceptionHandler(BusinessStateException.class)
+    @SendToUser(
+            value = "/queue/errors",
+            broadcast = false
+    )
+    public Map<String, Object> handleBusinessStateException(
+            BusinessStateException exception
+    ) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("event", "CONFLICT");
+        response.put(
+                "message",
+                exception.getMessage() == null
+                        ? "当前业务状态不允许执行该操作"
+                        : exception.getMessage()
+        );
+        response.put("time", LocalDateTime.now());
+        log.warn("STOMP业务状态冲突：{}", exception.getMessage());
+        return response;
+    }
 
     /**
      * 处理主动抛出的业务参数异常

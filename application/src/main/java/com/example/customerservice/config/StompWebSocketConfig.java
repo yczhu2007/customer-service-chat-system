@@ -62,7 +62,9 @@ public class StompWebSocketConfig
     /**
      * 注册WebSocket握手地址。
      *
-     * Token在HTTP握手阶段完成认证，
+     * 非浏览器客户端可使用Authorization请求头；浏览器客户端先通过认证接口
+     * 换取一次性短期ticket。正式访问Token不会出现在WebSocket URL中。
+     * 握手阶段完成认证，
      * 认证后的用户被设置为WebSocket Principal。
      */
     @Override

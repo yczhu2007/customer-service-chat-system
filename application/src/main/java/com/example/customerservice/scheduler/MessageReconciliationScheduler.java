@@ -19,17 +19,20 @@ public class MessageReconciliationScheduler {
             messagePersistService;
     private final StringRedisTemplate redisTemplate;
     private final long alertThreshold;
+    private final DistributedSchedulerLock schedulerLock;
 
     public MessageReconciliationScheduler(
             MessagePersistService
                     messagePersistService,
             StringRedisTemplate redisTemplate,
+            DistributedSchedulerLock schedulerLock,
             @Value("${app.chat.persist.alert-threshold:20}")
             long alertThreshold
     ) {
         this.messagePersistService =
                 messagePersistService;
         this.redisTemplate = redisTemplate;
+        this.schedulerLock = schedulerLock;
         this.alertThreshold = alertThreshold;
     }
 
@@ -37,6 +40,13 @@ public class MessageReconciliationScheduler {
             fixedDelay = 30_000
     )
     public void retryFailedMessages() {
+        schedulerLock.execute(
+                "message-reconciliation",
+                this::retryFailedMessagesLocked
+        );
+    }
+
+    private void retryFailedMessagesLocked() {
         try {
             messagePersistService
                     .retryFailedMessages();

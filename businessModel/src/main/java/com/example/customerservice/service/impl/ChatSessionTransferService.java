@@ -5,6 +5,7 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.ChatSessionDTO;
+import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -97,7 +98,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
 
         String operationLockToken = chatRedisRepository.acquireSessionOperationLock(sessionId);
         if (operationLockToken == null) {
-            throw new IllegalStateException("会话正在转接或结束，请稍后重试");
+            throw new BusinessStateException("会话正在转接或结束，请稍后重试");
         }
 
         boolean redisTransferred = false;
@@ -148,7 +149,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                 )
         );
         if (updatedRows == null || updatedRows != 1) {
-            throw new IllegalStateException("会话归属已变化，转接失败");
+            throw new BusinessStateException("会话归属已变化，转接失败");
         }
         // 数据库事务已经提交，之后即使通知失败也不能再回滚 Redis 归属。
         redisTransferred = false;
