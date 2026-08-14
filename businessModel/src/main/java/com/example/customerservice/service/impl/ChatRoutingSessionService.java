@@ -23,7 +23,8 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatAgentOperations;
+import com.example.customerservice.service.ChatMaintenanceOperations;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatPresenceCallbacks;
 import com.example.customerservice.service.ChatPresenceOperations;
@@ -32,6 +33,7 @@ import com.example.customerservice.service.ChatSessionNotificationOperations;
 import com.example.customerservice.service.MessagePersistService;
 import com.example.customerservice.util.ChatMessageContentValidator;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
@@ -46,10 +48,12 @@ import java.util.concurrent.TimeUnit;
 
 
 @Slf4j
-public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupport implements IChatService, ChatPresenceCallbacks {
+public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupport
+        implements ChatMaintenanceOperations, ChatPresenceCallbacks {
 
     private final ChatSessionReconciliationService reconciliationService;
     private final ChatSessionInactivityService inactivityService;
+    private final ObjectProvider<ChatAgentOperations> agentOperationsProvider;
 
     public ChatRoutingSessionService(
             ChatRedisRepository chatRedisRepository,
@@ -65,6 +69,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             ObjectMapper objectMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysUserMapper sysUserMapper,
+            ObjectProvider<ChatAgentOperations> agentOperationsProvider,
             long agentReconnectGraceSeconds,
             int vipReservedSlots,
             long averageHandleSeconds,
@@ -91,6 +96,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                 chatSessionMapper,
                 this
         );
+        this.agentOperationsProvider = agentOperationsProvider;
     }
     @Override
     public AssignResult onUserConnected(
@@ -383,118 +389,8 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     }
 
     @Override
-    public void agentOnline(
-            String agentId
-    ) {
-        if (agentId == null || agentId.isBlank()) {
-            throw new IllegalArgumentException(
-                    "agentId不能为空"
-            );
-        }
-
-        Set<String> indexedSessionIds = chatRedisRepository.setMembers(
-                RedisConstants.agentSessionsKey(agentId)
-        );
-        List<ChatSession> activeSessions = new ArrayList<>();
-        if (indexedSessionIds != null && !indexedSessionIds.isEmpty()) {
-            for (String sessionId : indexedSessionIds) {
-                ChatSession session = chatSessionMapper.selectById(sessionId);
-                if (session != null && ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
-                    activeSessions.add(session);
-                } else {
-                    chatRedisRepository.setRemove(
-                            RedisConstants.agentSessionsKey(agentId),
-                            sessionId
-                    );
-                }
-            }
-        }
-        if (activeSessions.isEmpty()) {
-            // Redis 索引可能因历史版本或缓存丢失而不存在，保留数据库兜底。
-            activeSessions = chatSessionMapper.selectList(
-                    Wrappers.<ChatSession>lambdaQuery()
-                            .eq(ChatSession::getAgentId, agentId)
-                            .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
-                            .orderByAsc(ChatSession::getCreateTime)
-            );
-        }
-
-        for (ChatSession activeSession : activeSessions) {
-            chatRedisRepository.setAdd(
-                    RedisConstants.agentSessionsKey(agentId),
-                    activeSession.getId()
-            );
-        }
-
-        chatRedisRepository.sortedSetAdd(
-                RedisConstants.AGENT_LOAD,
-                agentId,
-                activeSessions.size()
-        );
-        if (chatRedisRepository.sortedSetScore(
-                RedisConstants.AGENT_LAST_ASSIGNED,
-                agentId
-        ) == null) {
-            chatRedisRepository.sortedSetAdd(
-                    RedisConstants.AGENT_LAST_ASSIGNED,
-                    agentId,
-                    System.currentTimeMillis()
-            );
-        }
-
-        activeSessions.forEach(
-                this::notifyBothParties
-        );
-
-        log.info(
-                "客服上线，agentId={}，已恢复活动会话数={}",
-                agentId,
-                activeSessions.size()
-        );
-
-        fillAvailableAgentCapacity(
-                agentId
-        );
-    }
-
-
-
-    @Override
-    @Transactional
-    public void agentOffline(String agentId) {
-
-        if (
-                agentId == null ||
-                        agentId.isBlank()
-        ) {
-
-            throw new IllegalArgumentException(
-                    "agentId不能为空"
-            );
-        }
-
-
-        /*
-         * Manual offline changes service availability, not WebSocket connectivity.
-         * Keeping the connection mapping allows the same client to go online again
-         * and still lets a later disconnect event identify and clean up this agent.
-         */
-        chatRedisRepository.sortedSetRemove(
-                RedisConstants.AGENT_LOAD,
-                agentId
-        );
-        chatRedisRepository.sortedSetRemove(
-                RedisConstants.AGENT_LAST_ASSIGNED,
-                agentId
-        );
-        chatRedisRepository.sortedSetRemove(
-                RedisConstants.AGENT_RECONNECT_GRACE,
-                agentId
-        );
-        chatPresenceOperations.disconnectAgent(
-                agentId,
-                ChatConstants.REASON_AGENT_OFFLINE
-        );
+    public void restoreAgentOnline(String agentId) {
+        agentOperationsProvider.getObject().agentOnline(agentId);
     }
     @Override
     public String findIdleAgent(String userId) {
@@ -570,64 +466,6 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
         );
     }
     @Override
-    public void handleDisconnect(String userId) {
-        chatPresenceOperations.handleDisconnect(userId);
-    }
-    @Override
-    public int handleMessage(ChatMessage message) {
-        return chatMessageOperations.handleMessage(message);
-    }
-
-    @Override
-    public void cacheMessage(ChatMessage message) {
-        chatMessageOperations.cacheMessage(message);
-    }
-
-    @Override
-    public void routeAndPush(ChatMessage message) {
-        chatMessageOperations.routeAndPush(message);
-    }
-
-    @Override
-    public void pullOfflineMessages(String userId) {
-        chatMessageOperations.pullOfflineMessages(userId);
-    }
-
-    @Override
-    public void handleAck(String messageId, String receiverId) {
-        chatMessageOperations.handleAck(messageId, receiverId);
-    }
-
-    @Override
-    public MessageReadResult markMessagesRead(
-            String sessionId,
-            String lastReadMessageId,
-            String readerId
-    ) {
-        return chatMessageOperations.markMessagesRead(
-                sessionId, lastReadMessageId, readerId
-        );
-    }
-
-    @Override
-    public long countUnreadMessages(String sessionId, String userId) {
-        return chatMessageOperations.countUnreadMessages(sessionId, userId);
-    }
-
-    @Override
-    public MessageMutationResult editMessage(
-            String messageId,
-            String newContent,
-            String operatorId
-    ) {
-        return chatMessageOperations.editMessage(messageId, newContent, operatorId);
-    }
-
-    @Override
-    public MessageMutationResult recallMessage(String messageId, String operatorId) {
-        return chatMessageOperations.recallMessage(messageId, operatorId);
-    }
-    @Override
     public void reconcilePendingAssignments() {
         reconciliationService.reconcilePendingAssignments();
     }
@@ -655,24 +493,4 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
         inactivityService.handleSessionInactivityTimeout(sessionId, cutoffMillis);
     }
 
-    @Override
-    public ChatHistoryPage getHistory(
-            String sessionId,
-            String operatorId,
-            String beforeMessageId,
-            int pageSize
-    ) {
-        return chatMessageOperations.getHistory(
-                sessionId, operatorId, beforeMessageId, pageSize
-        );
-    }
-    @Override
-    public void handleHeartbeat(String userId, String wsSessionId) {
-        chatPresenceOperations.handleHeartbeat(userId, wsSessionId);
-    }
-
-    @Override
-    public void handleHeartbeatTimeout(String userId) {
-        chatPresenceOperations.handleHeartbeatTimeout(userId);
-    }
 }

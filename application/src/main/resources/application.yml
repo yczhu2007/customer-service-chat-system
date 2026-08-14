@@ -22,6 +22,9 @@ mybatis-plus:
     map-underscore-to-camel-case: true
 
 app:
+  auth:
+    # 登录Token写入Redis时设置TTL，过期后认证自动失效。
+    token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:30}
   websocket:
     allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
   bootstrap:
@@ -32,6 +35,8 @@ app:
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
   chat:
     agent-reconnect-grace-seconds: ${CHAT_AGENT_RECONNECT_GRACE_SECONDS:20}
+    # 客服上线恢复会话时，单次IN查询的最大会话ID数量。
+    agent-session-restore-batch-size: ${CHAT_AGENT_SESSION_RESTORE_BATCH_SIZE:100}
     vip:
       reserved-slots: ${CHAT_VIP_RESERVED_SLOTS:1}
     persist:

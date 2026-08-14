@@ -1,6 +1,5 @@
 package com.example.customerservice.service.impl;
 
-import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.LoginRequest;
 import com.example.customerservice.dto.LoginResponse;
@@ -76,7 +75,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         return new LoginResponse(
                 token,
                 "Bearer",
-                RedisConstants.TOKEN_TTL_MINUTES * 60,
+                tokenService.getTokenTtlSeconds(),
                 user.getId(),
                 user.getUsername(),
                 roleCodes

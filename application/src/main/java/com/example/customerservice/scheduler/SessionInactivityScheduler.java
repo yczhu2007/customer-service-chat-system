@@ -1,7 +1,7 @@
 package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatMaintenanceOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -17,17 +17,17 @@ import java.util.concurrent.TimeUnit;
 public class SessionInactivityScheduler {
 
     private final StringRedisTemplate redisTemplate;
-    private final IChatService chatService;
+    private final ChatMaintenanceOperations chatMaintenanceOperations;
     private final long inactivityTimeoutMillis;
 
     public SessionInactivityScheduler(
             StringRedisTemplate redisTemplate,
-            IChatService chatService,
+            ChatMaintenanceOperations chatMaintenanceOperations,
             @Value("${app.chat.session.inactivity-timeout-seconds:1800}")
             long inactivityTimeoutSeconds
     ) {
         this.redisTemplate = redisTemplate;
-        this.chatService = chatService;
+        this.chatMaintenanceOperations = chatMaintenanceOperations;
         this.inactivityTimeoutMillis = TimeUnit.SECONDS.toMillis(
                 Math.max(60L, inactivityTimeoutSeconds)
         );
@@ -50,7 +50,7 @@ public class SessionInactivityScheduler {
         }
         for (String sessionId : sessionIds) {
             try {
-                chatService.handleSessionInactivityTimeout(
+                chatMaintenanceOperations.handleSessionInactivityTimeout(
                         sessionId,
                         cutoffMillis
                 );

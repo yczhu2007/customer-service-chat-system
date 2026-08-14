@@ -23,7 +23,6 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatPresenceCallbacks;
 import com.example.customerservice.service.ChatPresenceOperations;
@@ -46,7 +45,7 @@ import java.util.concurrent.TimeUnit;
 
 
 @Slf4j
-abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSupport implements IChatService {
+abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSupport {
 
     protected ChatRoutingSessionMaintenanceSupport(
             ChatRedisRepository chatRedisRepository,
@@ -361,43 +360,6 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
                 agentId,
                 requeue ? "1" : "0"
         );
-    }
-
-    @Override
-    public void setAgentVipSkill(
-            String agentId,
-            boolean enabled
-    ) {
-        if (agentId == null || agentId.isBlank()) {
-            throw new IllegalArgumentException("agentId不能为空");
-        }
-        SysUser agent = sysUserMapper.selectById(agentId);
-        if (agent == null) {
-            throw new IllegalArgumentException("客服不存在");
-        }
-        Set<String> roleCodes = sysUserRoleMapper.findRoleCodesByUserId(agentId);
-        if (roleCodes == null || !roleCodes.contains("AGENT")) {
-            throw new IllegalArgumentException("该用户不具有AGENT角色");
-        }
-        if (enabled) {
-            chatRedisRepository.setAdd(
-                    RedisConstants.AGENT_SKILL_VIP,
-                    agentId
-            );
-        } else {
-            chatRedisRepository.setRemove(
-                    RedisConstants.AGENT_SKILL_VIP,
-                    agentId
-            );
-        }
-    }
-
-    @Override
-    public Set<String> findVipSkillAgentIds() {
-        Set<String> agentIds = chatRedisRepository.setMembers(
-                RedisConstants.AGENT_SKILL_VIP
-        );
-        return agentIds == null ? Set.of() : agentIds;
     }
 
     protected void clearAssignmentReservation(String userId) {

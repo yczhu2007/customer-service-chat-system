@@ -26,6 +26,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.ListOperations;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.SetOperations;
 import org.springframework.data.redis.core.ValueOperations;
@@ -65,12 +66,14 @@ class ChatMessageServiceTest {
     @Mock private ChatPresenceOperations chatPresenceOperations;
     @Mock private ChatSessionTransferOperations chatSessionTransferOperations;
     @Mock private ChatSessionNotificationOperations chatSessionNotificationOperations;
+    @Mock private ObjectProvider<ChatAgentOperations> agentOperationsProvider;
     @Mock private ValueOperations<String, String> valueOperations;
     @Mock private ListOperations<String, String> listOperations;
     @Mock private ZSetOperations<String, String> zSetOperations;
     @Mock private SetOperations<String, String> setOperations;
 
-    private IChatService service;
+    private ChatMessageOperations service;
+    private ChatRoutingOperations routingOperations;
 
     @BeforeEach
     void setUp() {
@@ -87,9 +90,12 @@ class ChatMessageServiceTest {
                 chatSessionTransferOperations, chatSessionNotificationOperations, chatSessionMapper,
                 chatMessageMapper, chatMessageReadMapper, messagingTemplate,
                 messagePersistService, new ObjectMapper(), sysUserRoleMapper,
-                sysUserMapper, 20, 1, 300, 1_000_000_000L, 120, 300
+                sysUserMapper,
+                agentOperationsProvider,
+                20, 1, 300, 1_000_000_000L, 120, 300
         );
-        service = routingSessionService;
+        service = messageOperations;
+        routingOperations = routingSessionService;
     }
 
     @Test
@@ -215,14 +221,7 @@ class ChatMessageServiceTest {
         ChatMessageOperations messageOperations = newMessageOperations(
                 chatRedisRepository, mapper
         );
-        ChatRoutingSessionService routingSessionService = new ChatRoutingSessionService(
-                chatRedisRepository, messageOperations, chatPresenceOperations,
-                chatSessionTransferOperations, chatSessionNotificationOperations, chatSessionMapper,
-                chatMessageMapper, chatMessageReadMapper, messagingTemplate,
-                messagePersistService, mapper, sysUserRoleMapper, sysUserMapper,
-                20, 1, 300, 1_000_000_000L, 120, 300
-        );
-        service = routingSessionService;
+        service = messageOperations;
         when(valueOperations.get(RedisConstants.USER_WS + "U001"))
                 .thenReturn("WS001");
         when(listOperations.range(
@@ -368,7 +367,7 @@ class ChatMessageServiceTest {
                 anyString(), anyString(), anyString()
         )).thenReturn("A002");
 
-        String selectedAgent = service.findIdleAgent("U001");
+        String selectedAgent = routingOperations.findIdleAgent("U001");
 
         assertEquals("A002", selectedAgent);
         ArgumentCaptor<RedisScript> scriptCaptor =

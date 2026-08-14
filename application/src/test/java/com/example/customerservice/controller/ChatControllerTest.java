@@ -2,7 +2,11 @@ package com.example.customerservice.controller;
 
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IAuthenticationService;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatAgentOperations;
+import com.example.customerservice.service.ChatMessageOperations;
+import com.example.customerservice.service.ChatPresenceOperations;
+import com.example.customerservice.service.ChatRoutingOperations;
+import com.example.customerservice.service.ChatSessionOperations;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -20,7 +24,11 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class ChatControllerTest {
 
-    @Mock private IChatService chatService;
+    @Mock private ChatRoutingOperations chatRoutingOperations;
+    @Mock private ChatAgentOperations chatAgentOperations;
+    @Mock private ChatMessageOperations chatMessageOperations;
+    @Mock private ChatSessionOperations chatSessionOperations;
+    @Mock private ChatPresenceOperations chatPresenceOperations;
     @Mock private IAuthenticationService authenticationService;
     @Mock private CurrentUser currentUser;
     @InjectMocks private ChatController controller;
@@ -37,7 +45,7 @@ class ChatControllerTest {
                 "U001",
                 "chat:user:access"
         );
-        verify(chatService).onUserConnected("U001");
+        verify(chatRoutingOperations).onUserConnected("U001");
     }
 
     @Test
@@ -51,6 +59,6 @@ class ChatControllerTest {
                 () -> controller.startConsultation(principal)
         );
 
-        verify(chatService, never()).onUserConnected("A001");
+        verify(chatRoutingOperations, never()).onUserConnected("A001");
     }
 }

@@ -1,6 +1,6 @@
 package com.example.customerservice.listener;
 
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatPresenceOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
@@ -15,15 +15,15 @@ import java.security.Principal;
 @Slf4j
 public class WebSocketEventListener {
 
-    private final IChatService chatService;
+    private final ChatPresenceOperations chatPresenceOperations;
 
 
     public WebSocketEventListener(
-            IChatService chatService
+            ChatPresenceOperations chatPresenceOperations
     ) {
 
-        this.chatService =
-                chatService;
+        this.chatPresenceOperations =
+                chatPresenceOperations;
     }
 
 
@@ -86,7 +86,7 @@ public class WebSocketEventListener {
          * 统一登记在线状态、双向连接映射、
          * 300秒TTL和初始心跳超时时间。
          */
-        chatService.registerOnline(
+        chatPresenceOperations.registerOnline(
                 userId,
                 sessionId
         );
@@ -145,7 +145,7 @@ public class WebSocketEventListener {
          */
         try {
 
-            chatService.handleDisconnect(
+            chatPresenceOperations.handleDisconnect(
                     sessionId
             );
 

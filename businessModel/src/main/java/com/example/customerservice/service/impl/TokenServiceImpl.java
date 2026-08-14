@@ -4,6 +4,7 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.TokenService;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -19,14 +20,20 @@ public class TokenServiceImpl
 
     private final StringRedisTemplate
             redisTemplate;
+    private final Duration tokenTtl;
 
 
     public TokenServiceImpl(
-            StringRedisTemplate redisTemplate
+            StringRedisTemplate redisTemplate,
+            @Value("${app.auth.token-ttl-minutes:30}") long tokenTtlMinutes
     ) {
 
         this.redisTemplate =
                 redisTemplate;
+        if (tokenTtlMinutes <= 0) {
+            throw new IllegalArgumentException("Token有效期必须大于0分钟");
+        }
+        this.tokenTtl = Duration.ofMinutes(tokenTtlMinutes);
     }
 
 
@@ -80,10 +87,7 @@ public class TokenServiceImpl
 
                         userId,
 
-                        Duration.ofMinutes(
-                                RedisConstants
-                                        .TOKEN_TTL_MINUTES
-                        )
+                        tokenTtl
                 );
 
 
@@ -123,7 +127,12 @@ public class TokenServiceImpl
 
         return resolveUserId(
                 token
-        ) != null;
+                ) != null;
+    }
+
+    @Override
+    public long getTokenTtlSeconds() {
+        return tokenTtl.toSeconds();
     }
 
 

@@ -1,7 +1,7 @@
 package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatRoutingOperations;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -37,12 +37,12 @@ public class QueueTimeoutSweeper {
     private final long vipTimeoutMillis;
     private final long vipPriorityStepMillis;
     private final QueuePriorityPolicy priorityPolicy;
-    private final IChatService chatService;
+    private final ChatRoutingOperations chatRoutingOperations;
 
     public QueueTimeoutSweeper(
             StringRedisTemplate redisTemplate,
             SimpMessagingTemplate messagingTemplate,
-            IChatService chatService,
+            ChatRoutingOperations chatRoutingOperations,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
@@ -62,7 +62,7 @@ public class QueueTimeoutSweeper {
                 vipPriorityStepMillis,
                 Math.max(1L, antiStarvationSeconds) * 1000L
         );
-        this.chatService = chatService;
+        this.chatRoutingOperations = chatRoutingOperations;
     }
 
     @Scheduled(fixedDelayString = "${app.chat.queue.sweep-delay-ms:15000}")
@@ -114,7 +114,7 @@ public class QueueTimeoutSweeper {
                 }
             }
         }
-        chatService.refreshWaitingPositions();
+        chatRoutingOperations.refreshWaitingPositions();
     }
 
     /** 重新计算 VIP 权重和普通用户反饥饿保障分数，同一优先层仍保持 FIFO。 */
@@ -169,7 +169,7 @@ public class QueueTimeoutSweeper {
                     userId
             );
             if (enqueuedAt == null) {
-                chatService.enqueueWaitingUser(userId);
+                chatRoutingOperations.enqueueWaitingUser(userId);
             }
         }
     }

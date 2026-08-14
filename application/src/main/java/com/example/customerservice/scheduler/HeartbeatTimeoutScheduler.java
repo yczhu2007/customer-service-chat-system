@@ -1,7 +1,7 @@
 package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatPresenceOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -18,19 +18,19 @@ public class HeartbeatTimeoutScheduler {
 
     private final StringRedisTemplate redisTemplate;
 
-    private final IChatService chatService;
+    private final ChatPresenceOperations chatPresenceOperations;
 
 
     public HeartbeatTimeoutScheduler(
             StringRedisTemplate redisTemplate,
-            IChatService chatService
+            ChatPresenceOperations chatPresenceOperations
     ) {
 
         this.redisTemplate =
                 redisTemplate;
 
-        this.chatService =
-                chatService;
+        this.chatPresenceOperations =
+                chatPresenceOperations;
     }
 
 
@@ -84,7 +84,7 @@ public class HeartbeatTimeoutScheduler {
 
             try {
 
-                chatService
+                chatPresenceOperations
                         .handleHeartbeatTimeout(
                                 userId
                         );

@@ -1,6 +1,6 @@
 package com.example.customerservice.scheduler;
 
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatMaintenanceOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -12,26 +12,28 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class SessionStateReconciliationScheduler {
 
-    private final IChatService chatService;
+    private final ChatMaintenanceOperations chatMaintenanceOperations;
 
-    public SessionStateReconciliationScheduler(IChatService chatService) {
-        this.chatService = chatService;
+    public SessionStateReconciliationScheduler(
+            ChatMaintenanceOperations chatMaintenanceOperations
+    ) {
+        this.chatMaintenanceOperations = chatMaintenanceOperations;
     }
 
     @Scheduled(fixedDelay = 30_000)
     public void reconcileSessionState() {
         try {
-            chatService.reconcileActiveSessionState();
+            chatMaintenanceOperations.reconcileActiveSessionState();
         } catch (Exception exception) {
             log.error("Active session state reconciliation failed", exception);
         }
         try {
-            chatService.reconcilePendingAssignments();
+            chatMaintenanceOperations.reconcilePendingAssignments();
         } catch (Exception exception) {
             log.error("会话创建状态对账任务执行失败", exception);
         }
         try {
-            chatService.reconcilePendingSessionFinalizations();
+            chatMaintenanceOperations.reconcilePendingSessionFinalizations();
         } catch (Exception exception) {
             log.error("会话结束状态对账任务执行失败", exception);
         }

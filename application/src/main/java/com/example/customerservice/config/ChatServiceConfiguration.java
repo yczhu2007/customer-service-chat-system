@@ -7,6 +7,8 @@ import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatMessageOperations;
+import com.example.customerservice.service.ChatAgentOperations;
+import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.ChatMessageDeliveryOperations;
 import com.example.customerservice.service.ChatMessageManagementOperations;
 import com.example.customerservice.service.ChatOfflineMessageOperations;
@@ -21,6 +23,8 @@ import com.example.customerservice.service.impl.ChatMessageManagementService;
 import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatPresenceService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
+import com.example.customerservice.service.impl.ChatAgentSessionRecoveryService;
+import com.example.customerservice.service.impl.ChatAgentService;
 import com.example.customerservice.service.impl.ChatSessionTransferService;
 import com.example.customerservice.service.impl.ChatSessionNotificationService;
 import org.springframework.beans.factory.ObjectProvider;
@@ -166,6 +170,20 @@ public class ChatServiceConfiguration {
     }
 
     @Bean
+    public ChatAgentSessionRecoveryService chatAgentSessionRecoveryService(
+            ChatRedisRepository chatRedisRepository,
+            ChatSessionMapper chatSessionMapper,
+            @Value("${app.chat.agent-session-restore-batch-size:100}")
+            int restoreBatchSize
+    ) {
+        return new ChatAgentSessionRecoveryService(
+                chatRedisRepository,
+                chatSessionMapper,
+                restoreBatchSize
+        );
+    }
+
+    @Bean
     public ChatRoutingSessionService chatRoutingSessionService(
             ChatRedisRepository chatRedisRepository,
             ChatMessageOperations chatMessageOperations,
@@ -180,6 +198,7 @@ public class ChatServiceConfiguration {
             ObjectMapper objectMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysUserMapper sysUserMapper,
+            ObjectProvider<ChatAgentOperations> agentOperationsProvider,
             @Value("${app.chat.agent-reconnect-grace-seconds:20}") long agentReconnectGraceSeconds,
             @Value("${app.chat.vip.reserved-slots:1}") int vipReservedSlots,
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
@@ -201,12 +220,34 @@ public class ChatServiceConfiguration {
                 objectMapper,
                 sysUserRoleMapper,
                 sysUserMapper,
+                agentOperationsProvider,
                 agentReconnectGraceSeconds,
                 vipReservedSlots,
                 averageHandleSeconds,
                 vipPriorityStepSeconds,
                 messageRecallWindowSeconds,
                 messageEditWindowSeconds
+        );
+    }
+
+    @Bean
+    public ChatAgentOperations chatAgentOperations(
+            ChatRedisRepository chatRedisRepository,
+            ChatAgentSessionRecoveryService sessionRecoveryService,
+            ChatRoutingOperations chatRoutingOperations,
+            ChatPresenceOperations chatPresenceOperations,
+            ChatSessionNotificationOperations notificationOperations,
+            SysUserMapper sysUserMapper,
+            SysUserRoleMapper sysUserRoleMapper
+    ) {
+        return new ChatAgentService(
+                chatRedisRepository,
+                sessionRecoveryService,
+                chatRoutingOperations,
+                chatPresenceOperations,
+                notificationOperations,
+                sysUserMapper,
+                sysUserRoleMapper
         );
     }
 

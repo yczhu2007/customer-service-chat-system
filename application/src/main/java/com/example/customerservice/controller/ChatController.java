@@ -4,7 +4,11 @@ import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IAuthenticationService;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatAgentOperations;
+import com.example.customerservice.service.ChatMessageOperations;
+import com.example.customerservice.service.ChatPresenceOperations;
+import com.example.customerservice.service.ChatRoutingOperations;
+import com.example.customerservice.service.ChatSessionOperations;
 import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,7 +35,19 @@ import java.util.Set;
 public class ChatController {
 
     @Autowired
-    private IChatService chatService;
+    private ChatRoutingOperations chatRoutingOperations;
+
+    @Autowired
+    private ChatAgentOperations chatAgentOperations;
+
+    @Autowired
+    private ChatMessageOperations chatMessageOperations;
+
+    @Autowired
+    private ChatSessionOperations chatSessionOperations;
+
+    @Autowired
+    private ChatPresenceOperations chatPresenceOperations;
 
     @Autowired
     private IAuthenticationService authenticationService;
@@ -85,7 +101,7 @@ public class ChatController {
                 userId,
                 "chat:user:access"
         );
-        chatService.onUserConnected(
+        chatRoutingOperations.onUserConnected(
                 userId
         );
 
@@ -123,7 +139,7 @@ public class ChatController {
                 currentUser.getUserId();
 
 
-        chatService.agentOnline(
+        chatAgentOperations.agentOnline(
                 agentId
         );
 
@@ -157,7 +173,7 @@ public class ChatController {
                 currentUser.getUserId();
 
 
-        chatService.agentOffline(
+        chatAgentOperations.agentOffline(
                 agentId
         );
 
@@ -177,7 +193,7 @@ public class ChatController {
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatService.setAgentVipSkill(agentId, true);
+        chatAgentOperations.setAgentVipSkill(agentId, true);
         return Result.successMessage("已加入VIP坐席技能组");
     }
 
@@ -191,7 +207,7 @@ public class ChatController {
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatService.setAgentVipSkill(agentId, false);
+        chatAgentOperations.setAgentVipSkill(agentId, false);
         return Result.successMessage("已移出VIP坐席技能组");
     }
 
@@ -200,7 +216,7 @@ public class ChatController {
     public Result<Set<String>> findVipSkillAgents() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        return Result.success(chatService.findVipSkillAgentIds());
+        return Result.success(chatAgentOperations.findVipSkillAgentIds());
     }
 
     @MessageMapping("/chat.send")
@@ -227,7 +243,7 @@ public class ChatController {
                         principal.getName()
                 );
         int result =
-                chatService.handleMessage(message);
+                chatMessageOperations.handleMessage(message);
 
 
         log.info(
@@ -281,7 +297,7 @@ public class ChatController {
         );
 
 
-        chatService.endSessionByAgent(
+        chatSessionOperations.endSessionByAgent(
                 request.getSessionId(),
                 agentId
         );
@@ -308,7 +324,7 @@ public class ChatController {
         String sourceAgentId = principal.getName();
         requireWebSocketRole(sourceAgentId, "AGENT");
         requireWebSocketPermission(sourceAgentId, "chat:session:transfer");
-        chatService.transferSession(
+        chatSessionOperations.transferSession(
                 request.getSessionId(),
                 sourceAgentId,
                 request.getTargetAgentId()
@@ -357,7 +373,7 @@ public class ChatController {
         /*
          * 3. 查询历史消息
          */
-        ChatHistoryPage historyPage = chatService.getHistory(
+        ChatHistoryPage historyPage = chatMessageOperations.getHistory(
                         request.getSessionId(),
                         principal.getName(),
                         request.getBeforeMessageId(),
@@ -437,7 +453,7 @@ public class ChatController {
                 principal.getName();
 
 
-        chatService.pullOfflineMessages(
+        chatMessageOperations.pullOfflineMessages(
                 userId
         );
     }
@@ -464,7 +480,7 @@ public class ChatController {
                     "ACK请求不能为空"
             );
         }
-        chatService.handleAck(
+        chatMessageOperations.handleAck(
                 request.getMessageId(),
                 principal.getName()
         );
@@ -484,7 +500,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
-        return chatService.markMessagesRead(
+        return chatMessageOperations.markMessagesRead(
                 request.getSessionId(),
                 request.getLastReadMessageId(),
                 principal.getName()
@@ -504,7 +520,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
-        return chatService.editMessage(
+        return chatMessageOperations.editMessage(
                 request.getMessageId(),
                 request.getContent(),
                 principal.getName()
@@ -524,7 +540,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
-        return chatService.recallMessage(
+        return chatMessageOperations.recallMessage(
                 request.getMessageId(),
                 principal.getName()
         );
@@ -557,7 +573,7 @@ public class ChatController {
                 principal.getName();
 
 
-        chatService.handleHeartbeat(
+        chatPresenceOperations.handleHeartbeat(
                 userId,
                 wsSessionId
         );

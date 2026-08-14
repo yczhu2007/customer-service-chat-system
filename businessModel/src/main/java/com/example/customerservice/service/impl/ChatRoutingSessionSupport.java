@@ -23,10 +23,11 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.service.IChatService;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatPresenceCallbacks;
 import com.example.customerservice.service.ChatPresenceOperations;
+import com.example.customerservice.service.ChatRoutingOperations;
+import com.example.customerservice.service.ChatSessionOperations;
 import com.example.customerservice.service.ChatSessionTransferOperations;
 import com.example.customerservice.service.ChatSessionNotificationOperations;
 import com.example.customerservice.service.MessagePersistService;
@@ -46,7 +47,7 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 abstract class ChatRoutingSessionSupport
-        implements IChatService, ChatPresenceCallbacks {
+        implements ChatRoutingOperations, ChatSessionOperations, ChatPresenceCallbacks {
 
 
     protected final ChatRedisRepository chatRedisRepository;
@@ -525,24 +526,12 @@ abstract class ChatRoutingSessionSupport
         }
     }
     @Override
-    public void registerOnline(String userId, String wsSessionId) {
-        chatPresenceOperations.registerOnline(userId, wsSessionId);
-    }
-
-    @Override
-    public void handleAgentReconnectGraceTimeout(String agentId) {
-        chatPresenceOperations.handleAgentReconnectGraceTimeout(agentId);
-    }
-
-    @Override
     public AssignResult reconnectUser(String userId) {
         return onUserConnected(userId);
     }
 
     @Override
-    public void restoreAgentOnline(String agentId) {
-        agentOnline(agentId);
-    }
+    public abstract void restoreAgentOnline(String agentId);
 
     @Override
     public boolean finalizePresenceSession(ChatSession session, String expectedAgentId) {
@@ -667,8 +656,6 @@ abstract class ChatRoutingSessionSupport
                 resolveMillis
         );
     }
-
-    public abstract void agentOnline(String agentId);
 
     public abstract AssignResult onUserConnected(String userId);
 

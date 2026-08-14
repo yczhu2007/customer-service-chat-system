@@ -182,13 +182,6 @@ public class RedisConstants {
 
 
     /**
-     * Token有效期：30分钟。
-     */
-    public static final long TOKEN_TTL_MINUTES =
-            30L;
-
-
-    /**
      * 生成完整Token Key。
      */
     public static String tokenKey(

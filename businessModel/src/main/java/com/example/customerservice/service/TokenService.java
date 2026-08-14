@@ -31,6 +31,9 @@ public interface TokenService {
             String token
     );
 
+    /** 当前登录Token的有效期，单位为秒。 */
+    long getTokenTtlSeconds();
+
 
     /**
      * 注销Token。

@@ -1,7 +1,7 @@
 package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatPresenceOperations;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,14 +13,14 @@ import java.util.Set;
 public class AgentReconnectGraceScheduler {
 
     private final StringRedisTemplate redisTemplate;
-    private final IChatService chatService;
+    private final ChatPresenceOperations chatPresenceOperations;
 
     public AgentReconnectGraceScheduler(
             StringRedisTemplate redisTemplate,
-            IChatService chatService
+            ChatPresenceOperations chatPresenceOperations
     ) {
         this.redisTemplate = redisTemplate;
-        this.chatService = chatService;
+        this.chatPresenceOperations = chatPresenceOperations;
     }
 
     @Scheduled(fixedDelay = 5_000)
@@ -36,7 +36,7 @@ public class AgentReconnectGraceScheduler {
             return;
         }
         for (String agentId : agentIds) {
-            chatService.handleAgentReconnectGraceTimeout(agentId);
+            chatPresenceOperations.handleAgentReconnectGraceTimeout(agentId);
         }
     }
 }

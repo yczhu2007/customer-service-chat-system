@@ -1,7 +1,7 @@
 package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
-import com.example.customerservice.service.IChatService;
+import com.example.customerservice.service.ChatMaintenanceOperations;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -24,14 +24,18 @@ class SessionInactivitySchedulerTest {
 
     @Mock private StringRedisTemplate redisTemplate;
     @Mock private ZSetOperations<String, String> zSetOperations;
-    @Mock private IChatService chatService;
+    @Mock private ChatMaintenanceOperations chatMaintenanceOperations;
 
     private SessionInactivityScheduler scheduler;
 
     @BeforeEach
     void setUp() {
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
-        scheduler = new SessionInactivityScheduler(redisTemplate, chatService, 60);
+        scheduler = new SessionInactivityScheduler(
+                redisTemplate,
+                chatMaintenanceOperations,
+                60
+        );
     }
 
     @Test
@@ -46,8 +50,8 @@ class SessionInactivitySchedulerTest {
 
         scheduler.reassignInactiveSessions();
 
-        verify(chatService).handleSessionInactivityTimeout(eq("S001"), anyLong());
-        verify(chatService).handleSessionInactivityTimeout(eq("S002"), anyLong());
+        verify(chatMaintenanceOperations).handleSessionInactivityTimeout(eq("S001"), anyLong());
+        verify(chatMaintenanceOperations).handleSessionInactivityTimeout(eq("S002"), anyLong());
     }
 
     @Test
@@ -62,7 +66,7 @@ class SessionInactivitySchedulerTest {
 
         scheduler.reassignInactiveSessions();
 
-        verify(chatService, never()).handleSessionInactivityTimeout(
+        verify(chatMaintenanceOperations, never()).handleSessionInactivityTimeout(
                 org.mockito.ArgumentMatchers.anyString(),
                 org.mockito.ArgumentMatchers.anyLong()
         );
