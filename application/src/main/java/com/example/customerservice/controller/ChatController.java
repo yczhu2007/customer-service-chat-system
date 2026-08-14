@@ -8,13 +8,10 @@ import com.example.customerservice.service.IChatService;
 import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.event.EventListener;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.socket.messaging.SessionSubscribeEvent;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -54,148 +51,7 @@ public class ChatController {
         );
     }
     /**
-     * 客户端订阅/user/queue/chat时触发。
-     *
-     * 普通用户触发客服分配；
-     * 客服和管理员只建立订阅，不触发用户接入。
-     */
-    @EventListener
-    public void onChatSubscribe(
-            SessionSubscribeEvent event
-    ) {
-
-        StompHeaderAccessor accessor =
-                StompHeaderAccessor.wrap(
-                        event.getMessage()
-                );
-
-
-        String destination =
-                accessor.getDestination();
-
-
-        /*
-         * 只处理用户聊天队列订阅。
-         */
-        if (
-                !"/user/queue/chat".equals(
-                        destination
-                )
-        ) {
-
-            return;
-        }
-
-
-        Principal principal =
-                accessor.getUser();
-
-
-        if (principal == null) {
-
-            log.info(
-                    "订阅聊天队列失败：没有用户身份"
-            );
-
-            return;
-        }
-
-
-        String userId =
-                principal.getName();
-
-
-        /*
-         * 从数据库查询真实角色，
-         * 不再使用agent:load判断永久身份。
-         */
-        Set<String> roleCodes =
-                authenticationService.findRoleCodesByUserId(
-                        userId
-                );
-
-
-        if (
-                roleCodes == null ||
-                        roleCodes.isEmpty()
-        ) {
-
-            log.info(
-                    "订阅聊天队列失败：用户没有角色，userId："
-                            + userId
-            );
-
-            return;
-        }
-
-
-        /*
-         * 客服订阅该地址是为了接收会话通知，
-         * 不能把客服再次当成普通用户进行分配。
-         */
-        if (
-                roleCodes.contains(
-                        "AGENT"
-                )
-        ) {
-
-            log.info(
-                    "客服订阅聊天队列，不触发用户接入，agentId："
-                            + userId
-            );
-
-            return;
-        }
-
-
-        /*
-         * 管理员不触发客服分配。
-         */
-        if (
-                roleCodes.contains(
-                        "ADMIN"
-                )
-        ) {
-
-            log.info(
-                    "管理员订阅聊天队列，不触发用户接入，userId："
-                            + userId
-            );
-
-            return;
-        }
-
-
-        /*
-         * 只有USER角色触发用户接入。
-         */
-        if (
-                roleCodes.contains(
-                        "USER"
-                )
-        ) {
-
-            requireWebSocketPermission(
-                    userId,
-                    "chat:user:access"
-            );
-
-            chatService.onUserConnected(
-                    userId
-            );
-
-            return;
-        }
-
-
-        log.info(
-                "当前角色不允许进入聊天流程，userId："
-                        + userId
-        );
-    }
-
-    /**
-     * 已结束会话的普通用户在保持WebSocket连接的情况下重新发起咨询。
+     * 普通用户显式发起或恢复咨询。
      * 客户端发送地址：/app/chat.start
      */
     @MessageMapping("/chat.start")
@@ -221,7 +77,7 @@ public class ChatController {
                         roleCodes.contains("ADMIN")
         ) {
             throw new IllegalArgumentException(
-                    "只有普通用户可以重新发起咨询"
+                    "只有普通用户可以发起咨询"
             );
         }
 
@@ -234,7 +90,7 @@ public class ChatController {
         );
 
         log.info(
-                "用户重新发起咨询，userId：{}",
+                "用户发起咨询，userId：{}",
                 userId
         );
     }

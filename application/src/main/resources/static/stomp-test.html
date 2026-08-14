@@ -5,101 +5,219 @@
     <title>客服聊天系统测试页面</title>
 
     <style>
+        :root {
+            --bg: #f7f8fa;
+            --paper: #ffffff;
+            --line: #e7e9ee;
+            --line-strong: #d6dae2;
+            --ink: #181d26;
+            --navy: #4d6bfe;
+            --navy-deep: #3a56e0;
+            --muted: #6a7280;
+            --faint: #9aa2ae;
+            --green: #1f8a5f;
+            --green-soft: #e7f4ee;
+            --red: #dc2626;
+            --red-soft: #fdecec;
+            --font-sans: "PingFang SC", "Microsoft YaHei", "Noto Sans SC", system-ui, -apple-system, sans-serif;
+            --font-mono: "JetBrains Mono", "SF Mono", "Cascadia Code", Consolas, "Courier New", monospace;
+        }
         * { box-sizing: border-box; }
+        html { color-scheme: light; }
         body {
             margin: 0;
-            color: #1f2937;
-            background: #f3f6fb;
-            font-family: "Microsoft YaHei", system-ui, sans-serif;
+            color: var(--ink);
+            background: var(--bg);
+            font-family: var(--font-sans);
+            font-size: 14px;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
         }
         button, input { font: inherit; }
         button {
-            padding: 9px 16px;
-            border: 0;
+            padding: 9px 14px;
+            border: 1px solid transparent;
             border-radius: 8px;
             color: #ffffff;
-            background: #2563eb;
+            background: var(--navy);
+            font-weight: 600;
             cursor: pointer;
+            transition: background .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
         }
-        button:hover { background: #1d4ed8; }
-        button:disabled { opacity: .55; cursor: not-allowed; }
+        button:hover { background: var(--navy-deep); }
+        button:active { transform: translateY(1px); }
+        button:disabled { opacity: .45; cursor: not-allowed; }
+        button.secondary {
+            color: var(--ink);
+            background: var(--paper);
+            border-color: var(--line-strong);
+        }
+        button.secondary:hover { background: #f1f3f7; }
+        button.danger { color: #ffffff; background: var(--red); }
+        button.danger:hover { background: #b91c1c; }
         input {
             min-width: 0;
             padding: 9px 11px;
-            border: 1px solid #d1d5db;
+            border: 1px solid var(--line-strong);
             border-radius: 8px;
+            background: var(--paper);
+            color: var(--ink);
             outline: none;
+            transition: border-color .12s ease, box-shadow .12s ease;
         }
-        input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px #dbeafe; }
+        input::placeholder { color: var(--faint); }
+        input:focus { border-color: var(--navy); box-shadow: 0 0 0 3px rgba(77, 107, 254, .14); }
         .page { width: min(1180px, calc(100% - 32px)); margin: 24px auto; }
-        .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
-        .login-card { width: min(420px, 100%); padding: 28px; border: 1px solid #e5e7eb; border-radius: 16px; background: #ffffff; box-shadow: 0 12px 35px rgba(15, 23, 42, .10); }
-        .login-card h1 { margin: 0 0 8px; font-size: 25px; text-align: center; }
-        .login-card > .hint { margin: 0 0 22px; text-align: center; }
-        .login-card button { width: 100%; margin-top: 4px; }
-        .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-        .page-header h1 { margin: 0; font-size: 25px; }
-        .header-actions { display: flex; align-items: center; gap: 10px; }
-        .account-text { color: #64748b; font-size: 13px; }
-        .status-badge { padding: 7px 12px; border-radius: 999px; background: #e5e7eb; color: #4b5563; }
-        .status-badge.online { color: #166534; background: #dcfce7; }
-        .layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 18px; align-items: start; }
-        .layout.admin-layout { grid-template-columns: minmax(330px, 720px); justify-content: center; }
-        .sidebar { display: grid; gap: 14px; }
-        .panel, .chat-card {
-            padding: 17px;
-            border: 1px solid #e5e7eb;
+        .login-screen { min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #ffffff; }
+        .login-card {
+            width: min(400px, 100%);
+            padding: 34px 30px;
+            border: 1px solid var(--line);
             border-radius: 14px;
-            background: #ffffff;
-            box-shadow: 0 5px 18px rgba(15, 23, 42, .05);
+            background: var(--paper);
+            box-shadow: 0 1px 3px rgba(24, 29, 38, .06), 0 12px 32px rgba(24, 29, 38, .08);
         }
-        .panel h2, .chat-card h2 { margin: 0 0 14px; font-size: 17px; }
-        .field { display: grid; gap: 6px; margin-bottom: 11px; color: #4b5563; font-size: 14px; }
+        .brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 26px; }
+        .brand h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: .03em; }
+        .brand .subtitle { margin: 0; color: var(--faint); font-family: var(--font-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
+        .login-card button { width: 100%; margin-top: 4px; background: var(--navy); }
+        .login-card button:hover { background: var(--navy-deep); }
+        .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+        .page-header h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: .01em; }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .account-text { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            padding: 5px 11px;
+            border: 1px solid var(--line-strong);
+            border-radius: 999px;
+            background: var(--paper);
+            color: var(--muted);
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
+        .status-badge::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--red);
+        }
+        .status-badge.online {
+            color: var(--green);
+            border-color: rgba(31, 138, 95, .35);
+            background: var(--green-soft);
+        }
+        .status-badge.online::before { background: var(--green); }
+        .layout { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
+        .layout.admin-layout { grid-template-columns: minmax(330px, 720px); justify-content: center; }
+        .sidebar { display: grid; gap: 12px; position: sticky; top: 24px; max-height: calc(100vh - 48px); overflow-y: auto; }
+        .panel, .chat-card {
+            padding: 18px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--paper);
+            box-shadow: 0 1px 2px rgba(24, 29, 38, .05);
+        }
+        .panel h2, .chat-card h2 {
+            margin: 0 0 14px;
+            padding-bottom: 11px;
+            border-bottom: 1px solid var(--line);
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: .02em;
+        }
+        .field { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
         .field input { width: 100%; }
         .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
         .button-row button { flex: 1 1 auto; }
-        .secondary { color: #1f2937; background: #eef2f7; }
-        .secondary:hover { background: #e2e8f0; }
-        .danger { background: #dc2626; }
-        .danger:hover { background: #b91c1c; }
-        .hint { margin: 10px 0 0; color: #64748b; font-size: 13px; line-height: 1.55; }
+        .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
         [hidden] { display: none !important; }
-        .operation-result { margin-top: 12px; padding: 10px 12px; border-radius: 8px; color: #475569; background: #f1f5f9; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
-        .operation-result.success { color: #166534; background: #dcfce7; }
-        .operation-result.error { color: #991b1b; background: #fee2e2; }
-        .advanced { margin-top: 12px; }
-        .advanced summary { color: #475569; cursor: pointer; }
-        .chat-card { padding: 0; overflow: hidden; }
-        .chat-header { padding: 16px 18px; border-bottom: 1px solid #e5e7eb; }
-        .chat-header h2 { margin-bottom: 5px; }
-        .session-text { color: #64748b; font-size: 13px; overflow-wrap: anywhere; }
-        .counterpart-text { margin-top: 4px; color: #2563eb; font-size: 14px; font-weight: 600; }
-        #chatMessages {
-            height: 500px;
-            padding: 20px;
-            overflow-y: auto;
-            background: #f8fafc;
+        .operation-result {
+            margin-top: 12px;
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            color: var(--ink);
+            background: #fafbfc;
+            font-size: 12px;
+            line-height: 1.6;
+            overflow-wrap: anywhere;
         }
-        .empty-chat { margin-top: 180px; color: #94a3b8; text-align: center; }
+        .operation-result.success { color: #0c6b47; border-color: rgba(31, 138, 95, .3); background: var(--green-soft); }
+        .operation-result.error { color: var(--red); border-color: rgba(220, 38, 38, .3); background: var(--red-soft); }
+        .advanced { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+        .advanced summary { color: var(--muted); cursor: pointer; font-size: 12px; }
+        .chat-card { padding: 0; overflow: hidden; }
+        .chat-header { padding: 16px 18px; border-bottom: 1px solid var(--line); background: #fbfbfc; }
+        .chat-header h2 { margin: 0 0 6px; padding-bottom: 0; border-bottom: none; }
+        .session-text { color: var(--muted); font-size: 12px; font-family: var(--font-mono); overflow-wrap: anywhere; }
+        .counterpart-text { margin-top: 4px; color: var(--navy); font-size: 13px; font-weight: 600; }
+        #chatMessages {
+            height: 520px;
+            padding: 22px 18px;
+            overflow-y: auto;
+            background: var(--bg);
+        }
+        .empty-chat { margin-top: 190px; color: var(--muted); text-align: center; font-size: 13px; }
         .message-row { display: flex; margin-bottom: 14px; }
         .message-row.mine { justify-content: flex-end; }
-        .message-bubble { max-width: 72%; padding: 10px 13px; border-radius: 13px; background: #ffffff; box-shadow: 0 1px 4px rgba(15, 23, 42, .12); overflow-wrap: anywhere; }
-        .message-row.mine .message-bubble { color: #ffffff; background: #2563eb; }
-        .message-row.selectable .message-bubble { cursor: pointer; }
-        .message-row.selected .message-bubble { outline: 3px solid #f59e0b; outline-offset: 2px; }
         .message-row.system { justify-content: center; }
-        .message-row.system .message-bubble { max-width: 90%; padding: 7px 12px; color: #475569; background: #e2e8f0; font-size: 13px; text-align: center; }
-        .message-row.error .message-bubble { color: #991b1b; background: #fee2e2; }
-        .message-meta { margin-bottom: 4px; color: #94a3b8; font-size: 11px; }
-        .message-row.mine .message-meta { color: #dbeafe; text-align: right; }
-        .chat-composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 15px; border-top: 1px solid #e5e7eb; }
+        .message-bubble {
+            max-width: 72%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            background: var(--paper);
+            color: var(--ink);
+            box-shadow: 0 1px 2px rgba(24, 29, 38, .05);
+            overflow-wrap: anywhere;
+        }
+        .message-row.mine .message-bubble { background: var(--navy); border-color: var(--navy); color: #ffffff; }
+        .message-row.system .message-bubble {
+            max-width: 90%;
+            padding: 6px 12px;
+            border: none;
+            background: transparent;
+            box-shadow: none;
+            color: var(--muted);
+            font-family: var(--font-mono);
+            font-size: 12px;
+            text-align: center;
+        }
+        .message-row.error .message-bubble { color: var(--red); }
+        .message-row.selectable .message-bubble { cursor: pointer; }
+        .message-row.selected .message-bubble { box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--navy); }
+        .message-meta { margin-bottom: 4px; color: var(--muted); font-size: 11px; }
+        .message-row.mine .message-meta { color: rgba(255, 255, 255, .85); text-align: right; }
+        .message-text { white-space: pre-wrap; word-break: break-word; }
+        .chat-composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--paper); }
         .chat-composer input { width: 100%; }
-        .chat-footer-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 15px 14px; }
+        .chat-footer-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px 14px; background: var(--paper); }
         .chat-footer-status .hint { margin: 0; }
-        #log { max-height: 220px; padding: 12px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; color: #475569; background: #f8fafc; font: 12px/1.55 Consolas, monospace; }
+        #log {
+            max-height: 240px;
+            padding: 12px;
+            overflow: auto;
+            white-space: pre-wrap;
+            overflow-wrap: anywhere;
+            color: #4a5362;
+            background: #fafbfc;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            font: 12px/1.6 var(--font-mono);
+        }
+        :focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+        @media (prefers-reduced-motion: reduce) {
+            * { transition: none !important; }
+        }
         @media (max-width: 820px) {
             .layout { grid-template-columns: 1fr; }
+            .sidebar { position: static; max-height: none; }
             #chatMessages { height: 420px; }
+            .page-header { flex-wrap: wrap; }
         }
     </style>
 </head>
@@ -107,8 +225,10 @@
 <body>
 <section id="loginView" class="login-screen">
     <div class="login-card">
-        <h1>客服聊天系统</h1>
-        <p class="hint">请使用系统账号登录</p>
+        <div class="brand">
+            <h1>客服聊天系统</h1>
+            <p class="subtitle">Support Console</p>
+        </div>
         <label class="field">用户名
             <input id="loginUsername" autocomplete="username" placeholder="请输入用户名">
         </label>
@@ -151,7 +271,7 @@
                 <input id="sessionId" type="hidden">
                 <p id="sessionOperationHint" class="hint">当前暂无进行中的会话</p>
                 <div class="button-row">
-                    <button id="loadHistoryButton" class="secondary" onclick="loadChatHistory()" disabled>加载历史</button>
+                    <button id="loadHistoryButton" class="secondary" onclick="loadChatHistory()" disabled>加载聊天记录</button>
                     <button id="endSessionButton" class="danger" onclick="endChatSession()" disabled>结束会话</button>
                 </div>
             </section>
@@ -195,7 +315,7 @@
             </section>
 
             <details class="panel">
-                <summary><strong>调试信息</strong></summary>
+                <summary><strong>调试日志</strong></summary>
                 <div id="log"></div>
             </details>
         </aside>
@@ -236,6 +356,14 @@
     let sessionActive = false;
     let canRestartConsultation = false;
     let pendingAgentSessionNotices = [];
+    let manualDisconnectRequested = false;
+    let reconnectBlockedByStompError = false;
+    let reconnectTimer = null;
+    let reconnectAttempts = 0;
+    let disconnectFallbackTimer = null;
+    let stompHeartbeatSendTimer = null;
+    let stompWatchdogTimer = null;
+    let lastServerActivityAt = 0;
     /*
      * 是否自动发送业务ACK
      *
@@ -252,7 +380,13 @@
      * 心跳发送间隔：30秒
      */
     const HEARTBEAT_INTERVAL_MS = 30000;
+    const STOMP_CONNECT_TIMEOUT_MS = 5000;
+    const STOMP_HEARTBEAT_INTERVAL_MS = 10000;
+    const STOMP_SERVER_INACTIVITY_TIMEOUT_MS = 45000;
+    const STOMP_WATCHDOG_CHECK_INTERVAL_MS = 5000;
     const AUTO_ACK = true;
+    const MAX_RECONNECT_ATTEMPTS = 6;
+    const MAX_RECONNECT_DELAY_MS = 30000;
 
     function writeLog(message) {
         const log = document.getElementById("log");
@@ -617,6 +751,21 @@
             appendSystemMessage((body.message || "暂无可用客服，已进入等待队列") + position + eta);
             return;
         }
+        if (body.event === "VIP_CALLBACK_REQUIRED") {
+            canRestartConsultation = false;
+            currentCounterpartId = null;
+            updateCounterpartDisplay();
+            updateActionAvailability();
+            const position = body.waitingPosition
+                ? "，当前排在第 " + body.waitingPosition + " 位"
+                : "";
+            appendSystemMessage((body.message || "当前没有可用客服，已进入回呼队列") + position);
+            return;
+        }
+        if (body.event === "ASSIGNMENT_PROCESSING") {
+            appendSystemMessage(body.message || "正在为你分配客服，请稍候");
+            return;
+        }
         if (body.event === "ERROR") {
             if (!sessionActive && loggedInRoles.includes("USER")) {
                 canRestartConsultation = true;
@@ -638,7 +787,7 @@
             return;
         }
         if (body.event === "SESSION_TRANSFERRED") {
-            appendSystemMessage("会话已转接" + (body.targetAgentId ? "给客服 " + body.targetAgentId : ""));
+            appendSystemMessage("会话已转接" + (body.agentId ? "给客服 " + body.agentId : ""));
             return;
         }
         if (body.event && body.message) {
@@ -756,8 +905,50 @@
         window.location.reload();
     }
 
+    function cancelReconnect() {
+        if (reconnectTimer !== null) {
+            clearTimeout(reconnectTimer);
+            reconnectTimer = null;
+        }
+    }
 
-    function connectStomp() {
+    function scheduleReconnect() {
+        const token = document.getElementById("token").value.trim();
+        if (manualDisconnectRequested || reconnectBlockedByStompError
+            || loggedInRoles.includes("ADMIN") || !token || reconnectTimer !== null) {
+            return;
+        }
+        if (reconnectAttempts >= MAX_RECONNECT_ATTEMPTS) {
+            sessionActive = false;
+            setConnectionStatus("重连失败", false);
+            setConnectionDescription("自动重连次数已用完，请点击“连接”重试");
+            appendSystemMessage("聊天连接自动重试失败，请点击“连接”重试", true);
+            updateSessionDisplay(document.getElementById("sessionId").value.trim());
+            updateActionAvailability();
+            return;
+        }
+
+        const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), MAX_RECONNECT_DELAY_MS);
+        reconnectAttempts += 1;
+        setConnectionStatus("正在重连", false);
+        setConnectionDescription("连接中断，" + Math.ceil(delay / 1000) + " 秒后自动重连");
+        writeLog("连接中断，准备第 " + reconnectAttempts + " 次自动重连");
+        reconnectTimer = setTimeout(function () {
+            reconnectTimer = null;
+            connectStomp(true);
+        }, delay);
+        updateActionAvailability();
+    }
+
+
+    function connectStomp(isAutomaticReconnect) {
+
+        if (!isAutomaticReconnect) {
+            reconnectAttempts = 0;
+            reconnectBlockedByStompError = false;
+        }
+        manualDisconnectRequested = false;
+        cancelReconnect();
 
         if (loggedInRoles.includes("ADMIN")) {
             showOperationResult("adminOperationResult", "管理员账号不需要建立聊天连接", true);
@@ -803,6 +994,10 @@
                 : "ws://";
 
 
+        /*
+         * 浏览器原生WebSocket不能设置Authorization请求头，因此握手Token使用查询参数。
+         * 页面日志不输出完整URL；部署时应使用HTTPS/WSS并保持Token短有效期。
+         */
         const websocketUrl =
             websocketProtocol +
             window.location.host +
@@ -810,9 +1005,7 @@
             encodeURIComponent(token);
 
 
-        writeLog(
-            "开始连接：" + websocketUrl
-        );
+        writeLog("开始连接WebSocket（Token已隐藏）");
         setConnectionStatus("连接中", false);
         setConnectionDescription("正在建立消息连接……");
 
@@ -821,18 +1014,26 @@
         /*
          * v12.stomp表示使用STOMP 1.2协议
          */
-        socket =
-            new WebSocket(
-                websocketUrl,
-                ["v12.stomp"]
-            );
+        const currentSocket = new WebSocket(websocketUrl, ["v12.stomp"]);
+        let stompConnectTimeoutTimer = null;
+        function clearStompConnectTimeout() {
+            if (stompConnectTimeoutTimer !== null) {
+                clearTimeout(stompConnectTimeoutTimer);
+                stompConnectTimeoutTimer = null;
+            }
+        }
+        socket = currentSocket;
         updateActionAvailability();
 
 
         /*
          * WebSocket握手成功
          */
-        socket.onopen = function () {
+        currentSocket.onopen = function () {
+            if (socket !== currentSocket) {
+                currentSocket.close(1000, "stale connection");
+                return;
+            }
 
             writeLog(
                 "WebSocket握手成功"
@@ -848,12 +1049,23 @@
                 "CONNECT\n" +
                 "accept-version:1.2\n" +
                 "host:localhost\n" +
-                "heart-beat:0,0\n" +
+                "heart-beat:10000,10000\n" +
                 "\n" +
                 "\u0000";
 
 
-            socket.send(connectFrame);
+            currentSocket.send(connectFrame);
+
+            stompConnectTimeoutTimer = setTimeout(function () {
+                if (socket !== currentSocket || stompConnected
+                    || currentSocket.readyState !== WebSocket.OPEN) {
+                    return;
+                }
+                writeLog("发送STOMP CONNECT后5秒内未收到CONNECTED，正在重新连接");
+                setConnectionStatus("连接超时", false);
+                setConnectionDescription("STOMP连接确认超时，正在自动重连");
+                currentSocket.close(4001, "STOMP CONNECT timeout");
+            }, STOMP_CONNECT_TIMEOUT_MS);
 
 
             writeLog(
@@ -865,20 +1077,37 @@
         /*
          * 收到服务器返回的信息
          */
-        socket.onmessage = function (event) {
+        currentSocket.onmessage = function (event) {
+
+            if (socket !== currentSocket) {
+                return;
+            }
+            markServerActivity();
+            if (typeof event.data === "string" && /^(?:\r?\n)+$/.test(event.data)) {
+                return;
+            }
+            const frame = parseStompFrame(event.data);
+            if (!frame) {
+                writeLog("收到无法解析的STOMP帧");
+                return;
+            }
 
             if (
-                event.data.startsWith("CONNECTED")
+                frame.command === "CONNECTED"
             ) {
 
+                clearStompConnectTimeout();
                 writeLog(
                     "STOMP连接成功"
                 );
                 setConnectionStatus("已连接", true);
                 stompConnected = true;
+                reconnectAttempts = 0;
+                reconnectBlockedByStompError = false;
                 setConnectionDescription("消息连接正常");
                 updateActionAvailability();
                 appendSystemMessage("聊天连接成功");
+                startStompHeartbeatMonitoring(currentSocket);
 
 
                 /*
@@ -893,7 +1122,7 @@
                     "\u0000";
 
 
-                socket.send(
+                currentSocket.send(
                     chatSubscribeFrame
                 );
 
@@ -911,7 +1140,7 @@
                     "\n" +
                     "\u0000";
 
-                socket.send(messageEventSubscribeFrame);
+                currentSocket.send(messageEventSubscribeFrame);
                 writeLog("已订阅：/user/queue/messages");
 
 
@@ -927,7 +1156,7 @@
                     "\u0000";
 
 
-                socket.send(
+                currentSocket.send(
                     errorSubscribeFrame
                 );
 
@@ -948,7 +1177,7 @@
                     "\u0000";
 
 
-                socket.send(
+                currentSocket.send(
                     offlinePullFrame
                 );
 
@@ -956,6 +1185,18 @@
                 writeLog(
                     "已请求拉取离线消息"
                 );
+
+                /* 订阅只负责接收消息；普通用户通过显式命令发起或恢复咨询。 */
+                const isUserOnly = loggedInRoles.includes("USER")
+                    && !loggedInRoles.includes("AGENT")
+                    && !loggedInRoles.includes("ADMIN");
+                if (isUserOnly) {
+                    sendStompJson(
+                        "/app/chat.start",
+                        {},
+                        isAutomaticReconnect ? null : "已请求发起或恢复咨询"
+                    );
+                }
                 /*
  * STOMP连接成功后启动心跳
  */
@@ -966,19 +1207,51 @@
                     setAgentStateLoading("登录成功，正在自动上线……");
                     void setAgentOnline(true);
                 }
+                return;
+            }
+
+            if (frame.command === "ERROR") {
+                clearStompConnectTimeout();
+                reconnectBlockedByStompError = true;
+                cancelReconnect();
+                let errorMessage = frame.headers.message || "STOMP协议处理失败";
+                if (frame.body) {
+                    try {
+                        const errorBody = JSON.parse(frame.body);
+                        errorMessage = errorBody.message || errorMessage;
+                    } catch (ignored) {
+                        errorMessage = frame.body.trim() || errorMessage;
+                    }
+                }
+                setConnectionStatus("连接被拒绝", false);
+                setConnectionDescription(errorMessage);
+                appendSystemMessage(errorMessage, true);
+                writeLog("STOMP ERROR：" + errorMessage);
+                updateActionAvailability();
+                return;
+            }
+
+            if (frame.command === "RECEIPT") {
+                const receiptId = frame.headers["receipt-id"] || "未知回执";
+                writeLog("收到STOMP回执：" + receiptId);
+                if (receiptId === "disconnect-001") {
+                    if (disconnectFallbackTimer !== null) {
+                        clearTimeout(disconnectFallbackTimer);
+                        disconnectFallbackTimer = null;
+                    }
+                    currentSocket.close(1000, "STOMP disconnect acknowledged");
+                }
+                return;
             }
             /*
  * 收到普通MESSAGE帧时，
  * 判断是不是一条聊天消息。
  */
             if (
-                event.data.startsWith("MESSAGE")
+                frame.command === "MESSAGE"
             ) {
 
-                const bodyText =
-                    extractStompBody(
-                        event.data
-                    );
+                const bodyText = frame.body;
 
 
                 if (bodyText) {
@@ -1063,31 +1336,41 @@
         /*
          * 连接关闭
          */
-        socket.onclose = function () {
+        currentSocket.onclose = function (event) {
+            clearStompConnectTimeout();
+            if (socket !== currentSocket) {
+                return;
+            }
             stopHeartbeat();
+            stopStompHeartbeatMonitoring();
+            if (disconnectFallbackTimer !== null) {
+                clearTimeout(disconnectFallbackTimer);
+                disconnectFallbackTimer = null;
+            }
             stompConnected = false;
-            sessionActive = false;
             setConnectionStatus(loggedInRoles.includes("ADMIN") ? "管理模式" : "未连接", false);
             if (!loggedInRoles.includes("ADMIN")) {
                 setConnectionDescription("消息连接已经断开");
             }
-            writeLog(
-                "连接已经关闭"
-            );
+            writeLog("连接已经关闭，code=" + event.code + (event.reason ? "，reason=" + event.reason : ""));
 
             socket = null;
             updateSessionDisplay(document.getElementById("sessionId").value.trim());
+            updateActionAvailability();
+            scheduleReconnect();
         };
 
 
         /*
          * 连接出错
          */
-        socket.onerror = function () {
+        currentSocket.onerror = function () {
+            if (socket !== currentSocket) {
+                return;
+            }
             stompConnected = false;
             setConnectionStatus("连接异常", false);
-            setConnectionDescription("消息连接发生异常，请重新连接");
-            appendSystemMessage("聊天连接发生异常，请重新连接", true);
+            setConnectionDescription("消息连接发生异常，正在等待自动重连");
             updateActionAvailability();
             writeLog(
                 "连接发生错误"
@@ -1097,17 +1380,25 @@
 
     /** 账号重新登录时，等待旧连接完全关闭后再使用新Token连接。 */
     function reconnectStomp() {
+        cancelReconnect();
         if (socket == null || socket.readyState === WebSocket.CLOSED) {
-            connectStomp();
+            connectStomp(false);
             return;
         }
 
+        if (disconnectFallbackTimer !== null) {
+            clearTimeout(disconnectFallbackTimer);
+            disconnectFallbackTimer = null;
+        }
+        stopStompHeartbeatMonitoring();
+
         const previousSocket = socket;
+        manualDisconnectRequested = true;
         previousSocket.addEventListener(
             "close",
             function () {
                 if (socket == null || socket === previousSocket) {
-                    connectStomp();
+                    connectStomp(false);
                 }
             },
             {once: true}
@@ -1239,26 +1530,130 @@
             heartbeatTimer = null;
         }
     }
-    /*
- * 从STOMP帧中提取JSON消息体
- */
-    function extractStompBody(frame) {
 
-        const bodyStart =
-            frame.indexOf("\n\n");
+    /** 记录最近一次服务端数据或协议心跳，用于识别静默断线。 */
+    function markServerActivity() {
+        lastServerActivityAt = Date.now();
+    }
 
+    /** 启动STOMP协议心跳发送及服务端入站超时看门狗。 */
+    function startStompHeartbeatMonitoring(currentSocket) {
+        stopStompHeartbeatMonitoring();
+        markServerActivity();
+        stompHeartbeatSendTimer = setInterval(function () {
+            if (socket === currentSocket && stompConnected
+                && currentSocket.readyState === WebSocket.OPEN) {
+                currentSocket.send("\n");
+            }
+        }, STOMP_HEARTBEAT_INTERVAL_MS);
+        stompWatchdogTimer = setInterval(function () {
+            if (socket !== currentSocket || !stompConnected
+                || currentSocket.readyState !== WebSocket.OPEN) {
+                return;
+            }
+            if (Date.now() - lastServerActivityAt <= STOMP_SERVER_INACTIVITY_TIMEOUT_MS) {
+                return;
+            }
+            writeLog("超过45秒未收到服务端数据，正在重建聊天连接");
+            setConnectionStatus("连接超时", false);
+            setConnectionDescription("长时间未收到服务端心跳，正在自动重连");
+            stopStompHeartbeatMonitoring();
+            currentSocket.close(4000, "STOMP heartbeat timeout");
+        }, STOMP_WATCHDOG_CHECK_INTERVAL_MS);
+    }
 
-        if (bodyStart === -1) {
+    function stopStompHeartbeatMonitoring() {
+        if (stompHeartbeatSendTimer !== null) {
+            clearInterval(stompHeartbeatSendTimer);
+            stompHeartbeatSendTimer = null;
+        }
+        if (stompWatchdogTimer !== null) {
+            clearInterval(stompWatchdogTimer);
+            stompWatchdogTimer = null;
+        }
+        lastServerActivityAt = 0;
+    }
 
+    function decodeStompHeader(value) {
+        let decoded = "";
+        for (let index = 0; index < value.length; index += 1) {
+            const character = value[index];
+            if (character !== "\\" || index + 1 >= value.length) {
+                decoded += character;
+                continue;
+            }
+            const escaped = value[index + 1];
+            if (escaped === "r") {
+                decoded += "\r";
+            } else if (escaped === "n") {
+                decoded += "\n";
+            } else if (escaped === "c") {
+                decoded += ":";
+            } else if (escaped === "\\") {
+                decoded += "\\";
+            } else {
+                decoded += "\\" + escaped;
+            }
+            index += 1;
+        }
+        return decoded;
+    }
+
+    /** 按UTF-8字节长度截取STOMP消息体，避免中文和换行导致content-length错位。 */
+    function takeUtf8Bytes(text, expectedBytes) {
+        const encoder = new TextEncoder();
+        let actualBytes = 0;
+        let result = "";
+        for (const character of text) {
+            const characterBytes = encoder.encode(character).length;
+            if (actualBytes + characterBytes > expectedBytes) {
+                break;
+            }
+            result += character;
+            actualBytes += characterBytes;
+            if (actualBytes === expectedBytes) {
+                break;
+            }
+        }
+        return result;
+    }
+
+    /** 解析一个STOMP 1.2帧，同时兼容LF、CRLF和content-length。 */
+    function parseStompFrame(rawFrame) {
+        if (typeof rawFrame !== "string") {
+            return null;
+        }
+        const frame = rawFrame.replace(/^(?:\r?\n)+/, "");
+        if (!frame) {
             return null;
         }
 
+        const separator = /\r?\n\r?\n/.exec(frame);
+        if (!separator) {
+            return null;
+        }
+        const headerLines = frame.substring(0, separator.index).split(/\r?\n/);
+        const command = headerLines.shift().trim();
+        const headers = {};
+        headerLines.forEach(function (line) {
+            const colonIndex = line.indexOf(":");
+            if (colonIndex > 0) {
+                const name = decodeStompHeader(line.substring(0, colonIndex));
+                const value = decodeStompHeader(line.substring(colonIndex + 1));
+                headers[name] = value;
+            }
+        });
 
-        return frame
-            .substring(bodyStart + 2)
-            .replace(/\u0000/g, "")
-            .trim();
+        const bodySource = frame.substring(separator.index + separator[0].length);
+        const contentLength = Number(headers["content-length"]);
+        const body = Number.isInteger(contentLength) && contentLength >= 0
+            ? takeUtf8Bytes(bodySource, contentLength)
+            : bodySource.substring(0, Math.max(0, bodySource.indexOf("\u0000") >= 0
+                ? bodySource.indexOf("\u0000")
+                : bodySource.length));
+        return {command: command, headers: headers, body: body};
     }
+
     function sendChatMessage() {
 
         if (!stompConnected || socket == null || socket.readyState !== WebSocket.OPEN) {
@@ -1301,14 +1696,7 @@
         }
 
 
-        /*
-         * clientMsgId为空时自动生成。
-         * 生成后写回输入框。
-         *
-         * 因此再次点击发送时，
-         * 会继续使用同一个clientMsgId，
-         * 方便测试消息去重。
-         */
+        /* clientMsgId为空时自动生成；发送后清空，下一条消息使用新ID。 */
         if (!clientMsgId) {
 
             clientMsgId =
@@ -1634,8 +2022,10 @@
             JSON.stringify(requestBody) +
             "\u0000";
         socket.send(frame);
-        writeLog(actionName);
-        appendSystemMessage(actionName);
+        if (actionName) {
+            writeLog(actionName);
+            appendSystemMessage(actionName);
+        }
         return true;
     }
 
@@ -1696,6 +2086,8 @@
 
     function disconnectStomp(silent) {
         stopHeartbeat();
+        cancelReconnect();
+        manualDisconnectRequested = true;
         if (socket == null || socket.readyState === WebSocket.CLOSED) {
             if (!silent) {
                 showChatError("当前没有已连接的聊天会话");
@@ -1738,15 +2130,18 @@
         );
 
 
-        /*
-         * 然后关闭WebSocket
-         */
-        socket.close();
         stompConnected = false;
         updateActionAvailability();
         writeLog("已经发送断开请求");
+        const disconnectingSocket = socket;
+        disconnectFallbackTimer = setTimeout(function () {
+            disconnectFallbackTimer = null;
+            if (disconnectingSocket.readyState !== WebSocket.CLOSED) {
+                disconnectingSocket.close(1000, "STOMP disconnect timeout");
+            }
+        }, 1000);
         if (!silent) {
-            appendSystemMessage("已主动断开聊天连接");
+            appendSystemMessage("正在断开聊天连接");
         }
     }
 

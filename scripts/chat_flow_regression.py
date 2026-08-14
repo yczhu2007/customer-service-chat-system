@@ -79,6 +79,9 @@ class StompClient:
         )
         self.send_raw(frame)
 
+    def start_consultation(self):
+        self.send_json("/app/chat.start", {})
+
     def receive_frame(self, timeout):
         deadline = time.time() + timeout
         while time.time() < deadline:
@@ -345,6 +348,7 @@ def main():
             client.subscribe("/user/queue/chat")
             client.subscribe("/user/queue/messages")
             client.subscribe("/user/queue/errors")
+            client.start_consultation()
             notice = client.receive_json(event="SESSION_CREATED")
             assignments.append(notice["session"])
             assigned_agent_index = agent_ids.index(notice["session"]["agentId"])
@@ -517,6 +521,7 @@ def main():
         inactivity_client = StompClient(args.base_url, user_tokens[8])
         clients.append(inactivity_client)
         inactivity_client.subscribe("/user/queue/chat")
+        inactivity_client.start_consultation()
         inactivity_session = inactivity_client.receive_json(event="SESSION_CREATED")["session"]
         redis("ZADD", "session:last-activity", 1, inactivity_session["sessionId"])
         inactivity_client.receive_json(timeout=40, event="SESSION_CLOSED")
@@ -552,6 +557,7 @@ def main():
         waiting = StompClient(args.base_url, user_tokens[4])
         clients.append(waiting)
         waiting.subscribe("/user/queue/chat")
+        waiting.start_consultation()
         waiting_notice = waiting.receive_json()
         if waiting_notice.get("assignmentStatus") != "WAITING":
             raise AssertionError("user did not enter waiting queue")
@@ -565,6 +571,7 @@ def main():
         replacement = StompClient(args.base_url, user_tokens[4])
         clients.append(replacement)
         replacement.subscribe("/user/queue/chat")
+        replacement.start_consultation()
         reconnected_notice = replacement.receive_json(event="SESSION_RECONNECTED")
         if reconnected_notice["session"]["sessionId"] != session["sessionId"]:
             raise AssertionError("user reconnect created or restored the wrong session")
@@ -630,8 +637,10 @@ def main():
         vip_waiter = StompClient(args.base_url, user_tokens[6])
         clients.extend([normal_waiter, vip_waiter])
         normal_waiter.subscribe("/user/queue/chat")
+        normal_waiter.start_consultation()
         normal_waiter.receive_json()
         vip_waiter.subscribe("/user/queue/chat")
+        vip_waiter.start_consultation()
         vip_notice = vip_waiter.receive_json()
         if vip_notice.get("vipLevel") != 5:
             raise AssertionError("VIP level was not included in waiting result")
@@ -648,6 +657,7 @@ def main():
         timeout_client = StompClient(args.base_url, user_tokens[7])
         clients.append(timeout_client)
         timeout_client.subscribe("/user/queue/chat")
+        timeout_client.start_consultation()
         timeout_client.receive_json()
         redis("ZADD", "queue:enqueued-at", int(time.time() * 1000) - 600000, user_ids[7])
         timeout_notice = timeout_client.receive_json(timeout=20, event="WAITING_TIMEOUT")

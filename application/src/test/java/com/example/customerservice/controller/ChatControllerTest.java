@@ -26,7 +26,7 @@ class ChatControllerTest {
     @InjectMocks private ChatController controller;
 
     @Test
-    void ordinaryUserCanRestartConsultationWithoutReconnect() {
+    void ordinaryUserCanStartConsultationExplicitly() {
         Principal principal = () -> "U001";
         when(authenticationService.findRoleCodesByUserId("U001"))
                 .thenReturn(Set.of("USER"));
@@ -41,7 +41,7 @@ class ChatControllerTest {
     }
 
     @Test
-    void agentCannotUseUserRestartConsultationEntry() {
+    void agentCannotUseUserConsultationEntry() {
         Principal principal = () -> "A001";
         when(authenticationService.findRoleCodesByUserId("A001"))
                 .thenReturn(Set.of("AGENT"));
