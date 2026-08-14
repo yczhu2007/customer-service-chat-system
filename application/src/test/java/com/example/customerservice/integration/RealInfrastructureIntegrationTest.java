@@ -3,13 +3,13 @@ package com.example.customerservice.integration;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.TokenService;
+import com.example.customerservice.service.impl.MessagePersistServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.connection.DataType;
-import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.List;
@@ -50,27 +50,36 @@ class RealInfrastructureIntegrationTest {
         try {
             redisTemplate.opsForValue().set(payloadKey, "payload");
             redisTemplate.opsForZSet().add(deadLetterKey, "M001", 1D);
-            DefaultRedisScript<String> replayScript = new DefaultRedisScript<>(
-                    "if not redis.call('ZSCORE', KEYS[1], ARGV[1]) then "
-                            + "return '__NOT_FOUND__'; end; "
-                            + "local payload = redis.call('GET', KEYS[3]); "
-                            + "if not payload then return '__PAYLOAD_EXPIRED__'; end; "
-                            + "redis.call('ZREM', KEYS[1], ARGV[1]); "
-                            + "redis.call('ZADD', KEYS[2], ARGV[2], ARGV[1]); "
-                            + "return payload;",
-                    String.class
-            );
 
             String replayedPayload = redisTemplate.execute(
-                    replayScript,
+                    MessagePersistServiceImpl.REPLAY_DEADLETTER_SCRIPT,
                     List.of(deadLetterKey, pendingKey, payloadKey),
                     "M001",
                     "2"
             );
-
             assertEquals("payload", replayedPayload);
             assertNull(redisTemplate.opsForZSet().score(deadLetterKey, "M001"));
             assertEquals(2D, redisTemplate.opsForZSet().score(pendingKey, "M001"));
+
+            String notFound = redisTemplate.execute(
+                    MessagePersistServiceImpl.REPLAY_DEADLETTER_SCRIPT,
+                    List.of(deadLetterKey, pendingKey, payloadKey),
+                    "M001",
+                    "3"
+            );
+            assertEquals(MessagePersistServiceImpl.DEADLETTER_NOT_FOUND, notFound);
+
+            redisTemplate.opsForZSet().add(deadLetterKey, "M002", 4D);
+            String payloadExpired = redisTemplate.execute(
+                    MessagePersistServiceImpl.REPLAY_DEADLETTER_SCRIPT,
+                    List.of(deadLetterKey, pendingKey, payloadKey + "-missing"),
+                    "M002",
+                    "5"
+            );
+            assertEquals(
+                    MessagePersistServiceImpl.DEADLETTER_PAYLOAD_EXPIRED,
+                    payloadExpired
+            );
         } finally {
             redisTemplate.delete(List.of(deadLetterKey, pendingKey, payloadKey));
         }

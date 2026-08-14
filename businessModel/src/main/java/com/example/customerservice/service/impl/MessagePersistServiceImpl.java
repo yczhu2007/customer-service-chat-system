@@ -47,9 +47,9 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                             "return 1;",
                     Long.class
             );
-    private static final String DEADLETTER_NOT_FOUND = "__NOT_FOUND__";
-    private static final String DEADLETTER_PAYLOAD_EXPIRED = "__PAYLOAD_EXPIRED__";
-    private static final DefaultRedisScript<String> REPLAY_DEADLETTER_SCRIPT =
+    public static final String DEADLETTER_NOT_FOUND = "__NOT_FOUND__";
+    public static final String DEADLETTER_PAYLOAD_EXPIRED = "__PAYLOAD_EXPIRED__";
+    public static final DefaultRedisScript<String> REPLAY_DEADLETTER_SCRIPT =
             new DefaultRedisScript<>(
                     "if not redis.call('ZSCORE', KEYS[1], ARGV[1]) then "
                             + "return '__NOT_FOUND__'; end; "
