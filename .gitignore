@@ -35,3 +35,4 @@ build/
 target-runtime-test/
 *.log
 .env
+data/

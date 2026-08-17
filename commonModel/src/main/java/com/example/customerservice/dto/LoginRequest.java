@@ -20,6 +20,9 @@ public class LoginRequest implements Serializable {
     @Size(max = 128, message = "密码长度不能超过128个字符")
     private String password;
 
+    /** 是否签发长期登录 Token。 */
+    private boolean rememberMe;
+
     public String getUsername() {
         return username;
     }
@@ -34,5 +37,13 @@ public class LoginRequest implements Serializable {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public boolean isRememberMe() {
+        return rememberMe;
+    }
+
+    public void setRememberMe(boolean rememberMe) {
+        this.rememberMe = rememberMe;
     }
 }

@@ -249,6 +249,26 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_QUICK_REPLY_MANAGE',
+        'chat:quick-reply:manage',
+        '客服快捷回复管理',
+        'API',
+        NULL,
+        '/chat/quick-replies/**',
+        '允许客服维护自己的常用回复',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_SESSION_RATE',
+        'chat:session:rate',
+        '会话满意度评价',
+        'API',
+        NULL,
+        '/chat/sessions/*/rating',
+        '允许用户对已结束的会话提交满意度评价',
+        'ENABLED'
+    ),
+    (
         'P_USER_MANAGE',
         'user:manage',
         '用户管理',
@@ -295,7 +315,8 @@ ON DUPLICATE KEY UPDATE
 INSERT INTO sys_role_permission
     (role_id, permission_id)
 VALUES
-    ('R_USER', 'P_CHAT_USER_ACCESS')
+    ('R_USER', 'P_CHAT_USER_ACCESS'),
+    ('R_USER', 'P_CHAT_SESSION_RATE')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 
@@ -307,7 +328,8 @@ VALUES
     ('R_AGENT', 'P_CHAT_AGENT_ONLINE'),
     ('R_AGENT', 'P_CHAT_AGENT_OFFLINE'),
     ('R_AGENT', 'P_CHAT_SESSION_END'),
-    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER')
+    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER'),
+    ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 

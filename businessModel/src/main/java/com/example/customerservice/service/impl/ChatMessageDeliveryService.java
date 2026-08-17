@@ -15,6 +15,8 @@ import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.ChatAttachmentMapper;
+import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatMessageDeliveryOperations;
 import com.example.customerservice.service.ChatOfflineMessageOperations;
@@ -42,6 +44,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
     private final ChatMessageReadMapper chatMessageReadMapper;
+    private final ChatAttachmentMapper chatAttachmentMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final MessagePersistService messagePersistService;
     private final ObjectMapper objectMapper;
@@ -54,6 +57,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             ChatSessionMapper chatSessionMapper,
             ChatMessageMapper chatMessageMapper,
             ChatMessageReadMapper chatMessageReadMapper,
+            ChatAttachmentMapper chatAttachmentMapper,
             SimpMessagingTemplate messagingTemplate,
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
@@ -65,6 +69,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         this.chatSessionMapper = chatSessionMapper;
         this.chatMessageMapper = chatMessageMapper;
         this.chatMessageReadMapper = chatMessageReadMapper;
+        this.chatAttachmentMapper = chatAttachmentMapper;
         this.messagingTemplate = messagingTemplate;
         this.messagePersistService = messagePersistService;
         this.objectMapper = objectMapper;
@@ -217,6 +222,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                     "当前用户不属于这个聊天会话"
             );
         }
+        validateAttachmentOwnership(messageType, message.getContent(), session.getId());
         message.setCreateTime(
                 LocalDateTime.now()
         );
@@ -262,6 +268,25 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                     message.getSessionId(),
                     operationLockToken
             );
+        }
+    }
+
+    private void validateAttachmentOwnership(ChatMessageType type, String content, String sessionId) {
+        if (type != ChatMessageType.IMAGE && type != ChatMessageType.FILE) {
+            return;
+        }
+        String prefix = "/chat/attachments/";
+        String suffix = "/content";
+        if (!content.startsWith(prefix) || !content.endsWith(suffix)) {
+            return; // 外部http/https资源仍按既有规则允许。
+        }
+        String attachmentId = content.substring(prefix.length(), content.length() - suffix.length());
+        ChatAttachment attachment = chatAttachmentMapper.selectById(attachmentId);
+        if (attachment == null) {
+            throw new IllegalArgumentException("附件不存在或已经失效");
+        }
+        if (!sessionId.equals(attachment.getSessionId()) || !type.name().equals(attachment.getMessageType())) {
+            throw new IllegalArgumentException("附件不属于当前会话或附件类型不匹配");
         }
     }
     /**

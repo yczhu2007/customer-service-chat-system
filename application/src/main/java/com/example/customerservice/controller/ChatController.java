@@ -3,6 +3,7 @@ package com.example.customerservice.controller;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.security.AuthRateLimiter;
 import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.ChatAgentOperations;
 import com.example.customerservice.service.ChatMessageOperations;
@@ -10,6 +11,7 @@ import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.ChatSessionOperations;
 import com.example.customerservice.service.MessagePersistService;
+import com.example.customerservice.service.ChatSessionQueryService;
 import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +20,7 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
@@ -59,13 +62,21 @@ public class ChatController {
     @Autowired
     private CurrentUser currentUser;
 
+    @Autowired
+    private AuthRateLimiter authRateLimiter;
+
+    @Autowired
+    private ChatSessionQueryService chatSessionQueryService;
+
 
     @PostMapping("/login")
     public Result<LoginResponse> login(
             @Valid
             @RequestBody
-            LoginRequest request
+            LoginRequest request,
+            HttpServletRequest servletRequest
     ) {
+        authRateLimiter.checkLogin(servletRequest);
         return Result.success(
                 authenticationService.login(request)
         );
@@ -279,6 +290,57 @@ public class ChatController {
     private void requireDeadLetterManagementPermission() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:message:deadletter:manage");
+    }
+
+    /** 当前用户查看自己的会话历史列表（用户或客服视角自动判断）。 */
+    @GetMapping("/sessions")
+    public Result<PageResult<ChatSessionListItemVO>> findMySessions(
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize
+    ) {
+        return Result.success(
+                chatSessionQueryService.findMySessions(
+                        currentUser.getUserId(), status, pageNo, pageSize));
+    }
+
+    /** 查询指定会话的满意度评价。 */
+    @GetMapping("/sessions/{sessionId}/rating")
+    public Result<SessionRatingVO> getSessionRating(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId
+    ) {
+        return Result.success(chatSessionQueryService.getSessionRating(sessionId));
+    }
+
+    /** 用户对已结束的会话提交满意度评价，每会话仅一次。 */
+    @PostMapping("/sessions/{sessionId}/rating")
+    public Result<SessionRatingVO> rateSession(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId,
+            @Valid @RequestBody SessionRatingDTO request
+    ) {
+        currentUser.requireRole("USER");
+        currentUser.requirePermission("chat:session:rate");
+        return Result.success(
+                chatSessionQueryService.rateSession(
+                        currentUser.getUserId(), sessionId, request));
+    }
+
+    /** 客服查看当前会话中用户的基本信息侧栏。 */
+    @GetMapping("/sessions/{sessionId}/user-profile")
+    public Result<UserProfileSidebarVO> getUserProfileSidebar(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId
+    ) {
+        currentUser.requireRole("AGENT");
+        return Result.success(
+                chatSessionQueryService.getUserProfileSidebar(
+                        currentUser.getUserId(), sessionId));
+    }
+
+    /** 查询当前排队状态（在线客服数、队列大小、我的位置、预估等待时间）。 */
+    @GetMapping("/queue-status")
+    public Result<QueueStatusVO> getQueueStatus() {
+        return Result.success(
+                chatSessionQueryService.getQueueStatus(currentUser.getUserId()));
     }
 
     @MessageMapping("/chat.send")

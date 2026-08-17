@@ -13,6 +13,10 @@ spring:
       database: ${REDIS_DATABASE:0}
       password: ${REDIS_PASSWORD:}
       timeout: 3000ms
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
 
 mybatis-plus:
   mapper-locations:
@@ -25,6 +29,15 @@ app:
   auth:
     # 登录Token写入Redis时设置TTL，过期后认证自动失效。
     token-ttl-minutes: ${AUTH_TOKEN_TTL_MINUTES:30}
+    # 勾选“记住我”后使用较长有效期，仍可通过退出登录、改密或禁用账号立即吊销。
+    remember-token-ttl-days: ${AUTH_REMEMBER_TOKEN_TTL_DAYS:7}
+    # 恢复码过期后，已登录用户可在账号资料中重新生成。
+    recovery-code-ttl-days: ${AUTH_RECOVERY_CODE_TTL_DAYS:90}
+    rate-limit:
+      max-requests: ${AUTH_REGISTRATION_RATE_LIMIT_MAX_REQUESTS:5}
+      window-seconds: ${AUTH_REGISTRATION_RATE_LIMIT_WINDOW_SECONDS:60}
+      # 仅当应用只允许可信反向代理访问时开启，防止客户端伪造X-Forwarded-For。
+      trust-forwarded-headers: ${AUTH_TRUST_FORWARDED_HEADERS:false}
   websocket:
     allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
   bootstrap:
@@ -47,6 +60,10 @@ app:
     message:
       recall-window-seconds: ${CHAT_MESSAGE_RECALL_WINDOW_SECONDS:120}
       edit-window-seconds: ${CHAT_MESSAGE_EDIT_WINDOW_SECONDS:300}
+    attachment:
+      storage-path: ${CHAT_ATTACHMENT_STORAGE_PATH:./data/chat-attachments}
+      cleanup-initial-delay-ms: ${CHAT_ATTACHMENT_CLEANUP_INITIAL_DELAY_MS:300000}
+      cleanup-delay-ms: ${CHAT_ATTACHMENT_CLEANUP_DELAY_MS:86400000}
     session:
       inactivity-timeout-seconds: ${CHAT_SESSION_INACTIVITY_TIMEOUT_SECONDS:1800}
       inactivity-sweep-delay-ms: ${CHAT_SESSION_INACTIVITY_SWEEP_DELAY_MS:30000}

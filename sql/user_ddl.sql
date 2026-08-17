@@ -40,3 +40,19 @@ CREATE TABLE IF NOT EXISTS sys_user
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci
     COMMENT = '系统用户表';
+
+CREATE TABLE IF NOT EXISTS sys_password_recovery
+(
+    user_id       VARCHAR(64)  NOT NULL COMMENT '用户ID',
+    recovery_hash VARCHAR(255) NOT NULL COMMENT '账号恢复码PBKDF2哈希',
+    expires_time  DATETIME     NOT NULL COMMENT '恢复码过期时间',
+    create_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    update_time   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    PRIMARY KEY (user_id),
+    CONSTRAINT fk_password_recovery_user FOREIGN KEY (user_id)
+        REFERENCES sys_user (id) ON DELETE CASCADE ON UPDATE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+    COMMENT = '账号密码恢复码表';

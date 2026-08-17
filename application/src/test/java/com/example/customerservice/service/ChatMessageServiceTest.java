@@ -11,6 +11,7 @@ import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
+import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -60,6 +61,7 @@ class ChatMessageServiceTest {
     @Mock private ChatSessionMapper chatSessionMapper;
     @Mock private ChatMessageMapper chatMessageMapper;
     @Mock private ChatMessageReadMapper chatMessageReadMapper;
+    @Mock private ChatAttachmentMapper chatAttachmentMapper;
     @Mock private SimpMessagingTemplate messagingTemplate;
     @Mock private MessagePersistService messagePersistService;
     @Mock private SysUserRoleMapper sysUserRoleMapper;
@@ -419,7 +421,7 @@ class ChatMessageServiceTest {
         return new ChatMessageService(
                 new ChatMessageDeliveryService(
                         chatRedisRepository, chatSessionMapper, chatMessageMapper,
-                        chatMessageReadMapper, messagingTemplate, messagePersistService,
+                        chatMessageReadMapper, chatAttachmentMapper, messagingTemplate, messagePersistService,
                         objectMapper,
                         new ChatOfflineMessageService(
                                 chatRedisRepository,

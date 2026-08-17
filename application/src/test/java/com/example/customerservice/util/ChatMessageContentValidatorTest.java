@@ -38,6 +38,13 @@ class ChatMessageContentValidatorTest {
     }
 
     @Test
+    void imageAndFileMessagesAcceptProtectedLocalAttachments() {
+        String content = "/chat/attachments/0123456789abcdef0123456789abcdef/content";
+        assertEquals(ChatMessageType.IMAGE, ChatMessageContentValidator.validate("IMAGE", content));
+        assertEquals(ChatMessageType.FILE, ChatMessageContentValidator.validate("FILE", content));
+    }
+
+    @Test
     void rejectsUnsupportedMessageType() {
         assertThrows(
                 IllegalArgumentException.class,

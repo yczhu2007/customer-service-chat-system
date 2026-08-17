@@ -9,9 +9,11 @@ public interface TokenService {
     /**
      * 为用户签发Token。
      */
-    String issueToken(
-            String userId
-    );
+    default String issueToken(String userId) {
+        return issueToken(userId, false);
+    }
+
+    String issueToken(String userId, boolean rememberMe);
 
 
     /**
@@ -31,8 +33,7 @@ public interface TokenService {
             String token
     );
 
-    /** 当前登录Token的有效期，单位为秒。 */
-    long getTokenTtlSeconds();
+    long getTokenTtlSeconds(boolean rememberMe);
 
 
     /**

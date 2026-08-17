@@ -36,25 +36,30 @@
         button, input { font: inherit; }
         button {
             padding: 9px 14px;
-            border: 1px solid transparent;
+            border: 1px solid var(--line-strong);
             border-radius: 8px;
-            color: #ffffff;
-            background: var(--navy);
+            color: var(--ink);
+            background: transparent;
             font-weight: 600;
             cursor: pointer;
             transition: background .12s ease, border-color .12s ease, color .12s ease, opacity .12s ease;
+            white-space: nowrap;
         }
-        button:hover { background: var(--navy-deep); }
+        button:hover { color: var(--navy); background: transparent; border-color: var(--navy); }
         button:active { transform: translateY(1px); }
         button:disabled { opacity: .45; cursor: not-allowed; }
         button.secondary {
             color: var(--ink);
-            background: var(--paper);
+            background: transparent;
             border-color: var(--line-strong);
         }
-        button.secondary:hover { background: #f1f3f7; }
-        button.danger { color: #ffffff; background: var(--red); }
-        button.danger:hover { background: #b91c1c; }
+        button.secondary:hover { background: transparent; }
+        button.danger { color: var(--red); background: transparent; border-color: #f3b4b4; }
+        button.danger:hover { color: #b91c1c; background: transparent; border-color: var(--red); }
+        #loginButton { color: #ffffff; background: var(--navy); border-color: var(--navy); }
+        #loginButton:hover { color: #ffffff; background: var(--navy-deep); border-color: var(--navy-deep); }
+        button.primary { color: #ffffff; background: var(--navy); border-color: var(--navy); }
+        button.primary:hover { color: #ffffff; background: var(--navy-deep); border-color: var(--navy-deep); }
         input {
             min-width: 0;
             padding: 9px 11px;
@@ -80,11 +85,11 @@
         .brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 26px; }
         .brand h1 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: .03em; }
         .brand .subtitle { margin: 0; color: var(--faint); font-family: var(--font-mono); font-size: 11px; letter-spacing: .18em; text-transform: uppercase; }
-        .login-card button { width: 100%; margin-top: 4px; background: var(--navy); }
-        .login-card button:hover { background: var(--navy-deep); }
+        .login-card > div > #loginButton,
+        .login-card > div > #registerButton { width: 100%; margin-top: 4px; }
         .page-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
         .page-header h1 { margin: 0; font-size: 19px; font-weight: 700; letter-spacing: .01em; }
-        .header-actions { display: flex; align-items: center; gap: 10px; }
+        .header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: nowrap; min-width: 0; }
         .account-text { color: var(--muted); font-size: 12px; font-family: var(--font-mono); }
         .status-badge {
             display: inline-flex;
@@ -95,6 +100,58 @@
             border-radius: 999px;
             background: var(--paper);
             color: var(--muted);
+        .unread-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 18px;
+            height: 18px;
+            padding: 0 5px;
+            border-radius: 999px;
+            background: var(--red);
+            color: #ffffff;
+            font-size: 11px;
+            font-weight: 700;
+            line-height: 1;
+        }
+        .queue-status-info {
+            padding: 10px 12px;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            background: var(--paper);
+            margin-top: 10px;
+        }
+        .queue-status-info .status-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 0;
+            font-size: 13px;
+        }
+        .queue-status-info .status-row .label {
+            color: var(--muted);
+        }
+        .queue-status-info .status-row .value {
+            font-weight: 600;
+            color: var(--ink);
+        }
+        .session-list-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            cursor: pointer;
+            transition: background .12s ease, border-color .12s ease;
+        }
+        .session-list-item:hover { border-color: var(--navy); background: rgba(77,107,254,.04); }
+        .session-list-item .session-info { flex: 1; min-width: 0; }
+        .session-list-item .session-id { font-family: var(--font-mono); font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .session-list-item .session-status { font-size: 11px; padding: 2px 6px; border-radius: 4px; }
+        .session-list-item .session-status.active { background: var(--green-soft); color: var(--green); }
+        .session-list-item .session-status.closed { background: var(--red-soft); color: var(--red); }
             font-size: 12px;
             font-family: var(--font-mono);
         }
@@ -131,7 +188,7 @@
         }
         .field { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
         .field input { width: 100%; }
-        .button-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .button-row { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
         .button-row button { flex: 1 1 auto; }
         .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
         [hidden] { display: none !important; }
@@ -193,8 +250,16 @@
         .message-meta { margin-bottom: 4px; color: var(--muted); font-size: 11px; }
         .message-row.mine .message-meta { color: rgba(255, 255, 255, .85); text-align: right; }
         .message-text { white-space: pre-wrap; word-break: break-word; }
-        .chat-composer { display: grid; grid-template-columns: 1fr auto; gap: 10px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--paper); }
-        .chat-composer input { width: 100%; }
+        .auth-options, .auth-switch { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 10px; font-size: 13px; flex-wrap: nowrap; white-space: nowrap; }
+        .auth-options label { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); }
+        .auth-options input { width: auto; margin: 0; }
+        .text-button { width: auto; padding: 0; border: 0; color: var(--navy); background: transparent; box-shadow: none; font-size: 13px; }
+        .text-button:hover { text-decoration: underline; background: transparent; }
+        .auth-switch { justify-content: center; color: var(--muted); }
+        .chat-composer { display: grid; gap: 8px; padding: 14px 16px; border-top: 1px solid var(--line); background: var(--paper); }
+        .composer-row { display: flex; gap: 8px; align-items: center; }
+        .composer-row input:not([type="file"]):not([type="hidden"]) { flex: 1; min-width: 0; }
+        .composer-row input[type="file"] { flex: 1; min-width: 0; font-size: 12px; padding: 6px 0; }
         .chat-footer-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px 14px; background: var(--paper); }
         .chat-footer-status .hint { margin: 0; }
         #log {
@@ -225,9 +290,9 @@
 <body>
 <section id="loginView" class="login-screen">
     <div class="login-card">
+        <div id="loginPanel">
         <div class="brand">
             <h1>客服聊天系统</h1>
-            <p class="subtitle">Support Console</p>
         </div>
         <label class="field">用户名
             <input id="loginUsername" autocomplete="username" placeholder="请输入用户名">
@@ -235,8 +300,67 @@
         <label class="field">密码
             <input id="loginPassword" type="password" autocomplete="current-password" value="123456">
         </label>
+        <div class="auth-options">
+            <label><input id="rememberMe" type="checkbox">记住我</label>
+            <button type="button" class="text-button" onclick="showForgotPasswordView()">忘记密码</button>
+        </div>
+
         <button id="loginButton" onclick="loginAndConnect()">登录</button>
         <p id="loginStatus" class="hint">当前未登录</p>
+        <div class="auth-switch">还没有账号？<button type="button" class="text-button" onclick="showRegisterView()">立即注册</button></div>
+        </div>
+
+        <div id="forgotPasswordPanel" hidden>
+            <div class="brand"><h1>重置密码</h1></div>
+            <label class="field">用户名
+                <input id="resetUsername" autocomplete="username" placeholder="请输入用户名">
+            </label>
+            <label class="field">账号恢复码
+                <input id="resetRecoveryCode" autocomplete="off" placeholder="XXXX-XXXX-XXXX-XXXX">
+            </label>
+            <label class="field">新密码
+                <input id="resetNewPassword" type="password" autocomplete="new-password" placeholder="至少6个字符">
+            </label>
+            <label class="field">确认新密码
+                <input id="resetNewPasswordConfirm" type="password" autocomplete="new-password" placeholder="再次输入新密码">
+            </label>
+            <button type="button" class="primary" onclick="resetForgottenPassword()">重置密码</button>
+            <p id="resetPasswordStatus" class="hint">请输入注册时保存的账号恢复码</p>
+            <div class="auth-switch"><button type="button" class="text-button" onclick="showLoginView()">返回登录</button></div>
+        </div>
+
+        <div id="registerPanel" hidden>
+            <div class="brand"><h1>注册普通用户</h1></div>
+            <label class="field">用户名
+                <input id="registerUsername" autocomplete="username" placeholder="3到64位字母、数字或下划线">
+            </label>
+            <label class="field">密码
+                <input id="registerPassword" type="password" autocomplete="new-password" placeholder="至少6个字符">
+            </label>
+            <label class="field">确认密码
+                <input id="registerPasswordConfirm" type="password" autocomplete="new-password" placeholder="再次输入密码">
+            </label>
+            <button id="registerButton" class="primary" onclick="registerAccount()">注册</button>
+            <p id="registerStatus" class="hint">注册后将自动获得普通用户角色</p>
+            <div class="auth-switch">已有账号？<button type="button" class="text-button" onclick="showLoginView()">返回登录</button></div>
+        </div>
+
+        <div id="accountPanel" hidden>
+            <div class="brand"><h1>账号管理</h1></div>
+            <label class="field">新用户名
+                <input id="profileUsername" autocomplete="username" maxlength="64" placeholder="输入新用户名">
+            </label>
+            <button class="primary" onclick="updateMyProfile()">修改用户名</button>
+            <details class="advanced">
+                <summary>修改密码</summary>
+                <label class="field">原密码<input id="currentPassword" type="password"></label>
+                <label class="field">新密码<input id="newPassword" type="password" autocomplete="new-password" placeholder="至少6个字符"></label>
+                <button class="primary" onclick="updateMyPassword()">确认修改密码</button>
+            </details>
+            <button class="secondary" onclick="regenerateRecoveryCode()" style="margin-top:12px">生成新的账号恢复码</button>
+            <div id="profileResult" class="operation-result" hidden></div>
+            <div class="auth-switch"><button type="button" class="text-button" onclick="showAppView()">返回聊天</button></div>
+        </div>
     </div>
 </section>
 
@@ -246,17 +370,18 @@
         <div class="header-actions">
             <span id="currentAccountText" class="account-text"></span>
             <span id="connectionStatus" class="status-badge">未连接</span>
-            <button class="secondary" onclick="switchAccount()">切换账号</button>
+            <button class="secondary" onclick="showAccountView()">账号</button>
+            <button class="secondary" onclick="switchAccount()">退出登录</button>
         </div>
     </header>
 
     <div id="mainLayout" class="layout">
-        <aside class="sidebar">
+        <aside id="chatSidebar" class="sidebar">
             <section id="connectionPanel" class="panel">
                 <h2>连接状态</h2>
                 <p id="connectionDescription" class="hint">聊天连接尚未建立</p>
                 <div class="button-row">
-                    <button id="connectButton" onclick="connectStomp()" disabled>连接</button>
+                    <button id="connectButton" class="primary" onclick="connectStomp()" disabled>连接</button>
                     <button id="disconnectButton" class="secondary" onclick="disconnectStomp()" disabled>断开连接</button>
                 </div>
                 <details id="tokenConnector" class="advanced">
@@ -266,27 +391,16 @@
                 </details>
             </section>
 
-            <section id="sessionPanel" class="panel">
-                <h2>会话操作</h2>
-                <input id="sessionId" type="hidden">
-                <p id="sessionOperationHint" class="hint">当前暂无进行中的会话</p>
-                <div class="button-row">
-                    <button id="loadHistoryButton" class="secondary" onclick="loadChatHistory()" disabled>加载聊天记录</button>
-                    <button id="endSessionButton" class="danger" onclick="endChatSession()" disabled>结束会话</button>
+            <section id="queueStatusPanel" class="panel" hidden>
+                <h2>排队状态</h2>
+                <div id="queueStatusContent" class="queue-status-info">
+                    <div class="status-row"><span class="label">在线客服</span><span class="value" id="queueOnlineAgents">-</span></div>
+                    <div class="status-row"><span class="label">排队人数</span><span class="value" id="queueSize">-</span></div>
+                    <div class="status-row"><span class="label">我的位置</span><span class="value" id="queueMyPosition">-</span></div>
+                    <div class="status-row"><span class="label">预计等待</span><span class="value" id="queueEstimatedWait">-</span></div>
                 </div>
-            </section>
-
-            <section id="messagePanel" class="panel">
-                <h2>消息操作</h2>
-                <input id="messageId" type="hidden">
-                <p id="messageOperationHint" class="hint">点击聊天气泡可以选择要操作的消息</p>
-                <label class="field">编辑后的内容
-                    <input id="editedMessageContent" value="这是编辑后的消息">
-                </label>
-                <div class="button-row">
-                    <button id="markReadButton" class="secondary" onclick="markMessageRead()" disabled>标记已读</button>
-                    <button id="editMessageButton" class="secondary" onclick="editChatMessage()" disabled>编辑</button>
-                    <button id="recallMessageButton" class="secondary" onclick="recallChatMessage()" disabled>撤回</button>
+                <div class="button-row" style="margin-top:8px">
+                    <button class="secondary" onclick="loadQueueStatus()">刷新状态</button>
                 </div>
             </section>
 
@@ -294,13 +408,63 @@
                 <h2>客服工作状态</h2>
                 <p id="agentStatusText" class="hint">正在同步客服状态……</p>
                 <div class="button-row" style="margin-top:10px">
-                    <button id="agentOnlineButton" onclick="setAgentOnline(true)" disabled>上线</button>
+                    <button id="agentOnlineButton" class="primary" onclick="setAgentOnline(true)" disabled>上线</button>
                     <button id="agentOfflineButton" class="secondary" onclick="setAgentOnline(false)" disabled>离线</button>
                 </div>
                 <div id="agentOperationResult" class="operation-result" hidden></div>
             </section>
 
-            <section id="adminPanel" class="panel" hidden>
+            <details id="sessionListPanel" class="panel">
+                <summary><strong>我的会话</strong> <span id="sessionListUnreadBadge" class="unread-badge" hidden>0</span></summary>
+                <div id="sessionListContent" class="hint" style="margin-top:10px">加载中……</div>
+                <div class="button-row" style="margin-top:8px">
+                    <button class="secondary" onclick="loadSessionList()">刷新列表</button>
+                </div>
+            </details>
+
+            <section id="sessionPanel" class="panel">
+                <h2>当前会话</h2>
+                <input id="sessionId" type="hidden">
+                <p id="sessionOperationHint" class="hint">暂无进行中的会话</p>
+                <div class="button-row">
+                    <button id="loadHistoryButton" class="primary" onclick="loadChatHistory()" disabled>加载聊天记录</button>
+                    <button id="endSessionButton" class="danger" onclick="endChatSession()" disabled>结束会话</button>
+                </div>
+            </section>
+
+            <section id="messagePanel" class="panel">
+                <h2>消息操作</h2>
+                <input id="messageId" type="hidden">
+                <p id="messageOperationHint" class="hint">点击聊天气泡选择消息</p>
+                <label class="field">编辑内容<input id="editedMessageContent" value="这是编辑后的消息"></label>
+                <div class="button-row">
+                    <button id="markReadButton" class="secondary" onclick="markMessageRead()" disabled>标记已读</button>
+                    <button id="editMessageButton" class="secondary" onclick="editChatMessage()" disabled>编辑</button>
+                    <button id="recallMessageButton" class="secondary" onclick="recallChatMessage()" disabled>撤回</button>
+                </div>
+            </section>
+
+            <section id="quickReplyPanel" class="panel" hidden>
+                <h2>快捷回复</h2>
+                <input id="quickReplyId" type="hidden">
+                <label class="field">标题<input id="quickReplyTitle" maxlength="50" placeholder="例如：开场问候"></label>
+                <label class="field">内容<textarea id="quickReplyContent" maxlength="1000" placeholder="请输入常用回复内容"></textarea></label>
+                <div class="button-row">
+                    <button onclick="saveQuickReply()" class="primary">保存常用语</button>
+                    <button class="secondary" onclick="loadQuickReplies()">刷新列表</button>
+                </div>
+                <div id="quickReplyList" class="hint" style="margin-top:10px">暂无快捷回复</div>
+                <div id="quickReplyResult" class="operation-result" hidden></div>
+            </section>
+
+            <details class="panel">
+                <summary><strong>调试日志</strong></summary>
+                <div id="log"></div>
+            </details>
+        </aside>
+
+        <aside id="adminSidebar" class="sidebar" hidden>
+            <section id="adminPanel" class="panel">
                 <h2>管理员功能</h2>
                 <label class="field">用户 ID<input id="vipUserId" placeholder="例如 U001"></label>
                 <label class="field">VIP 等级<input id="vipLevel" type="number" min="0" max="5" value="1"></label>
@@ -313,10 +477,9 @@
                 </div>
                 <div id="adminOperationResult" class="operation-result" hidden></div>
             </section>
-
             <details class="panel">
                 <summary><strong>调试日志</strong></summary>
-                <div id="log"></div>
+                <div id="adminLog"></div>
             </details>
         </aside>
 
@@ -330,9 +493,15 @@
                 <div id="emptyChat" class="empty-chat">登录后即可接收和发送消息</div>
             </div>
             <div class="chat-composer">
-                <input id="messageContent" value="你好，这是一条聊天消息" placeholder="输入消息，按 Enter 发送">
-                <input id="clientMsgId" type="hidden">
-                <button id="sendMessageButton" onclick="sendChatMessage()" disabled>发送</button>
+                <div class="composer-row">
+                    <input id="messageContent" value="你好，这是一条聊天消息" placeholder="输入消息，按 Enter 发送">
+                    <input id="clientMsgId" type="hidden">
+                    <button id="sendMessageButton" class="primary" onclick="sendChatMessage()" disabled>发送</button>
+                </div>
+                <div class="composer-row">
+                    <input id="attachmentFile" type="file" accept=".jpg,.jpeg,.png,.gif,.webp,.pdf,.txt,.doc,.docx,.xls,.xlsx,.zip">
+                    <button id="sendAttachmentButton" class="primary" onclick="uploadAndSendAttachment()" disabled>发送附件</button>
+                </div>
             </div>
             <div class="chat-footer-status">
                 <div id="chatActionHint" class="hint">请先登录并建立聊天连接</div>
@@ -388,12 +557,15 @@
     const AUTO_ACK = true;
     const MAX_RECONNECT_ATTEMPTS = 6;
     const MAX_RECONNECT_DELAY_MS = 30000;
+    const REMEMBERED_LOGIN_KEY = "customerServiceRememberedLogin";
 
     function writeLog(message) {
-        const log = document.getElementById("log");
         const time = new Date().toLocaleTimeString("zh-CN", {hour12: false});
-        log.textContent += "[" + time + "] " + message + "\n";
-        log.scrollTop = log.scrollHeight;
+        const line = "[" + time + "] " + message + "\n";
+        const log = document.getElementById("log");
+        if (log) { log.textContent += line; log.scrollTop = log.scrollHeight; }
+        const adminLog = document.getElementById("adminLog");
+        if (adminLog) { adminLog.textContent += line; adminLog.scrollTop = adminLog.scrollHeight; }
     }
 
     function setConnectionStatus(text, online) {
@@ -409,21 +581,24 @@
     function updateRolePanels() {
         const isAdmin = loggedInRoles.includes("ADMIN");
         const isAgent = loggedInRoles.includes("AGENT");
+        const isUser = loggedInRoles.includes("USER") && !isAgent && !isAdmin;
         document.getElementById("workspaceTitle").textContent = isAdmin
-            ? "客服聊天系统 · 管理后台"
-            : (isAgent ? "客服聊天系统 · 客服工作台" : "客服聊天系统 · 用户端");
-        document.getElementById("adminPanel").hidden = !isAdmin;
-        document.getElementById("agentPanel").hidden = isAdmin || !isAgent;
-        document.getElementById("sessionPanel").hidden = isAdmin;
-        document.getElementById("messagePanel").hidden = isAdmin;
+            ? "客服聊天系统 管理后台"
+            : (isAgent ? "客服聊天系统 客服工作台" : "客服聊天系统 用户端");
+        document.getElementById("chatSidebar").hidden = isAdmin;
+        document.getElementById("adminSidebar").hidden = !isAdmin;
         document.getElementById("chatCard").hidden = isAdmin;
         document.getElementById("connectionPanel").hidden = isAdmin;
-        document.getElementById("tokenConnector").hidden = isAdmin;
-        document.getElementById("disconnectButton").hidden = isAdmin;
+        document.getElementById("queueStatusPanel").hidden = !isUser;
+        document.getElementById("agentPanel").hidden = !isAgent;
+        document.getElementById("quickReplyPanel").hidden = !isAgent;
         document.getElementById("endSessionButton").hidden = !isAgent;
         document.getElementById("mainLayout").classList.toggle("admin-layout", isAdmin);
         if (isAdmin) {
             setConnectionStatus("管理模式", false);
+        }
+        if (isAgent) {
+            loadQuickReplies();
         }
         updateActionAvailability();
     }
@@ -470,6 +645,7 @@
         document.getElementById("connectButton").disabled = isAdmin || socketActive;
         document.getElementById("disconnectButton").disabled = isAdmin || !socketActive;
         document.getElementById("sendMessageButton").disabled = isAdmin || !stompConnected || !sessionId || !sessionActive;
+        document.getElementById("sendAttachmentButton").disabled = isAdmin || !stompConnected || !sessionId || !sessionActive;
         document.getElementById("loadHistoryButton").disabled = isAdmin || !stompConnected || !sessionId;
         document.getElementById("endSessionButton").disabled = isAdmin || !stompConnected || !sessionId || !sessionActive;
         document.getElementById("markReadButton").disabled = isAdmin || !stompConnected || !sessionId || !sessionActive || !messageId;
@@ -500,10 +676,18 @@
 
     function showOperationResult(elementId, message, isError) {
         const result = document.getElementById(elementId);
+        if (!result) return;
         result.textContent = message;
         result.hidden = false;
         result.classList.toggle("success", !isError);
         result.classList.toggle("error", Boolean(isError));
+        const parentDetails = result.closest("details");
+        if (parentDetails && !parentDetails.open) {
+            parentDetails.open = true;
+        }
+        if (isError) {
+            setTimeout(function () { result.hidden = true; }, 5000);
+        }
     }
 
     function updateSessionDisplay(sessionId) {
@@ -630,6 +814,40 @@
         if (body.id) {
             row.classList.add("selectable");
         }
+        if (!body.recalled && (body.type === "IMAGE" || body.type === "FILE")) {
+            renderAttachment(row, body);
+        }
+    }
+
+    async function renderAttachment(row, body) {
+        const text = row.querySelector(".message-text");
+        const token = document.getElementById("token").value.trim();
+        if (!text || !token) return;
+        text.textContent = body.type === "IMAGE" ? "正在加载图片……" : "正在加载附件……";
+        try {
+            const response = await fetch(body.content, {headers: {"Authorization": "Bearer " + token}});
+            if (!response.ok) throw new Error("附件加载失败");
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            text.innerHTML = "";
+            if (body.type === "IMAGE") {
+                const image = document.createElement("img");
+                image.src = objectUrl;
+                image.alt = "聊天图片";
+                image.style.maxWidth = "260px";
+                image.style.maxHeight = "220px";
+                image.style.borderRadius = "8px";
+                text.appendChild(image);
+            } else {
+                const link = document.createElement("a");
+                link.href = objectUrl;
+                link.download = "聊天附件";
+                link.textContent = "查看或下载附件";
+                text.appendChild(link);
+            }
+        } catch (error) {
+            text.textContent = error.message;
+        }
     }
 
     function selectMessage(row) {
@@ -736,10 +954,14 @@
         if (body.event === "SESSION_CREATED") {
             const agentId = body.session && body.session.agentId;
             appendSystemMessage("会话创建成功" + (agentId ? "，客服：" + agentId : ""));
+            loadQueueStatus();
+            loadSessionList();
             return;
         }
         if (body.event === "SESSION_RECONNECTED") {
             appendSystemMessage("已恢复原有会话");
+            loadQueueStatus();
+            loadSessionList();
             return;
         }
         if (body.event === "WAITING_FOR_AGENT") {
@@ -750,6 +972,7 @@
             const position = body.waitingPosition ? "，当前排在第 " + body.waitingPosition + " 位" : "";
             const eta = body.estimatedWaitSeconds != null ? "，预计等待 " + body.estimatedWaitSeconds + " 秒" : "";
             appendSystemMessage((body.message || "暂无可用客服，已进入等待队列") + position + eta);
+            loadQueueStatus();
             return;
         }
         if (body.event === "VIP_CALLBACK_REQUIRED") {
@@ -785,6 +1008,8 @@
             document.getElementById("messageId").value = "";
             document.getElementById("messageOperationHint").textContent = "点击聊天气泡可以选择要操作的消息";
             updateSessionDisplay(document.getElementById("sessionId").value.trim());
+            loadQueueStatus();
+            loadSessionList();
             return;
         }
         if (body.event === "SESSION_TRANSFERRED") {
@@ -815,6 +1040,7 @@
         const loginStatus = document.getElementById("loginStatus");
         const username = usernameInput.value.trim();
         const password = passwordInput.value;
+        const rememberMe = document.getElementById("rememberMe").checked;
 
         if (!username) {
             loginStatus.textContent = "请输入用户名";
@@ -838,7 +1064,8 @@
                 },
                 body: JSON.stringify({
                     username: username,
-                    password: password
+                    password: password,
+                    rememberMe: rememberMe
                 })
             });
             const responseText = await response.text();
@@ -862,7 +1089,20 @@
             loggedInRoles = Array.isArray(result.data.roles)
                 ? result.data.roles
                 : [];
+            if (rememberMe) {
+                localStorage.setItem(REMEMBERED_LOGIN_KEY, JSON.stringify({
+                    token: result.data.token,
+                    userId: result.data.userId,
+                    username: result.data.username,
+                    roles: loggedInRoles,
+                    expiresAt: Date.now() + result.data.expiresInSeconds * 1000
+                }));
+            } else {
+                localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+            }
             updateRolePanels();
+            loadQueueStatus();
+            loadSessionList();
             const roles = loggedInRoles.join(", ");
             loginStatus.textContent = "登录成功：" + result.data.username
                 + "（" + result.data.userId + "）"
@@ -892,6 +1132,158 @@
         }
     }
 
+    async function restoreRememberedLogin() {
+        let remembered = null;
+        try {
+            remembered = JSON.parse(localStorage.getItem(REMEMBERED_LOGIN_KEY) || "null");
+        } catch (ignored) {
+            localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+        }
+        if (!remembered || !remembered.token || remembered.expiresAt <= Date.now()) {
+            localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+            return;
+        }
+        try {
+            const response = await fetch("/account/profile", {
+                headers: {"Authorization": "Bearer " + remembered.token}
+            });
+            const body = await response.json();
+            if (!response.ok || !body.data) throw new Error("记住的登录状态已经失效");
+            const profile = body.data;
+            document.getElementById("token").value = remembered.token;
+            document.getElementById("loginUsername").value = profile.username;
+            document.getElementById("rememberMe").checked = true;
+            loggedInUserId = profile.id;
+            loggedInRoles = Array.isArray(profile.roles) ? profile.roles : [];
+            document.title = "客服聊天系统 - " + profile.username;
+            updateRolePanels();
+            const roleNames = loggedInRoles.map(function (role) {
+                return role === "ADMIN" ? "管理员" : (role === "AGENT" ? "客服" : (role === "USER" ? "用户" : role));
+            });
+            document.getElementById("currentAccountText").textContent = profile.username
+                + (roleNames.length > 0 ? " · " + roleNames.join("、") : "");
+            document.getElementById("loginView").hidden = true;
+            document.getElementById("appView").hidden = false;
+            if (loggedInRoles.includes("ADMIN")) {
+                setConnectionStatus("管理模式", false);
+            } else {
+                writeLog("已恢复记住的登录状态，正在连接WebSocket：" + profile.id);
+                reconnectStomp();
+            }
+        } catch (error) {
+            localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+            document.getElementById("loginStatus").textContent = "登录状态已过期，请重新登录";
+        }
+    }
+
+    async function registerAccount() {
+        const username = document.getElementById("registerUsername").value.trim();
+        const password = document.getElementById("registerPassword").value;
+        const passwordConfirm = document.getElementById("registerPasswordConfirm").value;
+        const status = document.getElementById("registerStatus");
+        if (!username || !password) {
+            status.textContent = "请先填写用户名和密码";
+            return;
+        }
+        if (password !== passwordConfirm) {
+            status.textContent = "两次输入的密码不一致";
+            return;
+        }
+        try {
+            const response = await fetch("/account/register", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({username: username, password: password})
+            });
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.message || "注册失败");
+            const recoveryCode = body.data && body.data.recoveryCode;
+            document.getElementById("loginUsername").value = username;
+            document.getElementById("loginPassword").value = password;
+            status.textContent = recoveryCode
+                ? "注册成功。请立即保存账号恢复码：" + recoveryCode
+                : "注册成功，请返回登录";
+        } catch (error) {
+            status.textContent = "注册失败：" + error.message;
+        }
+    }
+
+    function showRegisterView() {
+        document.getElementById("loginPanel").hidden = true;
+        document.getElementById("forgotPasswordPanel").hidden = true;
+        document.getElementById("accountPanel").hidden = true;
+        document.getElementById("registerPanel").hidden = false;
+        document.getElementById("registerUsername").focus();
+    }
+
+    function showLoginView() {
+        document.getElementById("registerPanel").hidden = true;
+        document.getElementById("forgotPasswordPanel").hidden = true;
+        document.getElementById("accountPanel").hidden = true;
+        document.getElementById("loginPanel").hidden = false;
+        document.getElementById("loginUsername").focus();
+    }
+
+    function showForgotPasswordView() {
+        document.getElementById("loginPanel").hidden = true;
+        document.getElementById("registerPanel").hidden = true;
+        document.getElementById("accountPanel").hidden = true;
+        document.getElementById("forgotPasswordPanel").hidden = false;
+        document.getElementById("resetUsername").value = document.getElementById("loginUsername").value.trim();
+        document.getElementById("resetUsername").focus();
+    }
+
+    function showAccountView() {
+        document.getElementById("loginPanel").hidden = true;
+        document.getElementById("registerPanel").hidden = true;
+        document.getElementById("forgotPasswordPanel").hidden = true;
+        document.getElementById("accountPanel").hidden = false;
+        document.getElementById("appView").hidden = true;
+        document.getElementById("loginView").hidden = false;
+        document.getElementById("profileResult").hidden = true;
+        document.getElementById("profileUsername").value = "";
+        document.getElementById("currentPassword").value = "";
+        document.getElementById("newPassword").value = "";
+        document.getElementById("profileUsername").focus();
+    }
+
+    function showAppView() {
+        document.getElementById("loginView").hidden = true;
+        document.getElementById("appView").hidden = false;
+    }
+
+    async function resetForgottenPassword() {
+        const username = document.getElementById("resetUsername").value.trim();
+        const recoveryCode = document.getElementById("resetRecoveryCode").value.trim();
+        const newPassword = document.getElementById("resetNewPassword").value;
+        const confirmation = document.getElementById("resetNewPasswordConfirm").value;
+        const status = document.getElementById("resetPasswordStatus");
+        if (!username || !recoveryCode || !newPassword) {
+            status.textContent = "请填写用户名、恢复码和新密码";
+            return;
+        }
+        if (newPassword !== confirmation) {
+            status.textContent = "两次输入的新密码不一致";
+            return;
+        }
+        try {
+            const response = await fetch("/account/forgot-password", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({username: username, recoveryCode: recoveryCode, newPassword: newPassword})
+            });
+            const body = await response.json();
+            if (!response.ok) throw new Error(body.message || "密码重置失败");
+            const nextCode = body.data && body.data.recoveryCode;
+            status.textContent = "密码重置成功。请保存新的账号恢复码：" + nextCode;
+            document.getElementById("loginUsername").value = username;
+            document.getElementById("loginPassword").value = newPassword;
+            localStorage.removeItem(REMEMBERED_LOGIN_KEY);
+        } catch (error) {
+            status.textContent = "密码重置失败：" + error.message;
+        }
+    }
+
     document.getElementById("loginPassword").addEventListener(
         "keydown",
         function (event) {
@@ -914,6 +1306,7 @@
                 });
             }
         } finally {
+            localStorage.removeItem(REMEMBERED_LOGIN_KEY);
             window.location.reload();
         }
     }
@@ -1151,6 +1544,8 @@
                 setConnectionDescription("消息连接正常");
                 updateActionAvailability();
                 appendSystemMessage("聊天连接成功");
+                loadQueueStatus();
+                loadSessionList();
                 startStompHeartbeatMonitoring(currentSocket);
 
 
@@ -2053,6 +2448,195 @@
         );
     }
 
+    async function updateMyProfile() {
+        const username = document.getElementById("profileUsername").value.trim();
+        if (!username) {
+            showOperationResult("profileResult", "请输入新用户名", true);
+            return;
+        }
+        const result = await callRest("PUT", "/account/profile", {username: username}, "profileResult");
+        if (result && result.data) {
+            document.getElementById("currentAccountText").textContent = result.data.username;
+            document.title = "客服聊天系统 - " + result.data.username;
+        }
+    }
+
+    async function updateMyPassword() {
+        const currentPassword = document.getElementById("currentPassword").value;
+        const newPassword = document.getElementById("newPassword").value;
+        const result = await callRest("PUT", "/account/password", {
+            currentPassword: currentPassword,
+            newPassword: newPassword
+        }, "profileResult");
+        if (result) {
+            setTimeout(switchAccount, 800);
+        }
+    }
+
+    async function regenerateRecoveryCode() {
+        const result = await callRest("POST", "/account/recovery-code", null, "profileResult");
+        if (result && result.data && result.data.recoveryCode) {
+            showOperationResult("profileResult",
+                "新的账号恢复码：" + result.data.recoveryCode + "。请立即保存，旧恢复码已失效。", false);
+        }
+    }
+
+    async function loadQuickReplies() {
+        if (!loggedInRoles.includes("AGENT") || !document.getElementById("token").value.trim()) return;
+        const result = await callRest("GET", "/chat/quick-replies", null, "quickReplyResult");
+        const container = document.getElementById("quickReplyList");
+        container.innerHTML = "";
+        const replies = result && Array.isArray(result.data) ? result.data : [];
+        if (replies.length === 0) {
+            container.textContent = "暂无快捷回复";
+            return;
+        }
+        replies.forEach(function (reply) {
+            const row = document.createElement("div");
+            row.className = "button-row";
+            row.style.marginBottom = "8px";
+            const use = document.createElement("button");
+            use.className = "secondary";
+            use.textContent = reply.title;
+            use.onclick = function () { document.getElementById("messageContent").value = reply.content; };
+            const remove = document.createElement("button");
+            remove.className = "secondary";
+            remove.textContent = "删除";
+            remove.onclick = async function () {
+                await callRest("DELETE", "/chat/quick-replies/" + encodeURIComponent(reply.id), null, "quickReplyResult");
+                await loadQuickReplies();
+            };
+            const edit = document.createElement("button");
+            edit.className = "secondary";
+            edit.textContent = "编辑";
+            edit.onclick = function () {
+                document.getElementById("quickReplyId").value = reply.id;
+                document.getElementById("quickReplyTitle").value = reply.title;
+                document.getElementById("quickReplyContent").value = reply.content;
+            };
+            row.append(use, edit, remove);
+            container.appendChild(row);
+        });
+    }
+
+    async function loadQueueStatus() {
+        const result = await callRest("GET", "/chat/queue-status", null, null);
+        if (!result || !result.data) return;
+        const d = result.data;
+        document.getElementById("queueOnlineAgents").textContent = d.onlineAgentCount ?? "-";
+        document.getElementById("queueSize").textContent = d.queueSize ?? "-";
+        document.getElementById("queueMyPosition").textContent = d.myPosition != null ? "第 " + d.myPosition + " 位" : "不在队列中";
+        document.getElementById("queueEstimatedWait").textContent = d.estimatedWaitSeconds != null
+            ? Math.ceil(d.estimatedWaitSeconds / 60) + " 分钟" : "-";
+    }
+
+    async function loadSessionList() {
+        const result = await callRest("GET", "/chat/sessions?pageNo=1&pageSize=50", null, null);
+        const container = document.getElementById("sessionListContent");
+        const badge = document.getElementById("sessionListUnreadBadge");
+        if (!result || !result.data || !Array.isArray(result.data.records)) {
+            container.textContent = "暂无会话记录";
+            badge.hidden = true;
+            return;
+        }
+        const sessions = result.data.records;
+        let totalUnread = 0;
+        container.innerHTML = "";
+        if (sessions.length === 0) {
+            container.textContent = "暂无会话记录";
+            badge.hidden = true;
+            return;
+        }
+        sessions.forEach(function (s) {
+            totalUnread += (s.unreadCount || 0);
+            const item = document.createElement("div");
+            item.className = "session-list-item";
+            const info = document.createElement("div");
+            info.className = "session-info";
+            const idLine = document.createElement("div");
+            idLine.className = "session-id";
+            const counterpart = loggedInUserId === s.userId
+                ? (s.agentId || "未分配客服")
+                : (s.userId || "未知用户");
+            idLine.textContent = counterpart + " · " + (s.sessionId || "").substring(0, 8) + "…";
+            info.appendChild(idLine);
+            const statusSpan = document.createElement("span");
+            statusSpan.className = "session-status " + (s.status === "ACTIVE" ? "active" : "closed");
+            statusSpan.textContent = s.status === "ACTIVE" ? "进行中" : "已结束";
+            item.appendChild(info);
+            item.appendChild(statusSpan);
+            if (s.unreadCount > 0) {
+                const unread = document.createElement("span");
+                unread.className = "unread-badge";
+                unread.textContent = s.unreadCount;
+                item.appendChild(unread);
+            }
+            item.onclick = function () {
+                document.getElementById("sessionId").value = s.sessionId;
+                updateSessionDisplay(s.sessionId);
+                if (stompConnected && socket && socket.readyState === WebSocket.OPEN) {
+                    loadChatHistory();
+                }
+            };
+            container.appendChild(item);
+        });
+        if (totalUnread > 0) {
+            badge.textContent = totalUnread;
+            badge.hidden = false;
+        } else {
+            badge.hidden = true;
+        }
+    }
+
+    async function saveQuickReply() {
+        const id = document.getElementById("quickReplyId").value.trim();
+        const title = document.getElementById("quickReplyTitle").value.trim();
+        const content = document.getElementById("quickReplyContent").value.trim();
+        const result = await callRest(id ? "PUT" : "POST", id
+                ? "/chat/quick-replies/" + encodeURIComponent(id)
+                : "/chat/quick-replies",
+            {title: title, content: content, sortOrder: 0}, "quickReplyResult");
+        if (result) {
+            document.getElementById("quickReplyId").value = "";
+            document.getElementById("quickReplyTitle").value = "";
+            document.getElementById("quickReplyContent").value = "";
+            await loadQuickReplies();
+        }
+    }
+
+    async function uploadAndSendAttachment() {
+        const sessionId = document.getElementById("sessionId").value.trim();
+        const input = document.getElementById("attachmentFile");
+        const token = requireToken(null);
+        if (!sessionId || !input.files || input.files.length === 0 || !token) {
+            showChatError("请选择附件，并确认当前会话已经建立");
+            return;
+        }
+        const data = new FormData();
+        data.append("sessionId", sessionId);
+        data.append("file", input.files[0]);
+        try {
+            const response = await fetch("/chat/attachments", {
+                method: "POST",
+                headers: {"Authorization": "Bearer " + token},
+                body: data
+            });
+            const result = await response.json();
+            if (!response.ok || !result.data) throw new Error(result.message || "附件上传失败");
+            const attachment = result.data;
+            const clientMsgId = "attachment-" + Date.now();
+            sendStompJson("/app/chat.send", {
+                sessionId: sessionId,
+                type: attachment.messageType,
+                content: attachment.contentUrl,
+                clientMsgId: clientMsgId
+            }, "已发送附件：" + attachment.originalName);
+            input.value = "";
+        } catch (error) {
+            showChatError(error.message);
+        }
+    }
+
     function sendStompJson(destination, requestBody, actionName) {
         if (!stompConnected || socket == null || socket.readyState !== WebSocket.OPEN) {
             showChatError("聊天连接尚未建立，暂时不能执行消息操作");
@@ -2201,6 +2785,7 @@
     });
 
     updateActionAvailability();
+    restoreRememberedLogin();
 
 </script>
 

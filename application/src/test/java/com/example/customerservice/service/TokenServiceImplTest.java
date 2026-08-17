@@ -44,12 +44,12 @@ class TokenServiceImplTest {
                 anyString(), anyString(), anyString(),
                 anyString(), anyString(), anyString()
         )).thenReturn(1L);
-        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15);
+        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15, 7);
 
         String token = tokenService.issueToken("U001");
 
         assertFalse(token.isBlank());
-        assertEquals(900L, tokenService.getTokenTtlSeconds());
+        assertEquals(900L, tokenService.getTokenTtlSeconds(false));
         verify(redisTemplate).execute(
                 any(RedisScript.class),
                 eq(List.of(
@@ -62,12 +62,33 @@ class TokenServiceImplTest {
     }
 
     @Test
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    void rememberMeTokenUsesLongerConfiguredTtl() {
+        when(redisTemplate.execute(
+                any(RedisScript.class), anyList(),
+                anyString(), anyString(), anyString(),
+                anyString(), anyString(), anyString()
+        )).thenReturn(1L);
+        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15, 7);
+
+        String token = tokenService.issueToken("U001", true);
+
+        assertEquals(604800L, tokenService.getTokenTtlSeconds(true));
+        verify(redisTemplate).execute(
+                any(RedisScript.class),
+                eq(List.of(RedisConstants.tokenKey(token), RedisConstants.userTokensKey("U001"))),
+                eq("U001"), anyString(), anyString(), eq("604800"),
+                eq(RedisConstants.TOKEN_PREFIX), eq(token)
+        );
+    }
+
+    @Test
     @SuppressWarnings("unchecked")
     void revokesEveryTokenIssuedForUser() {
         when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
         when(zSetOperations.range(RedisConstants.userTokensKey("U001"), 0, -1))
                 .thenReturn(Set.of("T001", "T002"));
-        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15);
+        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15, 7);
 
         tokenService.revokeAllForUser("U001");
 
@@ -85,7 +106,7 @@ class TokenServiceImplTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOperations);
         when(valueOperations.get(RedisConstants.tokenKey("ACCESS")))
                 .thenReturn("U001");
-        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15);
+        TokenServiceImpl tokenService = new TokenServiceImpl(redisTemplate, 15, 7);
 
         String ticket = tokenService.issueWebSocketTicket("ACCESS", "U001");
 

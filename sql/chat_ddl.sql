@@ -140,3 +140,54 @@ CREATE TABLE IF NOT EXISTS chat_message_read
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci
     COMMENT = '聊天消息已读状态表';
+
+CREATE TABLE IF NOT EXISTS chat_quick_reply
+(
+    id          VARCHAR(64)   NOT NULL COMMENT '快捷回复ID',
+    agent_id    VARCHAR(64)   NOT NULL COMMENT '所属客服ID',
+    title       VARCHAR(50)   NOT NULL COMMENT '标题',
+    content     VARCHAR(1000) NOT NULL COMMENT '回复内容',
+    sort_order  INT           NOT NULL DEFAULT 0 COMMENT '显示顺序',
+    create_time DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    update_time DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    KEY idx_chat_quick_reply_agent (agent_id, sort_order, update_time),
+    CONSTRAINT fk_chat_quick_reply_agent FOREIGN KEY (agent_id) REFERENCES sys_user (id)
+        ON UPDATE CASCADE ON DELETE CASCADE
+) ENGINE = InnoDB DEFAULT CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '客服快捷回复表';
+
+CREATE TABLE IF NOT EXISTS chat_attachment
+(
+    id            VARCHAR(64)  NOT NULL COMMENT '附件ID',
+    session_id    VARCHAR(64)  NOT NULL COMMENT '所属会话ID',
+    uploader_id   VARCHAR(64)  NOT NULL COMMENT '上传者ID',
+    original_name VARCHAR(255) NOT NULL COMMENT '原始文件名',
+    stored_name   VARCHAR(128) NOT NULL COMMENT '服务端存储名',
+    content_type  VARCHAR(128) NOT NULL COMMENT 'MIME类型',
+    file_size     BIGINT       NOT NULL COMMENT '字节数',
+    message_type  VARCHAR(16)  NOT NULL COMMENT 'IMAGE或FILE',
+    create_time   DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_chat_attachment_stored_name (stored_name),
+    KEY idx_chat_attachment_session_time (session_id, create_time),
+    CONSTRAINT fk_chat_attachment_session FOREIGN KEY (session_id) REFERENCES chat_session (id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_chat_attachment_uploader FOREIGN KEY (uploader_id) REFERENCES sys_user (id)
+        ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_chat_attachment_type CHECK (message_type IN ('IMAGE', 'FILE'))
+) ENGINE = InnoDB DEFAULT CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '聊天附件表';
+
+CREATE TABLE IF NOT EXISTS chat_session_rating
+(
+    session_id  VARCHAR(64) NOT NULL COMMENT '会话ID',
+    user_id     VARCHAR(64) NOT NULL COMMENT '评价用户ID',
+    rating      TINYINT     NOT NULL COMMENT '评分1到5',
+    comment     VARCHAR(500) NULL COMMENT '评价文字',
+    create_time DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    PRIMARY KEY (session_id),
+    CONSTRAINT fk_chat_session_rating_session FOREIGN KEY (session_id)
+        REFERENCES chat_session (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT fk_chat_session_rating_user FOREIGN KEY (user_id)
+        REFERENCES sys_user (id) ON UPDATE CASCADE ON DELETE CASCADE,
+    CONSTRAINT chk_chat_session_rating CHECK (rating BETWEEN 1 AND 5)
+) ENGINE = InnoDB DEFAULT CHARACTER SET = utf8mb4 COLLATE = utf8mb4_unicode_ci COMMENT = '会话满意度评价表';

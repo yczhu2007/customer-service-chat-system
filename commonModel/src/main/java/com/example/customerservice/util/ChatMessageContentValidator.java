@@ -42,6 +42,10 @@ public final class ChatMessageContentValidator {
             );
         }
 
+        if (content.matches("^/chat/attachments/[A-Za-z0-9]{32,64}/content$")) {
+            return;
+        }
+
         try {
             URI uri = new URI(content);
             String scheme = uri.getScheme();
@@ -63,7 +67,7 @@ public final class ChatMessageContentValidator {
     ) {
         return new IllegalArgumentException(
                 messageType.name()
-                        + " 消息内容必须是合法的 http/https 地址"
+                        + " 消息内容必须是合法的附件地址或http/https地址"
         );
     }
 }

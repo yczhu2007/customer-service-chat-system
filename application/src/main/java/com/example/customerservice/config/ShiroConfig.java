@@ -132,6 +132,15 @@ public class ShiroConfig {
                 "anon"
         );
 
+        filterChain.put(
+                "/account/register",
+                "anon"
+        );
+        filterChain.put(
+                "/account/forgot-password",
+                "anon"
+        );
+
 
         /*
          * 健康检查允许匿名访问。

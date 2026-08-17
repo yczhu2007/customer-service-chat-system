@@ -45,7 +45,9 @@ public class TokenServiceImpl
                             + "redis.call('SET', KEYS[1], ARGV[1], 'EX', ARGV[4]); "
                             + "redis.call('ZREMRANGEBYSCORE', KEYS[2], '-inf', ARGV[2]); "
                             + "redis.call('ZADD', KEYS[2], ARGV[3], ARGV[6]); "
-                            + "redis.call('EXPIRE', KEYS[2], ARGV[4]); "
+                            + "local indexTtl = redis.call('TTL', KEYS[2]); "
+                            + "if indexTtl < tonumber(ARGV[4]) then "
+                            + "redis.call('EXPIRE', KEYS[2], ARGV[4]); end; "
                             + "return 1;",
                     Long.class
             );
@@ -53,11 +55,13 @@ public class TokenServiceImpl
     private final StringRedisTemplate
             redisTemplate;
     private final Duration tokenTtl;
+    private final Duration rememberTokenTtl;
 
 
     public TokenServiceImpl(
             StringRedisTemplate redisTemplate,
-            @Value("${app.auth.token-ttl-minutes:30}") long tokenTtlMinutes
+            @Value("${app.auth.token-ttl-minutes:30}") long tokenTtlMinutes,
+            @Value("${app.auth.remember-token-ttl-days:7}") long rememberTokenTtlDays
     ) {
 
         this.redisTemplate =
@@ -66,6 +70,10 @@ public class TokenServiceImpl
             throw new IllegalArgumentException("Token有效期必须大于0分钟");
         }
         this.tokenTtl = Duration.ofMinutes(tokenTtlMinutes);
+        if (rememberTokenTtlDays <= 0) {
+            throw new IllegalArgumentException("记住我Token有效期必须大于0天");
+        }
+        this.rememberTokenTtl = Duration.ofDays(rememberTokenTtlDays);
     }
 
 
@@ -84,9 +92,7 @@ public class TokenServiceImpl
      * 30分钟
      */
     @Override
-    public String issueToken(
-            String userId
-    ) {
+    public String issueToken(String userId, boolean rememberMe) {
 
         if (
                 userId == null ||
@@ -108,6 +114,7 @@ public class TokenServiceImpl
                         );
 
 
+        Duration effectiveTtl = rememberMe ? rememberTokenTtl : tokenTtl;
         String userTokensKey = RedisConstants.userTokensKey(userId);
         long now = System.currentTimeMillis();
         Long issued = redisTemplate.execute(
@@ -118,8 +125,8 @@ public class TokenServiceImpl
                 ),
                 userId,
                 String.valueOf(now),
-                String.valueOf(now + tokenTtl.toMillis()),
-                String.valueOf(tokenTtl.toSeconds()),
+                String.valueOf(now + effectiveTtl.toMillis()),
+                String.valueOf(effectiveTtl.toSeconds()),
                 RedisConstants.TOKEN_PREFIX,
                 token
         );
@@ -168,8 +175,8 @@ public class TokenServiceImpl
     }
 
     @Override
-    public long getTokenTtlSeconds() {
-        return tokenTtl.toSeconds();
+    public long getTokenTtlSeconds(boolean rememberMe) {
+        return rememberMe ? rememberTokenTtl.toSeconds() : tokenTtl.toSeconds();
     }
 
 

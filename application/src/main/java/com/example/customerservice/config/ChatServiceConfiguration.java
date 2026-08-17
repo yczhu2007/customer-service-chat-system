@@ -2,6 +2,7 @@ package com.example.customerservice.config;
 
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
+import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -67,6 +68,7 @@ public class ChatServiceConfiguration {
             ChatSessionMapper chatSessionMapper,
             ChatMessageMapper chatMessageMapper,
             ChatMessageReadMapper chatMessageReadMapper,
+            ChatAttachmentMapper chatAttachmentMapper,
             SimpMessagingTemplate messagingTemplate,
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
@@ -79,6 +81,7 @@ public class ChatServiceConfiguration {
                 chatSessionMapper,
                 chatMessageMapper,
                 chatMessageReadMapper,
+                chatAttachmentMapper,
                 messagingTemplate,
                 messagePersistService,
                 objectMapper,

@@ -75,11 +75,11 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
         }
 
         Set<String> roleCodes = findRoleCodesByUserId(user.getId());
-        String token = tokenService.issueToken(user.getId());
+        String token = tokenService.issueToken(user.getId(), request.isRememberMe());
         return new LoginResponse(
                 token,
                 "Bearer",
-                tokenService.getTokenTtlSeconds(),
+                tokenService.getTokenTtlSeconds(request.isRememberMe()),
                 user.getId(),
                 user.getUsername(),
                 roleCodes
