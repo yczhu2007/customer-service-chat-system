@@ -48,48 +48,6 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
     }
 
     @Override
-    public PageResult<ChatSessionListItemVO> findMySessions(
-            String participantId, String statusFilter, long pageNo, long pageSize) {
-        long normalizedPageNo = Math.max(1L, pageNo);
-        long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
-
-        Page<ChatSession> page = sessionMapper.selectPage(
-                new Page<>(normalizedPageNo, normalizedPageSize),
-                Wrappers.<ChatSession>lambdaQuery()
-                        .and(w -> w
-                                .eq(ChatSession::getUserId, participantId)
-                                .or()
-                                .eq(ChatSession::getAgentId, participantId)
-                        )
-                        .eq(statusFilter != null && !statusFilter.isBlank(),
-                                ChatSession::getStatus, statusFilter)
-                        .orderByDesc(ChatSession::getCreateTime)
-                        .orderByDesc(ChatSession::getId)
-        );
-
-        List<ChatSessionListItemVO> records = page.getRecords().stream()
-                .map(s -> {
-                    ChatSessionListItemVO vo = new ChatSessionListItemVO();
-                    vo.setSessionId(s.getId());
-                    vo.setUserId(s.getUserId());
-                    vo.setAgentId(s.getAgentId());
-                    vo.setStatus(s.getStatus());
-                    vo.setCreateTime(s.getCreateTime());
-                    vo.setEndTime(s.getEndTime());
-                    try {
-                        vo.setUnreadCount(messageReadMapper.countUnread(s.getId(), participantId));
-                    } catch (Exception e) {
-                        vo.setUnreadCount(0);
-                    }
-                    return vo;
-                })
-                .toList();
-
-        return new PageResult<>(
-                page.getCurrent(), page.getSize(), page.getTotal(), page.getPages(), records);
-    }
-
-    @Override
     @Transactional
     public SessionRatingVO rateSession(String userId, String sessionId, SessionRatingDTO request) {
         if (sessionId == null || sessionId.isBlank()) {
@@ -209,5 +167,126 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         }
         long serviceRounds = (position + onlineAgentCount - 1) / onlineAgentCount;
         return serviceRounds * averageHandleSeconds;
+    }
+
+    // ── 归档状态筛选的会话列表 ──────────────────────────────────────────────
+
+    @Override
+    public PageResult<ChatSessionListItemVO> findMySessions(
+            String participantId, String statusFilter,
+            String archiveStatusFilter, long pageNo, long pageSize) {
+        long normalizedPageNo = Math.max(1L, pageNo);
+        long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
+
+        boolean filterArchive = archiveStatusFilter != null && !archiveStatusFilter.isBlank();
+        boolean filterUnarchived = "NONE".equals(archiveStatusFilter);
+
+        Page<ChatSession> page = sessionMapper.selectPage(
+                new Page<>(normalizedPageNo, normalizedPageSize),
+                Wrappers.<ChatSession>lambdaQuery()
+                        .and(w -> w
+                                .eq(ChatSession::getUserId, participantId)
+                                .or()
+                                .eq(ChatSession::getAgentId, participantId)
+                        )
+                        .eq(statusFilter != null && !statusFilter.isBlank(),
+                                ChatSession::getStatus, statusFilter)
+                        .and(filterArchive && !filterUnarchived, w ->
+                                w.eq(ChatSession::getArchiveStatus, archiveStatusFilter))
+                        .and(filterUnarchived, w ->
+                                w.isNull(ChatSession::getArchiveStatus))
+                        .orderByDesc(ChatSession::getCreateTime)
+                        .orderByDesc(ChatSession::getId)
+        );
+
+        List<ChatSessionListItemVO> records = page.getRecords().stream()
+                .map(s -> {
+                    ChatSessionListItemVO vo = new ChatSessionListItemVO();
+                    vo.setSessionId(s.getId());
+                    vo.setUserId(s.getUserId());
+                    vo.setAgentId(s.getAgentId());
+                    vo.setStatus(s.getStatus());
+                    vo.setCreateTime(s.getCreateTime());
+                    vo.setEndTime(s.getEndTime());
+                    vo.setArchiveStatus(s.getArchiveStatus());
+                    vo.setArchiveRemark(s.getArchiveRemark());
+                    vo.setArchivedAt(s.getArchivedAt());
+                    try {
+                        vo.setUnreadCount(messageReadMapper.countUnread(s.getId(), participantId));
+                    } catch (Exception e) {
+                        vo.setUnreadCount(0);
+                    }
+                    return vo;
+                })
+                .toList();
+
+        return new PageResult<>(
+                page.getCurrent(), page.getSize(), page.getTotal(), page.getPages(), records);
+    }
+
+    // ── 归档状态（Zendesk 风格） ────────────────────────────────────────────
+
+    @Override
+    @Transactional
+    public void setArchiveStatus(String agentId, String sessionId, SessionArchiveDTO request) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new NotFoundException("会话不存在");
+        }
+        if (!ChatConstants.SESSION_STATUS_CLOSED.equals(session.getStatus())) {
+            throw new BusinessStateException("只能对已结束的会话进行归档");
+        }
+        if (!agentId.equals(session.getAgentId())) {
+            throw new IllegalArgumentException("只有该会话的客服可以归档");
+        }
+        String target = request.getArchiveStatus();
+        if (!ChatConstants.canTransitionTo(session.getArchiveStatus(), target)) {
+            throw new BusinessStateException(
+                    "不允许从 " + (session.getArchiveStatus() == null ? "未归档" : session.getArchiveStatus())
+                            + " 转换到 " + target);
+        }
+        session.setArchiveStatus(target);
+        session.setArchiveRemark(request.getRemark());
+        session.setArchivedBy(agentId);
+        session.setArchivedAt(LocalDateTime.now());
+        if (sessionMapper.updateById(session) != 1) {
+            throw new IllegalStateException("归档保存失败");
+        }
+    }
+
+    // ── 归档统计（管理端） ──────────────────────────────────────────────────
+
+    @Override
+    public ArchiveStatsVO findArchiveStats() {
+        ArchiveStatsVO vo = new ArchiveStatsVO();
+        Long completed = sessionMapper.selectCount(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED)
+                        .eq(ChatSession::getArchiveStatus, ChatConstants.ARCHIVE_COMPLETED));
+        Long pending = sessionMapper.selectCount(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED)
+                        .eq(ChatSession::getArchiveStatus, ChatConstants.ARCHIVE_PENDING));
+        Long onHold = sessionMapper.selectCount(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED)
+                        .eq(ChatSession::getArchiveStatus, ChatConstants.ARCHIVE_ON_HOLD));
+        Long other = sessionMapper.selectCount(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED)
+                        .eq(ChatSession::getArchiveStatus, ChatConstants.ARCHIVE_OTHER));
+        Long unarchived = sessionMapper.selectCount(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED)
+                        .isNull(ChatSession::getArchiveStatus));
+        vo.setCompleted(completed == null ? 0 : completed);
+        vo.setPending(pending == null ? 0 : pending);
+        vo.setOnHold(onHold == null ? 0 : onHold);
+        vo.setOther(other == null ? 0 : other);
+        vo.setUnarchived(unarchived == null ? 0 : unarchived);
+        return vo;
     }
 }

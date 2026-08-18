@@ -113,3 +113,31 @@ WHERE role_info.role_code = 'USER'
 $env:RUN_REAL_INTEGRATION_TESTS='true'
 .\mvnw.cmd -pl application -am '-Dtest=RealInfrastructureIntegrationTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
 ```
+
+## 会话归档状态（参考 Zendesk）
+
+客服对已结束（CLOSED）的会话可以设置归档状态，用于分类归档和跟进：
+
+| 状态 | 含义 | 对应 Zendesk |
+|---|---|---|
+| `COMPLETED` | 已完成 | Solved |
+| `PENDING` | 挂起·等客户回复 | Pending |
+| `ON_HOLD` | 挂起·等内部处理 | On-hold |
+| `OTHER` | 其他情况（需填备注） | — |
+
+### 状态流转规则
+
+- 未归档 → 任意状态（首次归档）
+- `PENDING` / `ON_HOLD` / `OTHER` → 任意状态（含 `COMPLETED`）
+- `COMPLETED` → `PENDING` / `ON_HOLD`（允许 reopen，不允许直接改 `OTHER` 或重复 `COMPLETED`）
+
+### 接口
+
+- `PUT /chat/sessions/{sessionId}/archive-status` — 客服设置归档状态（需 `chat:session:archive` 权限）
+- `GET /chat/sessions?archiveStatus=COMPLETED` — 按归档状态筛选会话
+- `GET /chat/admin/archive-stats` — 管理员查看归档统计概览（需 `chat:archive:stats` 权限）
+
+### 数据库
+
+`chat_session` 表新增 4 个归档字段：`archive_status`、`archive_remark`、`archived_by`、`archived_at`。
+已有数据库升级需执行 `ALTER TABLE` 添加字段，详见 `sql/chat_ddl.sql` 注释。

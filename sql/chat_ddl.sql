@@ -13,6 +13,20 @@ SET NAMES utf8mb4;
 
 
 -- ============================================================
+-- 0. 已有数据库升级：chat_session 新增归档字段（仅在列不存在时执行）
+-- ============================================================
+
+ALTER TABLE chat_session
+    ADD COLUMN IF NOT EXISTS archive_status VARCHAR(16) NULL COMMENT '归档状态：COMPLETED、PENDING、ON_HOLD、OTHER',
+    ADD COLUMN IF NOT EXISTS archive_remark VARCHAR(255) NULL COMMENT '归档备注',
+    ADD COLUMN IF NOT EXISTS archived_by    VARCHAR(64)  NULL COMMENT '归档操作客服ID',
+    ADD COLUMN IF NOT EXISTS archived_at    DATETIME(6)  NULL COMMENT '归档时间';
+
+CREATE INDEX IF NOT EXISTS idx_chat_session_agent_archive
+    ON chat_session (agent_id, archive_status, archived_at);
+
+
+-- ============================================================
 -- 0. 客服技能表
 -- ============================================================
 
@@ -46,20 +60,28 @@ CREATE TABLE IF NOT EXISTS chat_agent_skill
 
 CREATE TABLE IF NOT EXISTS chat_session
 (
-    id          VARCHAR(64) NOT NULL COMMENT '会话ID',
-    user_id     VARCHAR(64) NOT NULL COMMENT '普通用户ID',
-    agent_id    VARCHAR(64) NULL COMMENT '客服ID',
-    status      VARCHAR(16) NOT NULL COMMENT '会话状态：ACTIVE、CLOSED',
-    create_time DATETIME(6) NOT NULL COMMENT '会话创建时间',
-    end_time    DATETIME(6) NULL COMMENT '会话结束时间',
+    id             VARCHAR(64) NOT NULL COMMENT '会话ID',
+    user_id        VARCHAR(64) NOT NULL COMMENT '普通用户ID',
+    agent_id       VARCHAR(64) NULL COMMENT '客服ID',
+    status         VARCHAR(16) NOT NULL COMMENT '会话状态：ACTIVE、CLOSED',
+    create_time    DATETIME(6) NOT NULL COMMENT '会话创建时间',
+    end_time       DATETIME(6) NULL COMMENT '会话结束时间',
+    archive_status VARCHAR(16) NULL COMMENT '归档状态：COMPLETED、PENDING、ON_HOLD、OTHER',
+    archive_remark VARCHAR(255) NULL COMMENT '归档备注',
+    archived_by    VARCHAR(64) NULL COMMENT '归档操作客服ID',
+    archived_at    DATETIME(6) NULL COMMENT '归档时间',
 
     PRIMARY KEY (id),
     KEY idx_chat_session_user_status (user_id, status),
     KEY idx_chat_session_agent_status (agent_id, status),
     KEY idx_chat_session_create_time (create_time),
+    KEY idx_chat_session_agent_archive (agent_id, archive_status, archived_at),
 
     CONSTRAINT chk_chat_session_status
-        CHECK (status IN ('ACTIVE', 'CLOSED'))
+        CHECK (status IN ('ACTIVE', 'CLOSED')),
+    CONSTRAINT chk_chat_session_archive
+        CHECK (archive_status IS NULL
+            OR archive_status IN ('COMPLETED', 'PENDING', 'ON_HOLD', 'OTHER'))
 )
     ENGINE = InnoDB
     DEFAULT CHARACTER SET = utf8mb4

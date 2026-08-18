@@ -4,9 +4,10 @@ import com.example.customerservice.dto.*;
 
 /** 会话查询、评价和用户侧栏的只读/评价服务。 */
 public interface ChatSessionQueryService {
-    /** 参与者查看自己的会话历史列表（用户或客服视角）。 */
+    /** 参与者查看自己的会话历史列表（用户或客服视角），支持归档状态筛选。 */
     PageResult<ChatSessionListItemVO> findMySessions(
-            String participantId, String statusFilter, long pageNo, long pageSize);
+            String participantId, String statusFilter,
+            String archiveStatusFilter, long pageNo, long pageSize);
 
     /** 用户对已结束的会话提交满意度评价，每会话仅一次。 */
     SessionRatingVO rateSession(String userId, String sessionId, SessionRatingDTO request);
@@ -19,4 +20,10 @@ public interface ChatSessionQueryService {
 
     /** 查询当前排队状态（在线客服数、队列大小、我的位置、预估等待时间）。 */
     QueueStatusVO getQueueStatus(String userId);
+
+    /** 客服对已结束会话设置/更新归档状态。 */
+    void setArchiveStatus(String agentId, String sessionId, SessionArchiveDTO request);
+
+    /** 管理员查询归档统计概览。 */
+    ArchiveStatsVO findArchiveStats();
 }

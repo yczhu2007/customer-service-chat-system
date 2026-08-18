@@ -292,16 +292,17 @@ public class ChatController {
         currentUser.requirePermission("chat:message:deadletter:manage");
     }
 
-    /** 当前用户查看自己的会话历史列表（用户或客服视角自动判断）。 */
+    /** 当前用户查看自己的会话历史列表（用户或客服视角自动判断），支持归档状态筛选。 */
     @GetMapping("/sessions")
     public Result<PageResult<ChatSessionListItemVO>> findMySessions(
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String archiveStatus,
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize
     ) {
         return Result.success(
                 chatSessionQueryService.findMySessions(
-                        currentUser.getUserId(), status, pageNo, pageSize));
+                        currentUser.getUserId(), status, archiveStatus, pageNo, pageSize));
     }
 
     /** 查询指定会话的满意度评价。 */
@@ -341,6 +342,27 @@ public class ChatController {
     public Result<QueueStatusVO> getQueueStatus() {
         return Result.success(
                 chatSessionQueryService.getQueueStatus(currentUser.getUserId()));
+    }
+
+    /** 客服对已结束会话设置/更新归档状态（COMPLETED/PENDING/ON_HOLD/OTHER），允许 reopen。 */
+    @PutMapping("/sessions/{sessionId}/archive-status")
+    public Result<Void> setArchiveStatus(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId,
+            @Valid @RequestBody SessionArchiveDTO request
+    ) {
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:archive");
+        chatSessionQueryService.setArchiveStatus(
+                currentUser.getUserId(), sessionId, request);
+        return Result.successMessage("归档状态更新成功");
+    }
+
+    /** 管理员查看已结束会话的归档统计概览。 */
+    @GetMapping("/admin/archive-stats")
+    public Result<ArchiveStatsVO> findArchiveStats() {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:archive:stats");
+        return Result.success(chatSessionQueryService.findArchiveStats());
     }
 
     @MessageMapping("/chat.send")

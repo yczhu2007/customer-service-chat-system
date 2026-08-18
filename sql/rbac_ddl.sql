@@ -269,6 +269,26 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_SESSION_ARCHIVE',
+        'chat:session:archive',
+        '会话归档状态管理',
+        'API',
+        NULL,
+        '/chat/sessions/*/archive-status',
+        '允许客服对已结束会话设置归档状态（已完成/挂起/其他）',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_ARCHIVE_STATS',
+        'chat:archive:stats',
+        '归档统计查询',
+        'API',
+        NULL,
+        '/chat/admin/archive-stats',
+        '允许管理员查看归档统计概览',
+        'ENABLED'
+    ),
+    (
         'P_USER_MANAGE',
         'user:manage',
         '用户管理',
@@ -329,7 +349,8 @@ VALUES
     ('R_AGENT', 'P_CHAT_AGENT_OFFLINE'),
     ('R_AGENT', 'P_CHAT_SESSION_END'),
     ('R_AGENT', 'P_CHAT_SESSION_TRANSFER'),
-    ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE')
+    ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE'),
+    ('R_AGENT', 'P_CHAT_SESSION_ARCHIVE')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 

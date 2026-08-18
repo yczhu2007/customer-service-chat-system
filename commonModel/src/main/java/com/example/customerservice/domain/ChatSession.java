@@ -16,6 +16,14 @@ public class ChatSession {
     private String status;
     private LocalDateTime createTime;
     private LocalDateTime endTime;
+    /** 归档状态：COMPLETED / PENDING / ON_HOLD / OTHER，NULL 表示未归档。 */
+    private String archiveStatus;
+    /** 归档备注（OTHER 时建议必填，其余可选）。 */
+    private String archiveRemark;
+    /** 归档操作客服 ID。 */
+    private String archivedBy;
+    /** 归档时间。 */
+    private LocalDateTime archivedAt;
 
     public String getId() {
         return id;
@@ -65,6 +73,38 @@ public class ChatSession {
         this.endTime = endTime;
     }
 
+    public String getArchiveStatus() {
+        return archiveStatus;
+    }
+
+    public void setArchiveStatus(String archiveStatus) {
+        this.archiveStatus = archiveStatus;
+    }
+
+    public String getArchiveRemark() {
+        return archiveRemark;
+    }
+
+    public void setArchiveRemark(String archiveRemark) {
+        this.archiveRemark = archiveRemark;
+    }
+
+    public String getArchivedBy() {
+        return archivedBy;
+    }
+
+    public void setArchivedBy(String archivedBy) {
+        this.archivedBy = archivedBy;
+    }
+
+    public LocalDateTime getArchivedAt() {
+        return archivedAt;
+    }
+
+    public void setArchivedAt(LocalDateTime archivedAt) {
+        this.archivedAt = archivedAt;
+    }
+
     @Override
     public String toString() {
         return "ChatSession{" +
@@ -72,6 +112,7 @@ public class ChatSession {
                 ", userId='" + userId + '\'' +
                 ", agentId='" + agentId + '\'' +
                 ", status='" + status + '\'' +
+                ", archiveStatus='" + archiveStatus + '\'' +
                 ", createTime=" + createTime +
                 ", endTime=" + endTime +
                 '}';
