@@ -16,6 +16,7 @@ import com.example.customerservice.mapper.ChatSessionRatingMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatSessionQueryService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,17 +31,20 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
     private final SysUserMapper userMapper;
     private final ChatMessageReadMapper messageReadMapper;
     private final ChatRedisRepository chatRedisRepository;
+    private final long averageHandleSeconds;
 
     public ChatSessionQueryServiceImpl(ChatSessionMapper sessionMapper,
                                        ChatSessionRatingMapper ratingMapper,
                                        SysUserMapper userMapper,
                                        ChatMessageReadMapper messageReadMapper,
-                                       ChatRedisRepository chatRedisRepository) {
+                                       ChatRedisRepository chatRedisRepository,
+                                       @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds) {
         this.sessionMapper = sessionMapper;
         this.ratingMapper = ratingMapper;
         this.userMapper = userMapper;
         this.messageReadMapper = messageReadMapper;
         this.chatRedisRepository = chatRedisRepository;
+        this.averageHandleSeconds = Math.max(30L, averageHandleSeconds);
     }
 
     @Override
@@ -204,6 +208,6 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             return null;
         }
         long serviceRounds = (position + onlineAgentCount - 1) / onlineAgentCount;
-        return serviceRounds * 300;
+        return serviceRounds * averageHandleSeconds;
     }
 }

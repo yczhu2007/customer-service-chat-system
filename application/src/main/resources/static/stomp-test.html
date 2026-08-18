@@ -801,6 +801,11 @@
                     meta.textContent = "我 · " + (body.ackStatus === "STORED" ? "已保存" : "已送达服务器");
                 }
             }
+            // 附件发送时会先创建带 clientMsgId 的临时气泡。正式消息返回后，
+            // 需要在同一个气泡中加载附件，不能因为命中幂等消息就直接跳过渲染。
+            if (!body.recalled && (body.type === "IMAGE" || body.type === "FILE")) {
+                renderAttachment(existing, body);
+            }
             return;
         }
 
@@ -823,17 +828,27 @@
         const text = row.querySelector(".message-text");
         const token = document.getElementById("token").value.trim();
         if (!text || !token) return;
+        if (row.dataset.attachmentUrl === body.content
+                && (row.dataset.attachmentState === "loading"
+                    || row.dataset.attachmentState === "loaded")) {
+            return;
+        }
+        row.dataset.attachmentUrl = body.content;
+        row.dataset.attachmentState = "loading";
         text.textContent = body.type === "IMAGE" ? "正在加载图片……" : "正在加载附件……";
         try {
             const response = await fetch(body.content, {headers: {"Authorization": "Bearer " + token}});
             if (!response.ok) throw new Error("附件加载失败");
             const blob = await response.blob();
             const objectUrl = URL.createObjectURL(blob);
+            const originalName = body.originalName
+                || readAttachmentFileName(response.headers.get("Content-Disposition"))
+                || "聊天附件";
             text.innerHTML = "";
             if (body.type === "IMAGE") {
                 const image = document.createElement("img");
                 image.src = objectUrl;
-                image.alt = "聊天图片";
+                image.alt = originalName;
                 image.style.maxWidth = "260px";
                 image.style.maxHeight = "220px";
                 image.style.borderRadius = "8px";
@@ -841,13 +856,29 @@
             } else {
                 const link = document.createElement("a");
                 link.href = objectUrl;
-                link.download = "聊天附件";
-                link.textContent = "查看或下载附件";
+                link.download = originalName;
+                link.textContent = originalName;
                 text.appendChild(link);
             }
+            row.dataset.attachmentState = "loaded";
         } catch (error) {
+            row.dataset.attachmentState = "failed";
             text.textContent = error.message;
         }
+    }
+
+    function readAttachmentFileName(contentDisposition) {
+        if (!contentDisposition) return "";
+        const encoded = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (encoded) {
+            try {
+                return decodeURIComponent(encoded[1]);
+            } catch (ignored) {
+                return encoded[1];
+            }
+        }
+        const plain = contentDisposition.match(/filename="?([^";]+)"?/i);
+        return plain ? plain[1] : "";
     }
 
     function selectMessage(row) {
@@ -929,6 +960,12 @@
 
         if (body.id && body.sessionId && body.senderId) {
             renderChatMessage(body);
+            /* 未读数实时刷新：收到对方发来的新消息且不是正在查看的会话时，刷新会话列表未读角标。 */
+            const activeSessionId = document.getElementById("sessionId").value.trim();
+            const isMine = body.senderId === loggedInUserId;
+            if (!isMine && body.sessionId !== activeSessionId) {
+                loadSessionList();
+            }
             return;
         }
         if (body.event === "CHAT_HISTORY") {
@@ -2576,6 +2613,8 @@
                 updateSessionDisplay(s.sessionId);
                 if (stompConnected && socket && socket.readyState === WebSocket.OPEN) {
                     loadChatHistory();
+                } else {
+                    appendSystemMessage("聊天连接尚未建立，已选择会话 " + s.sessionId + "，连接后即可查看聊天记录");
                 }
             };
             container.appendChild(item);
@@ -2625,12 +2664,23 @@
             if (!response.ok || !result.data) throw new Error(result.message || "附件上传失败");
             const attachment = result.data;
             const clientMsgId = "attachment-" + Date.now();
-            sendStompJson("/app/chat.send", {
+            const sent = sendStompJson("/app/chat.send", {
                 sessionId: sessionId,
                 type: attachment.messageType,
                 content: attachment.contentUrl,
                 clientMsgId: clientMsgId
             }, "已发送附件：" + attachment.originalName);
+            if (!sent) return;
+            const row = appendChatBubble(attachment.originalName, {
+                kind: "mine",
+                sender: "我 · 发送中",
+                clientMsgId: clientMsgId
+            });
+            renderAttachment(row, {
+                type: attachment.messageType,
+                content: attachment.contentUrl,
+                originalName: attachment.originalName
+            });
             input.value = "";
         } catch (error) {
             showChatError(error.message);

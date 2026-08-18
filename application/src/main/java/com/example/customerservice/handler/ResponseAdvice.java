@@ -4,6 +4,7 @@ import com.example.customerservice.common.Result;
 import org.springframework.core.MethodParameter;
 import org.springframework.http.MediaType;
 import org.springframework.http.converter.HttpMessageConverter;
+import org.springframework.http.converter.ResourceHttpMessageConverter;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpResponse;
@@ -26,7 +27,12 @@ public class ResponseAdvice
             Class<? extends HttpMessageConverter<?>>
                     converterType
     ) {
-        return true;
+        /*
+         * 文件下载必须由ResourceHttpMessageConverter直接写出二进制内容。
+         * 若包装为Result，会导致已经按Resource选定的转换器发生类型转换异常，
+         * 浏览器只能收到一小段错误响应，附件因此无法显示或下载。
+         */
+        return !ResourceHttpMessageConverter.class.isAssignableFrom(converterType);
     }
 
     @Override
