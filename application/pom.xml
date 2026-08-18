@@ -50,8 +50,10 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- 让@TempDir位于项目target中，测试结束后由JUnit自动清理。 -->
-                    <argLine>-Djava.io.tmpdir=${project.build.directory} --enable-final-field-mutation=ALL-UNNAMED</argLine>
+                    <!-- 让@TempDir位于项目target中，测试结束后由JUnit自动清理。
+                         另外JDK 21+默认禁止self-attach，Mockito inline mock maker需要打开，否则报
+                         "Could not self-attach to current VM"。 -->
+                    <argLine>-Djava.io.tmpdir=${project.build.directory} --enable-final-field-mutation=ALL-UNNAMED -Djdk.attach.allowAttachSelf=true</argLine>
                 </configuration>
             </plugin>
             <plugin>

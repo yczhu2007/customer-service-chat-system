@@ -33,6 +33,9 @@
         <lombok.version>1.18.46</lombok.version>
         <mybatis-plus.version>3.5.17</mybatis-plus.version>
         <shiro.version>2.0.2</shiro.version>
+        <!-- JDK 26 需要更新版本的 Mockito/ByteBuddy 才能初始化 inline mock maker。 -->
+        <mockito.version>5.23.0</mockito.version>
+        <byte-buddy.version>1.18.10</byte-buddy.version>
     </properties>
 
     <dependencies>
