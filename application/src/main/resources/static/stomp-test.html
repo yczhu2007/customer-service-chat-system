@@ -163,6 +163,34 @@
         .archive-actions button { font-size: 12px; padding: 6px 10px; flex: 1 1 auto; }
         .archive-remark { margin-top: 6px; }
         .archive-remark input { width: 100%; font-size: 12px; padding: 6px 8px; }
+        .archive-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
+        .archive-stat-card {
+            display: flex; align-items: center; gap: 10px;
+            padding: 12px 14px; border-radius: 10px;
+            background: var(--paper); border: 1px solid var(--line);
+            transition: box-shadow .15s;
+        }
+        .archive-stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
+        .archive-stat-card .stat-dot {
+            width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
+        }
+        .archive-stat-card .stat-dot.completed { background: var(--green); }
+        .archive-stat-card .stat-dot.pending { background: #e65100; }
+        .archive-stat-card .stat-dot.on-hold { background: #1565c0; }
+        .archive-stat-card .stat-dot.other { background: #7b1fa2; }
+        .archive-stat-card .stat-dot.unarchived { background: var(--faint); }
+        .archive-stat-card .stat-info { flex: 1; min-width: 0; }
+        .archive-stat-card .stat-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
+        .archive-stat-card .stat-value { font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.2; }
+        .archive-stat-total {
+            margin-top: 10px; padding: 10px 14px;
+            border-radius: 10px; background: #f8f9fb;
+            border: 1px dashed var(--line-strong);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 13px;
+        }
+        .archive-stat-total .total-label { color: var(--muted); }
+        .archive-stat-total .total-value { font-weight: 700; color: var(--ink); font-size: 18px; }
             font-size: 12px;
             font-family: var(--font-mono);
         }
@@ -512,14 +540,48 @@
             </section>
             <section id="archiveStatsPanel" class="panel">
                 <h2>归档统计</h2>
-                <div id="archiveStatsContent" class="queue-status-info">
-                    <div class="status-row"><span class="label">已完成</span><span class="value" id="statsCompleted">-</span></div>
-                    <div class="status-row"><span class="label">挂起 等客户</span><span class="value" id="statsPending">-</span></div>
-                    <div class="status-row"><span class="label">挂起 等内部</span><span class="value" id="statsOnHold">-</span></div>
-                    <div class="status-row"><span class="label">其他</span><span class="value" id="statsOther">-</span></div>
-                    <div class="status-row"><span class="label">未归档</span><span class="value" id="statsUnarchived">-</span></div>
+                <div class="archive-stats-grid">
+                    <div class="archive-stat-card">
+                        <div class="stat-dot completed"></div>
+                        <div class="stat-info">
+                            <div class="stat-label">已完成</div>
+                            <div class="stat-value" id="statsCompleted">0</div>
+                        </div>
+                    </div>
+                    <div class="archive-stat-card">
+                        <div class="stat-dot pending"></div>
+                        <div class="stat-info">
+                            <div class="stat-label">挂起 等客户</div>
+                            <div class="stat-value" id="statsPending">0</div>
+                        </div>
+                    </div>
+                    <div class="archive-stat-card">
+                        <div class="stat-dot on-hold"></div>
+                        <div class="stat-info">
+                            <div class="stat-label">挂起 等内部</div>
+                            <div class="stat-value" id="statsOnHold">0</div>
+                        </div>
+                    </div>
+                    <div class="archive-stat-card">
+                        <div class="stat-dot other"></div>
+                        <div class="stat-info">
+                            <div class="stat-label">其他</div>
+                            <div class="stat-value" id="statsOther">0</div>
+                        </div>
+                    </div>
+                    <div class="archive-stat-card">
+                        <div class="stat-dot unarchived"></div>
+                        <div class="stat-info">
+                            <div class="stat-label">未归档</div>
+                            <div class="stat-value" id="statsUnarchived">0</div>
+                        </div>
+                    </div>
                 </div>
-                <div class="button-row" style="margin-top:8px">
+                <div class="archive-stat-total">
+                    <span class="total-label">已结束会话总数</span>
+                    <span class="total-value" id="statsTotal">0</span>
+                </div>
+                <div class="button-row" style="margin-top:10px">
                     <button class="secondary" onclick="loadArchiveStats()">刷新统计</button>
                 </div>
             </section>
@@ -2542,11 +2604,17 @@
         const result = await callRest("GET", "/chat/admin/archive-stats", null, null);
         if (!result || !result.data) return;
         const d = result.data;
-        document.getElementById("statsCompleted").textContent = d.completed ?? 0;
-        document.getElementById("statsPending").textContent = d.pending ?? 0;
-        document.getElementById("statsOnHold").textContent = d.onHold ?? 0;
-        document.getElementById("statsOther").textContent = d.other ?? 0;
-        document.getElementById("statsUnarchived").textContent = d.unarchived ?? 0;
+        const completed = d.completed ?? 0;
+        const pending = d.pending ?? 0;
+        const onHold = d.onHold ?? 0;
+        const other = d.other ?? 0;
+        const unarchived = d.unarchived ?? 0;
+        document.getElementById("statsCompleted").textContent = completed;
+        document.getElementById("statsPending").textContent = pending;
+        document.getElementById("statsOnHold").textContent = onHold;
+        document.getElementById("statsOther").textContent = other;
+        document.getElementById("statsUnarchived").textContent = unarchived;
+        document.getElementById("statsTotal").textContent = completed + pending + onHold + other + unarchived;
     }
 
     async function updateMyProfile() {
