@@ -16,13 +16,18 @@ import com.example.customerservice.mapper.ChatSessionRatingMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatSessionQueryService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
+@Slf4j
 @Service
 public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
@@ -207,6 +212,12 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                         .orderByDesc(ChatSession::getId)
         );
 
+        List<String> sessionIds = page.getRecords().stream()
+                .map(ChatSession::getId)
+                .toList();
+
+        Map<String, Long> unreadCounts = loadUnreadCounts(sessionIds, participantId);
+
         List<ChatSessionListItemVO> records = page.getRecords().stream()
                 .map(s -> {
                     ChatSessionListItemVO vo = new ChatSessionListItemVO();
@@ -219,11 +230,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     vo.setArchiveStatus(s.getArchiveStatus());
                     vo.setArchiveRemark(s.getArchiveRemark());
                     vo.setArchivedAt(s.getArchivedAt());
-                    try {
-                        vo.setUnreadCount(messageReadMapper.countUnread(s.getId(), participantId));
-                    } catch (Exception e) {
-                        vo.setUnreadCount(0);
-                    }
+                    vo.setUnreadCount(unreadCounts.getOrDefault(s.getId(), 0L));
                     return vo;
                 })
                 .toList();
@@ -296,5 +303,27 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         vo.setOther(other == null ? 0 : other);
         vo.setUnarchived(unarchived == null ? 0 : unarchived);
         return vo;
+    }
+
+    private Map<String, Long> loadUnreadCounts(List<String> sessionIds, String userId) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        try {
+            List<Map<String, Object>> rows =
+                    messageReadMapper.countUnreadBySessions(sessionIds, userId);
+            Map<String, Long> result = new HashMap<>();
+            for (Map<String, Object> row : rows) {
+                String sid = (String) row.get("sessionId");
+                Number count = (Number) row.get("unreadCount");
+                if (sid != null) {
+                    result.put(sid, count == null ? 0L : count.longValue());
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("批量查询未读消息数失败，将返回全零结果，userId={}", userId, e);
+            return Collections.emptyMap();
+        }
     }
 }

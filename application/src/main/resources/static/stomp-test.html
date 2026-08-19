@@ -762,9 +762,6 @@
         document.getElementById("agentPanel").hidden = !isAgent;
         document.getElementById("quickReplyPanel").hidden = !isAgent;
         document.getElementById("transferPanel").hidden = !isAgent;
-        if (!isUser) {
-            document.getElementById("ratingPanel").hidden = true;
-        }
         document.getElementById("endSessionButton").hidden = !isAgent;
         document.getElementById("mainLayout").classList.toggle("admin-layout", isAdmin);
         if (isAdmin) {
@@ -1042,12 +1039,20 @@
                 image.style.maxWidth = "260px";
                 image.style.maxHeight = "220px";
                 image.style.borderRadius = "8px";
+                image.onload = image.onerror = function () {
+                    URL.revokeObjectURL(objectUrl);
+                    image.onload = image.onerror = null;
+                };
                 text.appendChild(image);
             } else {
                 const link = document.createElement("a");
                 link.href = objectUrl;
                 link.download = originalName;
                 link.textContent = originalName;
+                link.onclick = function () {
+                    /* 浏览器点击下载后释放 blob URL */
+                    setTimeout(function () { URL.revokeObjectURL(objectUrl); }, 60000);
+                };
                 text.appendChild(link);
             }
             row.dataset.attachmentState = "loaded";
@@ -1995,10 +2000,11 @@
                             body["sessionId"] ||
                             (body["session"] && body["session"]["sessionId"]);
 
-                        if (receivedSessionId) {
-                            document.getElementById("sessionId").value =
-                                receivedSessionId;
-                        }
+
+                        /*
+                         * 不在这里设置 sessionId，由 renderServerPayload 通过
+                         * 过滤逻辑决定是否切换到该会话，避免后台消息抢占当前窗口。
+                         */
 
 
                         /*
@@ -2804,6 +2810,7 @@
             remove.className = "secondary";
             remove.textContent = "删除";
             remove.onclick = async function () {
+                if (!confirm("确定要删除「" + reply.title + "」这条快捷回复吗？")) return;
                 await callRest("DELETE", "/chat/quick-replies/" + encodeURIComponent(reply.id), null, "quickReplyResult");
                 await loadQuickReplies();
             };
@@ -3146,12 +3153,14 @@
             showChatError("聊天连接尚未建立，暂时不能执行消息操作");
             return false;
         }
+        const body = JSON.stringify(requestBody);
         const frame =
             "SEND\n" +
             "destination:" + destination + "\n" +
             "content-type:application/json\n" +
+            "content-length:" + new TextEncoder().encode(body).length + "\n" +
             "\n" +
-            JSON.stringify(requestBody) +
+            body +
             "\u0000";
         socket.send(frame);
         if (actionName) {

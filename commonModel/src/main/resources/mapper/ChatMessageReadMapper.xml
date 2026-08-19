@@ -42,4 +42,22 @@
           )
     </select>
 
+    <select id="countUnreadBySessions" resultType="java.util.Map">
+        SELECT message.session_id AS sessionId, COUNT(*) AS unreadCount
+        FROM chat_message message
+        WHERE message.session_id IN
+        <foreach collection="sessionIds" item="sid" open="(" separator="," close=")">
+            #{sid}
+        </foreach>
+          AND message.sender_id != #{userId}
+          AND message.recalled = 0
+          AND NOT EXISTS (
+                SELECT 1
+                FROM chat_message_read read_state
+                WHERE read_state.message_id = message.id
+                  AND read_state.user_id = #{userId}
+          )
+        GROUP BY message.session_id
+    </select>
+
 </mapper>
