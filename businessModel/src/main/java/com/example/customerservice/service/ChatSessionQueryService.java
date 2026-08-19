@@ -13,7 +13,7 @@ public interface ChatSessionQueryService {
     SessionRatingVO rateSession(String userId, String sessionId, SessionRatingDTO request);
 
     /** 查询指定会话的评价（若已评价）。 */
-    SessionRatingVO getSessionRating(String sessionId);
+    SessionRatingVO getSessionRating(String participantId, String sessionId);
 
     /** 客服查看当前会话中用户的基本信息侧栏。 */
     UserProfileSidebarVO getUserProfileSidebar(String agentId, String sessionId);

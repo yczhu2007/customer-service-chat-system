@@ -166,6 +166,18 @@
         .archive-actions button { font-size: 12px; padding: 6px 10px; flex: 1 1 auto; }
         .archive-remark { margin-top: 6px; }
         .archive-remark input { width: 100%; font-size: 12px; padding: 6px 8px; }
+        .rating-display { text-align: center; padding: 14px 0 8px; }
+        .rating-stars { font-size: 28px; letter-spacing: 2px; line-height: 1.2; }
+        .rating-stars .star-on { color: #f59e0b; }
+        .rating-stars .star-off { color: var(--line-strong); }
+        .rating-score-label { font-size: 14px; font-weight: 600; color: var(--ink); margin-top: 6px; }
+        .rating-comment-box {
+            margin-top: 10px; padding: 10px 12px;
+            background: #f8f9fb; border: 1px solid var(--line);
+            border-radius: 8px; font-size: 13px; color: var(--ink);
+            line-height: 1.6; white-space: pre-wrap; overflow-wrap: anywhere;
+        }
+        .rating-meta { margin-top: 8px; font-size: 11px; color: var(--faint); text-align: right; }
         .archive-stats-list {
             list-style: none;
             margin: 12px 0 0;
@@ -230,6 +242,17 @@
         }
         .field { display: grid; gap: 6px; margin-bottom: 12px; color: var(--muted); font-size: 12px; }
         .field input { width: 100%; }
+        .field textarea, .field select {
+            width: 100%;
+            min-width: 0;
+            padding: 9px 11px;
+            border: 1px solid var(--line-strong);
+            border-radius: 8px;
+            background: var(--paper);
+            color: var(--ink);
+            font: inherit;
+        }
+        .field textarea { min-height: 78px; resize: vertical; }
         .button-row { display: flex; gap: 8px; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
         .button-row button { flex: 1 1 auto; }
         .hint { margin: 10px 0 0; color: var(--muted); font-size: 12px; line-height: 1.6; }
@@ -434,12 +457,12 @@
             </section>
 
             <section id="queueStatusPanel" class="panel" hidden>
-                <h2>排队状态</h2>
+                <h2 id="queueStatusTitle">排队状态</h2>
                 <div id="queueStatusContent" class="queue-status-info">
                     <div class="status-row"><span class="label">在线客服</span><span class="value" id="queueOnlineAgents">-</span></div>
                     <div class="status-row"><span class="label">排队人数</span><span class="value" id="queueSize">-</span></div>
-                    <div class="status-row"><span class="label">我的位置</span><span class="value" id="queueMyPosition">-</span></div>
-                    <div class="status-row"><span class="label">预计等待</span><span class="value" id="queueEstimatedWait">-</span></div>
+                    <div id="queueMyPositionRow" class="status-row"><span class="label">我的位置</span><span class="value" id="queueMyPosition">-</span></div>
+                    <div id="queueEstimatedWaitRow" class="status-row"><span class="label">预计等待</span><span class="value" id="queueEstimatedWait">-</span></div>
                 </div>
                 <div class="button-row" style="margin-top:8px">
                     <button class="secondary" onclick="loadQueueStatus()">刷新状态</button>
@@ -506,6 +529,46 @@
                     <button id="editMessageButton" class="secondary" onclick="editChatMessage()" disabled hidden>编辑</button>
                     <button id="recallMessageButton" class="secondary" onclick="recallChatMessage()" disabled>撤回</button>
                 </div>
+            </section>
+
+            <section id="ratingPanel" class="panel" hidden>
+                <h2>满意度评价</h2>
+                <!-- 展示区：已评价时显示 -->
+                <div id="ratingDisplay" hidden>
+                    <div class="rating-display">
+                        <div id="ratingStars" class="rating-stars"></div>
+                        <div id="ratingScoreLabel" class="rating-score-label"></div>
+                    </div>
+                    <div id="ratingCommentBox" class="rating-comment-box" hidden></div>
+                    <div id="ratingMeta" class="rating-meta"></div>
+                </div>
+                <!-- 输入区：未评价时显示 -->
+                <div id="ratingInput">
+                    <p id="ratingHint" class="hint">会话结束后可以提交一次评价</p>
+                    <label class="field">满意度
+                        <select id="ratingScore">
+                            <option value="5">5 分 非常满意</option>
+                            <option value="4">4 分 满意</option>
+                            <option value="3">3 分 一般</option>
+                            <option value="2">2 分 不满意</option>
+                            <option value="1">1 分 非常不满意</option>
+                        </select>
+                    </label>
+                    <label class="field">评价内容
+                        <textarea id="ratingComment" maxlength="500" placeholder="可以填写本次服务的感受"></textarea>
+                    </label>
+                    <button id="ratingSubmitButton" class="primary" onclick="submitSessionRating()">提交评价</button>
+                    <div id="ratingResult" class="operation-result" hidden></div>
+                </div>
+            </section>
+
+            <section id="transferPanel" class="panel" hidden>
+                <h2>会话转接</h2>
+                <label class="field">目标客服 ID
+                    <input id="transferTargetAgentId" maxlength="64" placeholder="例如 A002">
+                </label>
+                <button id="transferSessionButton" class="primary" onclick="transferCurrentSession()" disabled>转接当前会话</button>
+                <div id="transferResult" class="operation-result" hidden></div>
             </section>
 
             <section id="quickReplyPanel" class="panel" hidden>
@@ -624,6 +687,8 @@
     let agentStateChanging = false;
     let agentTargetOnline = null;
     let sessionActive = false;
+    let selectedSessionStatus = null;
+    let ratingSessionId = null;
     let canRestartConsultation = false;
     let pendingAgentSessionNotices = [];
     let manualDisconnectRequested = false;
@@ -690,9 +755,16 @@
         document.getElementById("adminSidebar").hidden = !isAdmin;
         document.getElementById("chatCard").hidden = isAdmin;
         document.getElementById("connectionPanel").hidden = isAdmin;
-        document.getElementById("queueStatusPanel").hidden = !isUser;
+        document.getElementById("queueStatusPanel").hidden = !(isUser || isAgent);
+        document.getElementById("queueStatusTitle").textContent = isAgent ? "排队概况" : "排队状态";
+        document.getElementById("queueMyPositionRow").hidden = isAgent;
+        document.getElementById("queueEstimatedWaitRow").hidden = isAgent;
         document.getElementById("agentPanel").hidden = !isAgent;
         document.getElementById("quickReplyPanel").hidden = !isAgent;
+        document.getElementById("transferPanel").hidden = !isAgent;
+        if (!isUser) {
+            document.getElementById("ratingPanel").hidden = true;
+        }
         document.getElementById("endSessionButton").hidden = !isAgent;
         document.getElementById("mainLayout").classList.toggle("admin-layout", isAdmin);
         if (isAdmin) {
@@ -753,6 +825,8 @@
         document.getElementById("markReadButton").disabled = isAdmin || !stompConnected || !sessionId || !sessionActive || !messageId;
         document.getElementById("editMessageButton").disabled = isAdmin || !stompConnected || !sessionActive || !messageId;
         document.getElementById("recallMessageButton").disabled = isAdmin || !stompConnected || !sessionActive || !messageId;
+        document.getElementById("transferSessionButton").disabled = !loggedInRoles.includes("AGENT")
+            || !stompConnected || !sessionId || !sessionActive;
         const restartButton = document.getElementById("restartConsultationButton");
         restartButton.hidden = !isUser || !canRestartConsultation;
         restartButton.disabled = !stompConnected;
@@ -804,6 +878,20 @@
             : "当前暂无进行中的会话";
         updateCounterpartDisplay();
         updateActionAvailability();
+    }
+
+    function selectSessionRecord(session) {
+        if (!session || !session.sessionId) return;
+        document.getElementById("sessionId").value = session.sessionId;
+        selectedSessionStatus = session.status || (sessionActive ? "ACTIVE" : null);
+        sessionActive = selectedSessionStatus === "ACTIVE";
+        currentCounterpartId = loggedInUserId === session.userId
+            ? (session.agentId || null)
+            : (session.userId || null);
+        document.getElementById("messageId").value = "";
+        updateSessionDisplay(session.sessionId);
+        updateArchiveDisplay(session);
+        updateRatingPanel(session);
     }
 
     function updateCounterpartDisplay() {
@@ -1048,29 +1136,52 @@
             pendingAgentSessionNotices.push(body);
             return;
         }
-        if (isSessionActivation || (body.id && body.sessionId && body.senderId)) {
-            sessionActive = true;
-            canRestartConsultation = false;
-        }
-        updateCounterpartFromPayload(body);
-
         const receivedSessionId = body.sessionId || (body.session && body.session.sessionId);
-        if (receivedSessionId) {
-            document.getElementById("sessionId").value = receivedSessionId;
-            updateSessionDisplay(receivedSessionId);
-        }
-
         if (body.id && body.sessionId && body.senderId) {
-            renderChatMessage(body);
-            /* 未读数实时刷新：收到对方发来的新消息且不是正在查看的会话时，刷新会话列表未读角标。 */
             const activeSessionId = document.getElementById("sessionId").value.trim();
             const isMine = body.senderId === loggedInUserId;
-            if (!isMine && body.sessionId !== activeSessionId) {
+            if (activeSessionId && body.sessionId !== activeSessionId) {
+                /* 后台会话的新消息只更新会话列表，不抢占当前聊天窗口。 */
+                if (!isMine) {
+                    writeLog("后台会话收到新消息，会话列表未读数已刷新");
+                }
                 loadSessionList();
+                return;
             }
+            if (!activeSessionId) {
+                selectSessionRecord({
+                    sessionId: body.sessionId,
+                    userId: loggedInRoles.includes("AGENT") ? body.senderId : loggedInUserId,
+                    agentId: loggedInRoles.includes("AGENT") ? loggedInUserId : body.senderId,
+                    status: "ACTIVE"
+                });
+            } else {
+                sessionActive = true;
+                selectedSessionStatus = "ACTIVE";
+                updateCounterpartFromPayload(body);
+                updateSessionDisplay(activeSessionId);
+            }
+            canRestartConsultation = false;
+            renderChatMessage(body);
+            if (!isMine) loadSessionList();
             return;
         }
+        if (isSessionActivation) {
+            const activationSession = body.session || body;
+            const activeSessionId = document.getElementById("sessionId").value.trim();
+            const isUserOnly = loggedInRoles.includes("USER")
+                && !loggedInRoles.includes("AGENT")
+                && !loggedInRoles.includes("ADMIN");
+            if (isUserOnly || !activeSessionId || activeSessionId === receivedSessionId) {
+                selectSessionRecord({...activationSession, status: "ACTIVE"});
+                canRestartConsultation = false;
+            }
+        }
         if (body.event === "CHAT_HISTORY") {
+            const activeSessionId = document.getElementById("sessionId").value.trim();
+            if (body.sessionId && activeSessionId && body.sessionId !== activeSessionId) {
+                return;
+            }
             renderHistory(body);
             return;
         }
@@ -1079,6 +1190,7 @@
             return;
         }
         if (body.event === "MESSAGES_READ") {
+            loadSessionList();
             const isCurrentUser = body.readerId === loggedInUserId;
             if (body.markedCount > 0) {
                 appendSystemMessage((isCurrentUser ? "你" : (body.readerId || "对方"))
@@ -1094,7 +1206,10 @@
             const agentId = body.session && body.session.agentId;
             const sid = body.session && body.session.sessionId;
             appendSystemMessage("会话创建成功" + (agentId ? "，客服：" + agentId : ""));
-            if (sid) updateArchiveDisplay({sessionId: sid, status: "ACTIVE"});
+            if (sid && document.getElementById("sessionId").value.trim() === sid) {
+                updateArchiveDisplay({sessionId: sid, status: "ACTIVE"});
+                updateRatingPanel({sessionId: sid, status: "ACTIVE"});
+            }
             loadQueueStatus();
             loadSessionList();
             return;
@@ -1140,9 +1255,18 @@
             return;
         }
         if (body.event === "SESSION_CLOSED" || body.event === "SESSION_ENDED") {
+            const eventSessionId = receivedSessionId;
+            const selectedSessionId = document.getElementById("sessionId").value.trim();
+            if (eventSessionId && selectedSessionId && eventSessionId !== selectedSessionId) {
+                writeLog("后台会话已结束，会话列表已刷新");
+                loadQueueStatus();
+                loadSessionList();
+                return;
+            }
             const reasonText = formatSessionCloseReason(body.reason);
             appendSystemMessage("当前会话已结束" + (reasonText ? "：" + reasonText : ""));
             sessionActive = false;
+            selectedSessionStatus = "CLOSED";
             canRestartConsultation = loggedInRoles.includes("USER")
                 && !loggedInRoles.includes("AGENT")
                 && !loggedInRoles.includes("ADMIN");
@@ -1152,13 +1276,26 @@
             updateSessionDisplay(closedSessionId);
             if (closedSessionId) {
                 updateArchiveDisplay({sessionId: closedSessionId, status: "CLOSED"});
+                updateRatingPanel({sessionId: closedSessionId, status: "CLOSED"});
             }
             loadQueueStatus();
             loadSessionList();
             return;
         }
         if (body.event === "SESSION_TRANSFERRED") {
-            appendSystemMessage("会话已转接" + (body.agentId ? "给客服 " + body.agentId : ""));
+            const selectedSessionId = document.getElementById("sessionId").value.trim();
+            if (!receivedSessionId || receivedSessionId === selectedSessionId) {
+                appendSystemMessage("会话已转接" + (body.agentId ? "给客服 " + body.agentId : ""));
+                showOperationResult("transferResult",
+                    "会话已转接" + (body.agentId ? "给客服 " + body.agentId : ""), false);
+                if (loggedInRoles.includes("AGENT") && body.agentId !== loggedInUserId) {
+                    sessionActive = false;
+                    selectedSessionStatus = "TRANSFERRED";
+                    updateSessionDisplay(selectedSessionId);
+                }
+            }
+            loadSessionList();
+            loadQueueStatus();
             return;
         }
         if (body.event && body.message) {
@@ -2549,6 +2686,8 @@
             appendSystemMessage(online
                 ? "客服已上线，可以接待用户"
                 : "客服已离线，当前会话已经结束");
+            loadQueueStatus();
+            loadSessionList();
         } else if (previousState != null) {
             setAgentWorkState(previousState);
         } else {
@@ -2758,9 +2897,7 @@
             item.appendChild(badges);
 
             item.onclick = function () {
-                document.getElementById("sessionId").value = s.sessionId;
-                updateSessionDisplay(s.sessionId);
-                updateArchiveDisplay(s);
+                selectSessionRecord(s);
                 if (stompConnected && socket && socket.readyState === WebSocket.OPEN) {
                     loadChatHistory();
                 } else {
@@ -2784,6 +2921,134 @@
             case "ON_HOLD": return "挂起 等内部处理";
             case "OTHER": return "其他";
             default: return "未归档";
+        }
+    }
+
+    function renderRatingStars(score) {
+        let html = "";
+        for (let i = 1; i <= 5; i++) {
+            html += '<span class="' + (i <= score ? "star-on" : "star-off") + '">\u2605</span>';
+        }
+        return html;
+    }
+
+    const RATING_LABELS = {5: "非常满意", 4: "满意", 3: "一般", 2: "不满意", 1: "非常不满意"};
+
+    function showRatingDisplay(rating) {
+        document.getElementById("ratingDisplay").hidden = false;
+        document.getElementById("ratingInput").hidden = true;
+        document.getElementById("ratingStars").innerHTML = renderRatingStars(rating.rating);
+        document.getElementById("ratingScoreLabel").textContent = rating.rating + " 分 " + (RATING_LABELS[rating.rating] || "");
+        const commentBox = document.getElementById("ratingCommentBox");
+        if (rating.comment) {
+            commentBox.textContent = rating.comment;
+            commentBox.hidden = false;
+        } else {
+            commentBox.hidden = true;
+        }
+        const meta = rating.createTime ? "评价时间：" + rating.createTime.replace("T", " ").substring(0, 19) : "";
+        document.getElementById("ratingMeta").textContent = meta;
+    }
+
+    function showRatingInput() {
+        document.getElementById("ratingDisplay").hidden = true;
+        document.getElementById("ratingInput").hidden = false;
+        document.getElementById("ratingScore").disabled = false;
+        document.getElementById("ratingComment").disabled = false;
+        document.getElementById("ratingSubmitButton").disabled = false;
+        document.getElementById("ratingHint").textContent = "请评价本次客服服务，每个会话只能提交一次";
+        document.getElementById("ratingResult").hidden = true;
+    }
+
+    function updateRatingPanel(session) {
+        const panel = document.getElementById("ratingPanel");
+        const isClosed = session && session.sessionId && session.status === "CLOSED";
+        panel.hidden = !isClosed;
+        ratingSessionId = isClosed ? session.sessionId : null;
+        if (!isClosed) return;
+
+        const isUserOnly = loggedInRoles.includes("USER")
+            && !loggedInRoles.includes("AGENT")
+            && !loggedInRoles.includes("ADMIN");
+        /* 未评价时仅用户可见输入区；已评价时客服/管理员也可查看结果 */
+        if (isUserOnly) {
+            showRatingInput();
+        } else {
+            document.getElementById("ratingDisplay").hidden = true;
+            document.getElementById("ratingInput").hidden = true;
+        }
+        void loadSessionRating(session.sessionId, isUserOnly);
+    }
+
+    async function loadSessionRating(sessionId, showInput) {
+        const token = requireToken("ratingResult");
+        if (!token) return;
+        try {
+            const response = await fetch(
+                "/chat/sessions/" + encodeURIComponent(sessionId) + "/rating",
+                {headers: {"Authorization": "Bearer " + token}}
+            );
+            if (ratingSessionId !== sessionId) return;
+            if (response.status === 404) {
+                /* 未评价：保持输入区可见（仅用户） */
+                if (showInput) {
+                    document.getElementById("ratingHint").textContent = "请评价本次客服服务，每个会话只能提交一次";
+                }
+                return;
+            }
+            const result = await response.json();
+            if (!response.ok || !result.data) {
+                throw new Error(result.message || "评价状态加载失败");
+            }
+            showRatingDisplay(result.data);
+        } catch (error) {
+            if (showInput) showOperationResult("ratingResult", error.message, true);
+        }
+    }
+
+    async function submitSessionRating() {
+        if (!ratingSessionId) {
+            showOperationResult("ratingResult", "请先选择一条已结束的会话", true);
+            return;
+        }
+        const rating = Number(document.getElementById("ratingScore").value);
+        const comment = document.getElementById("ratingComment").value.trim();
+        const result = await callRest(
+            "POST",
+            "/chat/sessions/" + encodeURIComponent(ratingSessionId) + "/rating",
+            {rating: rating, comment: comment},
+            "ratingResult",
+            function (body) { return "评价提交成功：" + body.data.rating + " 分"; }
+        );
+        if (result && result.data) {
+            showRatingDisplay({
+                rating: result.data.rating,
+                comment: result.data.comment,
+                createTime: result.data.createTime
+            });
+            appendSystemMessage("评价已提交，感谢你的反馈");
+        }
+    }
+
+    function transferCurrentSession() {
+        const sessionId = document.getElementById("sessionId").value.trim();
+        const targetAgentId = document.getElementById("transferTargetAgentId").value.trim();
+        if (!sessionId || !sessionActive) {
+            showOperationResult("transferResult", "请先选择一个进行中的会话", true);
+            return;
+        }
+        if (!targetAgentId) {
+            showOperationResult("transferResult", "请输入目标客服 ID", true);
+            return;
+        }
+        const sent = sendStompJson(
+            "/app/chat.transfer",
+            {sessionId: sessionId, targetAgentId: targetAgentId},
+            null
+        );
+        if (sent) {
+            showOperationResult("transferResult", "转接请求已发送，正在等待服务器处理", false);
+            document.getElementById("transferTargetAgentId").value = "";
         }
     }
 

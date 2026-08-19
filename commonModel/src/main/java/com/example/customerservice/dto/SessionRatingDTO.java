@@ -2,6 +2,7 @@ package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 
 import java.io.Serializable;
@@ -9,6 +10,7 @@ import java.io.Serializable;
 public class SessionRatingDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
+    @NotNull(message = "请选择满意度评分")
     @Min(value = 1, message = "评分最低为1星")
     @Max(value = 5, message = "评分最高为5星")
     private Integer rating;

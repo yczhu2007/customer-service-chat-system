@@ -80,9 +80,17 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
     }
 
     @Override
-    public SessionRatingVO getSessionRating(String sessionId) {
+    public SessionRatingVO getSessionRating(String participantId, String sessionId) {
         if (sessionId == null || sessionId.isBlank()) {
             throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new NotFoundException("会话不存在");
+        }
+        if (!participantId.equals(session.getUserId())
+                && !participantId.equals(session.getAgentId())) {
+            throw new IllegalArgumentException("无权查看该会话评价");
         }
         ChatSessionRating rating = ratingMapper.selectById(sessionId);
         if (rating == null) {

@@ -310,7 +310,9 @@ public class ChatController {
     public Result<SessionRatingVO> getSessionRating(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        return Result.success(chatSessionQueryService.getSessionRating(sessionId));
+        return Result.success(
+                chatSessionQueryService.getSessionRating(
+                        currentUser.getUserId(), sessionId));
     }
 
     /** 用户对已结束的会话提交满意度评价，每会话仅一次。 */
