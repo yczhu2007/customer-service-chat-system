@@ -100,6 +100,9 @@
             border-radius: 999px;
             background: var(--paper);
             color: var(--muted);
+            font-size: 12px;
+            font-family: var(--font-mono);
+        }
         .unread-badge {
             display: inline-flex;
             align-items: center;
@@ -163,37 +166,37 @@
         .archive-actions button { font-size: 12px; padding: 6px 10px; flex: 1 1 auto; }
         .archive-remark { margin-top: 6px; }
         .archive-remark input { width: 100%; font-size: 12px; padding: 6px 8px; }
-        .archive-stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px; }
-        .archive-stat-card {
-            display: flex; align-items: center; gap: 10px;
-            padding: 12px 14px; border-radius: 10px;
-            background: var(--paper); border: 1px solid var(--line);
-            transition: box-shadow .15s;
+        .archive-stats-list {
+            list-style: none;
+            margin: 12px 0 0;
+            padding: 0;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: hidden;
         }
-        .archive-stat-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,.06); }
-        .archive-stat-card .stat-dot {
+        .archive-stat-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 44px;
+            padding: 9px 12px;
+            background: var(--paper);
+            border-bottom: 1px solid var(--line);
+        }
+        .archive-stat-item:last-child { border-bottom: 0; }
+        .archive-stat-item .stat-dot {
             width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0;
         }
-        .archive-stat-card .stat-dot.completed { background: var(--green); }
-        .archive-stat-card .stat-dot.pending { background: #e65100; }
-        .archive-stat-card .stat-dot.on-hold { background: #1565c0; }
-        .archive-stat-card .stat-dot.other { background: #7b1fa2; }
-        .archive-stat-card .stat-dot.unarchived { background: var(--faint); }
-        .archive-stat-card .stat-info { flex: 1; min-width: 0; }
-        .archive-stat-card .stat-label { font-size: 12px; color: var(--muted); white-space: nowrap; }
-        .archive-stat-card .stat-value { font-size: 22px; font-weight: 700; color: var(--ink); line-height: 1.2; }
-        .archive-stat-total {
-            margin-top: 10px; padding: 10px 14px;
-            border-radius: 10px; background: #f8f9fb;
-            border: 1px dashed var(--line-strong);
-            display: flex; justify-content: space-between; align-items: center;
-            font-size: 13px;
-        }
-        .archive-stat-total .total-label { color: var(--muted); }
-        .archive-stat-total .total-value { font-weight: 700; color: var(--ink); font-size: 18px; }
-            font-size: 12px;
-            font-family: var(--font-mono);
-        }
+        .archive-stat-item .stat-dot.completed { background: var(--green); }
+        .archive-stat-item .stat-dot.pending { background: #e65100; }
+        .archive-stat-item .stat-dot.on-hold { background: #1565c0; }
+        .archive-stat-item .stat-dot.other { background: #7b1fa2; }
+        .archive-stat-item .stat-dot.unarchived { background: var(--faint); }
+        .archive-stat-item .stat-label { flex: 1; min-width: 0; font-size: 12px; color: var(--muted); }
+        .archive-stat-item .stat-value { font-size: 15px; font-weight: 700; color: var(--ink); }
+        .archive-stat-item.total { background: #f8f9fb; }
+        .archive-stat-item.total .stat-label { color: var(--ink); font-weight: 600; }
+        .archive-stat-item.total .stat-value { color: var(--navy); font-size: 17px; }
         .status-badge::before {
             content: "";
             width: 7px;
@@ -482,10 +485,10 @@
                 </div>
                 <div id="archiveActions" hidden>
                     <div class="archive-actions">
-                        <button class="primary" onclick="setArchiveStatus('COMPLETED')">✅ 已完成</button>
-                        <button style="background:#fff3e0;color:#e65100;border-color:#ffcc80" onclick="setArchiveStatus('PENDING')">⏸ 等客户</button>
-                        <button style="background:#e3f2fd;color:#1565c0;border-color:#90caf9" onclick="setArchiveStatus('ON_HOLD')">⏸ 等内部</button>
-                        <button class="secondary" onclick="setArchiveStatus('OTHER')">📋 其他</button>
+                        <button class="primary" onclick="setArchiveStatus('COMPLETED')">已完成</button>
+                        <button style="background:#fff3e0;color:#e65100;border-color:#ffcc80" onclick="setArchiveStatus('PENDING')">等客户</button>
+                        <button style="background:#e3f2fd;color:#1565c0;border-color:#90caf9" onclick="setArchiveStatus('ON_HOLD')">等内部</button>
+                        <button class="secondary" onclick="setArchiveStatus('OTHER')">其他</button>
                     </div>
                     <div class="archive-remark">
                         <input id="archiveRemark" placeholder="备注（OTHER时建议填写）" maxlength="255">
@@ -497,10 +500,10 @@
                 <h2>消息操作</h2>
                 <input id="messageId" type="hidden">
                 <p id="messageOperationHint" class="hint">点击聊天气泡选择消息</p>
-                <label class="field">编辑内容<input id="editedMessageContent" value="这是编辑后的消息"></label>
+                <label class="field" hidden>编辑内容<input id="editedMessageContent" value="这是编辑后的消息"></label>
                 <div class="button-row">
                     <button id="markReadButton" class="secondary" onclick="markMessageRead()" disabled>标记已读</button>
-                    <button id="editMessageButton" class="secondary" onclick="editChatMessage()" disabled>编辑</button>
+                    <button id="editMessageButton" class="secondary" onclick="editChatMessage()" disabled hidden>编辑</button>
                     <button id="recallMessageButton" class="secondary" onclick="recallChatMessage()" disabled>撤回</button>
                 </div>
             </section>
@@ -540,47 +543,37 @@
             </section>
             <section id="archiveStatsPanel" class="panel">
                 <h2>归档统计</h2>
-                <div class="archive-stats-grid">
-                    <div class="archive-stat-card">
+                <ul class="archive-stats-list">
+                    <li class="archive-stat-item">
                         <div class="stat-dot completed"></div>
-                        <div class="stat-info">
-                            <div class="stat-label">已完成</div>
-                            <div class="stat-value" id="statsCompleted">0</div>
-                        </div>
-                    </div>
-                    <div class="archive-stat-card">
+                        <span class="stat-label">已完成</span>
+                        <span class="stat-value" id="statsCompleted">0</span>
+                    </li>
+                    <li class="archive-stat-item">
                         <div class="stat-dot pending"></div>
-                        <div class="stat-info">
-                            <div class="stat-label">挂起 等客户</div>
-                            <div class="stat-value" id="statsPending">0</div>
-                        </div>
-                    </div>
-                    <div class="archive-stat-card">
+                        <span class="stat-label">挂起 · 等客户</span>
+                        <span class="stat-value" id="statsPending">0</span>
+                    </li>
+                    <li class="archive-stat-item">
                         <div class="stat-dot on-hold"></div>
-                        <div class="stat-info">
-                            <div class="stat-label">挂起 等内部</div>
-                            <div class="stat-value" id="statsOnHold">0</div>
-                        </div>
-                    </div>
-                    <div class="archive-stat-card">
+                        <span class="stat-label">挂起 · 等内部</span>
+                        <span class="stat-value" id="statsOnHold">0</span>
+                    </li>
+                    <li class="archive-stat-item">
                         <div class="stat-dot other"></div>
-                        <div class="stat-info">
-                            <div class="stat-label">其他</div>
-                            <div class="stat-value" id="statsOther">0</div>
-                        </div>
-                    </div>
-                    <div class="archive-stat-card">
+                        <span class="stat-label">其他</span>
+                        <span class="stat-value" id="statsOther">0</span>
+                    </li>
+                    <li class="archive-stat-item">
                         <div class="stat-dot unarchived"></div>
-                        <div class="stat-info">
-                            <div class="stat-label">未归档</div>
-                            <div class="stat-value" id="statsUnarchived">0</div>
-                        </div>
-                    </div>
-                </div>
-                <div class="archive-stat-total">
-                    <span class="total-label">已结束会话总数</span>
-                    <span class="total-value" id="statsTotal">0</span>
-                </div>
+                        <span class="stat-label">未归档</span>
+                        <span class="stat-value" id="statsUnarchived">0</span>
+                    </li>
+                    <li class="archive-stat-item total">
+                        <span class="stat-label">已结束会话总数</span>
+                        <span class="stat-value" id="statsTotal">0</span>
+                    </li>
+                </ul>
                 <div class="button-row" style="margin-top:10px">
                     <button class="secondary" onclick="loadArchiveStats()">刷新统计</button>
                 </div>
