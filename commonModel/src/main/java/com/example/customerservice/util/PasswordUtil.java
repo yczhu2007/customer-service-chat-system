@@ -235,5 +235,11 @@ public final class PasswordUtil {
                     "密码不能为空"
             );
         }
+
+        if (rawPassword.length() < 8) {
+            throw new IllegalArgumentException(
+                    "密码长度不能少于8个字符"
+            );
+        }
     }
 }

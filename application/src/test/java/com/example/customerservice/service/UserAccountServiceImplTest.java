@@ -42,7 +42,7 @@ class UserAccountServiceImplTest {
             user.setStatus("ENABLED"); user.setVipLevel(0); return user;
         });
         when(userRoleMapper.findAllRoleCodesByUserId(anyString())).thenReturn(Set.of("USER"));
-        UserRegisterDTO request = new UserRegisterDTO(); request.setUsername("new_user"); request.setPassword("123456");
+        UserRegisterDTO request = new UserRegisterDTO(); request.setUsername("new_user"); request.setPassword("12345678");
 
         var result = service.register(request);
 
@@ -56,7 +56,7 @@ class UserAccountServiceImplTest {
         SysRole role = new SysRole(); role.setId("R_USER"); role.setStatus("ENABLED");
         when(roleMapper.findByCode("USER")).thenReturn(role);
         when(userMapper.insert(any(SysUser.class))).thenThrow(new DuplicateKeyException("duplicate"));
-        UserRegisterDTO request = new UserRegisterDTO(); request.setUsername("same_name"); request.setPassword("123456");
+        UserRegisterDTO request = new UserRegisterDTO(); request.setUsername("same_name"); request.setPassword("12345678");
         BusinessStateException error = assertThrows(BusinessStateException.class, () -> service.register(request));
         assertEquals("用户名已经存在", error.getMessage());
     }
@@ -77,7 +77,7 @@ class UserAccountServiceImplTest {
         PasswordResetDTO request = new PasswordResetDTO();
         request.setUsername("user001");
         request.setRecoveryCode("abcd-1234-ef56-7890");
-        request.setNewPassword("new-password");
+        request.setNewPassword("new-password-123");
 
         var result = service.resetPassword(request);
 
@@ -100,7 +100,7 @@ class UserAccountServiceImplTest {
         PasswordResetDTO request = new PasswordResetDTO();
         request.setUsername("user001");
         request.setRecoveryCode("ABCD-1234-EF56-7890");
-        request.setNewPassword("new-password");
+        request.setNewPassword("new-password-123");
 
         IllegalArgumentException error = assertThrows(
                 IllegalArgumentException.class,

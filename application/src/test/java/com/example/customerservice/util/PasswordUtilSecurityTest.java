@@ -9,14 +9,14 @@ class PasswordUtilSecurityTest {
 
     @Test
     void plaintextDatabasePasswordIsNeverAccepted() {
-        assertFalse(PasswordUtil.matches("123456", "123456"));
+        assertFalse(PasswordUtil.matches("testpass123", "testpass123"));
     }
 
     @Test
     void pbkdf2PasswordCanBeVerified() {
-        String storedPassword = PasswordUtil.hash("123456");
+        String storedPassword = PasswordUtil.hash("testpass123");
 
-        assertTrue(PasswordUtil.matches("123456", storedPassword));
+        assertTrue(PasswordUtil.matches("testpass123", storedPassword));
         assertFalse(PasswordUtil.matches("wrong-password", storedPassword));
     }
 }

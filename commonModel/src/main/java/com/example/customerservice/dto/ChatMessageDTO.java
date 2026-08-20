@@ -1,6 +1,7 @@
 package com.example.customerservice.dto;
 
 import com.example.customerservice.domain.ChatMessage;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -24,8 +25,10 @@ public class ChatMessageDTO implements Serializable {
     @Size(max = 64, message = "sessionId长度不能超过64个字符")
     private String sessionId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String senderId;
 
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
     private String senderRole;
 
     @NotBlank(message = "消息类型不能为空")

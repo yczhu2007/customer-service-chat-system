@@ -300,6 +300,7 @@ public class ChatController {
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize
     ) {
+        currentUser.requireRole("USER");
         return Result.success(
                 chatSessionQueryService.findMySessions(
                         currentUser.getUserId(), status, archiveStatus, pageNo, pageSize));
@@ -310,6 +311,7 @@ public class ChatController {
     public Result<SessionRatingVO> getSessionRating(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
+        currentUser.requireRole("USER");
         return Result.success(
                 chatSessionQueryService.getSessionRating(
                         currentUser.getUserId(), sessionId));
@@ -334,6 +336,7 @@ public class ChatController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
         currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:user-profile:view");
         return Result.success(
                 chatSessionQueryService.getUserProfileSidebar(
                         currentUser.getUserId(), sessionId));
@@ -384,6 +387,20 @@ public class ChatController {
             throw new IllegalArgumentException(
                     "聊天消息不能为空"
             );
+        }
+
+        /* STOMP @Valid 不保证触发，手动校验核心字段长度。 */
+        if (request.getSessionId() != null
+                && request.getSessionId().length() > 64) {
+            throw new IllegalArgumentException("sessionId长度不能超过64个字符");
+        }
+        if (request.getClientMsgId() != null
+                && request.getClientMsgId().length() > 64) {
+            throw new IllegalArgumentException("clientMsgId长度不能超过64个字符");
+        }
+        if (request.getContent() != null
+                && request.getContent().length() > 4000) {
+            throw new IllegalArgumentException("消息内容不能超过4000个字符");
         }
 
         ChatMessage message =

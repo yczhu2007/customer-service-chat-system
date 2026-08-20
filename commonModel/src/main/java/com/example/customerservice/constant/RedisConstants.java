@@ -244,4 +244,8 @@ public class RedisConstants {
 
     public static final String ONLINE_USERS =
             "online:users";
+
+    /** 消息发送限流 key 前缀，每用户独立桶。 */
+    public static final String MSG_RATE_LIMIT =
+            "chat:msg:rate:";
 }

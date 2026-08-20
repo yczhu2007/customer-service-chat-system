@@ -279,6 +279,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_USER_PROFILE_VIEW',
+        'chat:user-profile:view',
+        '会话用户信息查看',
+        'API',
+        NULL,
+        '/chat/sessions/*/user-profile',
+        '允许客服查看当前会话用户的基本信息',
+        'ENABLED'
+    ),
+    (
         'P_CHAT_ARCHIVE_STATS',
         'chat:archive:stats',
         '归档统计查询',
@@ -350,7 +360,8 @@ VALUES
     ('R_AGENT', 'P_CHAT_SESSION_END'),
     ('R_AGENT', 'P_CHAT_SESSION_TRANSFER'),
     ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE'),
-    ('R_AGENT', 'P_CHAT_SESSION_ARCHIVE')
+    ('R_AGENT', 'P_CHAT_SESSION_ARCHIVE'),
+    ('R_AGENT', 'P_CHAT_USER_PROFILE_VIEW')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 

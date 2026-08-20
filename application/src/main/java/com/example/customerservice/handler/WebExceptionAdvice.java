@@ -42,9 +42,7 @@ public class WebExceptionAdvice {
         if (fieldError == null) {
             message = "请求参数不正确";
         } else {
-            message = fieldError.getField()
-                    + "："
-                    + fieldError.getDefaultMessage();
+            message = fieldError.getDefaultMessage();
         }
 
         return buildResponse(

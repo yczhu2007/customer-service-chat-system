@@ -18,6 +18,7 @@ import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatSessionQueryService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -78,8 +79,12 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         rating.setRating(request.getRating());
         rating.setComment(request.getComment());
         rating.setCreateTime(LocalDateTime.now());
-        if (ratingMapper.insert(rating) != 1) {
-            throw new IllegalStateException("评价保存失败");
+        try {
+            if (ratingMapper.insert(rating) != 1) {
+                throw new IllegalStateException("评价保存失败");
+            }
+        } catch (DuplicateKeyException e) {
+            throw new BusinessStateException("该会话已经评价过");
         }
         return toRatingVO(rating);
     }
@@ -263,12 +268,22 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     "不允许从 " + (session.getArchiveStatus() == null ? "未归档" : session.getArchiveStatus())
                             + " 转换到 " + target);
         }
-        session.setArchiveStatus(target);
         session.setArchiveRemark(request.getRemark());
         session.setArchivedBy(agentId);
         session.setArchivedAt(LocalDateTime.now());
-        if (sessionMapper.updateById(session) != 1) {
-            throw new IllegalStateException("归档保存失败");
+        /* 使用 WHERE archive_status = :expected 防止并发覆盖 */
+        String previousStatus = session.getArchiveStatus();
+        session.setArchiveStatus(target);
+        int updated = sessionMapper.update(session,
+                Wrappers.<ChatSession>lambdaUpdate()
+                        .eq(ChatSession::getId, sessionId)
+                        .eq(ChatSession::getArchiveStatus, previousStatus)
+                        .set(ChatSession::getArchiveStatus, target)
+                        .set(ChatSession::getArchiveRemark, request.getRemark())
+                        .set(ChatSession::getArchivedBy, agentId)
+                        .set(ChatSession::getArchivedAt, LocalDateTime.now()));
+        if (updated != 1) {
+            throw new BusinessStateException("归档状态已被其他操作修改，请刷新后重试");
         }
     }
 

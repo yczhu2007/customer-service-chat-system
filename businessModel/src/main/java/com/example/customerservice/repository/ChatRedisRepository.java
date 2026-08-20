@@ -194,6 +194,10 @@ public class ChatRedisRepository {
         return redisTemplate.hasKey(key);
     }
 
+    public Long increment(String key) {
+        return redisTemplate.opsForValue().increment(key);
+    }
+
     public Boolean expire(String key, long timeout, TimeUnit unit) {
         return redisTemplate.expire(key, timeout, unit);
     }

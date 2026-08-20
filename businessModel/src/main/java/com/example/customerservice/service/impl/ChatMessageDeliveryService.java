@@ -98,6 +98,16 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             );
         }
 
+        /* ── 每用户每秒最多 10 条消息（Redis 滑动窗口） ── */
+        String rateKey = RedisConstants.MSG_RATE_LIMIT + message.getSenderId();
+        Long msgCount = chatRedisRepository.increment(rateKey);
+        if (msgCount != null && msgCount == 1L) {
+            chatRedisRepository.expire(rateKey, 1, TimeUnit.SECONDS);
+        }
+        if (msgCount != null && msgCount > 10) {
+            throw new BusinessStateException("消息发送过于频繁，请稍后重试");
+        }
+
 
         if (
                 message.getClientMsgId() == null ||
@@ -156,8 +166,8 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             );
 
             log.info(
-                    "检测到重复消息，clientMsgId："
-                            + message.getClientMsgId()
+                    "检测到重复消息，clientMsgId：{}",
+                    message.getClientMsgId()
             );
 
             return 0;
@@ -257,8 +267,8 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
 
 
         log.info(
-                "消息处理完成，messageId："
-                        + message.getId()
+                "消息处理完成，messageId：{}",
+                message.getId()
         );
 
 
