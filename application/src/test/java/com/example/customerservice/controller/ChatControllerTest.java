@@ -2,6 +2,8 @@ package com.example.customerservice.controller;
 
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.common.Result;
+import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
+import com.example.customerservice.dto.ChatSessionMetadataVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
@@ -25,8 +27,8 @@ import java.util.Set;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -167,5 +169,99 @@ class ChatControllerTest {
 
         verify(currentUser).requirePermission("chat:session:view-own");
         verifyNoInteractions(chatSessionQueryService);
+    }
+
+    @Test
+    void adminCanReadSessionMetadataViaAuditScope() {
+        ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
+        when(currentUser.getUserId()).thenReturn("ADMIN001");
+        when(chatSessionQueryService.getSessionMetadata("ADMIN001", true, "S001"))
+                .thenReturn(metadata);
+
+        Result<ChatSessionMetadataVO> result =
+                controller.getSessionMetadata("S001");
+
+        assertEquals(metadata, result.getData());
+        verify(currentUser).requireRole("ADMIN");
+        verify(currentUser).requirePermission("chat:session:audit:view");
+        verify(chatSessionQueryService).getSessionMetadata("ADMIN001", true, "S001");
+    }
+
+    @Test
+    void participantCanReadSessionMetadataViaOwnScope() {
+        ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
+        when(currentUser.getUserId()).thenReturn("A001");
+        when(chatSessionQueryService.getSessionMetadata("A001", false, "S001"))
+                .thenReturn(metadata);
+
+        Result<ChatSessionMetadataVO> result =
+                controller.getSessionMetadata("S001");
+
+        assertEquals(metadata, result.getData());
+        verify(currentUser).requirePermission("chat:session:view-own");
+        verify(chatSessionQueryService).getSessionMetadata("A001", false, "S001");
+    }
+
+    @Test
+    void unsupportedRoleCannotReadSessionMetadata() {
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("SUPERVISOR"));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.getSessionMetadata("S001")
+        );
+
+        verifyNoInteractions(chatSessionQueryService);
+    }
+
+    @Test
+    void agentCanUpdateSessionMetadata() {
+        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
+        ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getUserId()).thenReturn("A001");
+        when(chatSessionQueryService.updateSessionMetadata("A001", "S001", request))
+                .thenReturn(metadata);
+
+        Result<ChatSessionMetadataVO> result =
+                controller.updateSessionMetadata("S001", request);
+
+        assertEquals(metadata, result.getData());
+        verify(currentUser).requireRole("AGENT");
+        verify(currentUser).requirePermission("chat:session:metadata:update");
+        verify(chatSessionQueryService).updateSessionMetadata("A001", "S001", request);
+    }
+
+    @Test
+    void adminCannotUpdateSessionMetadata() {
+        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.updateSessionMetadata("S001", request)
+        );
+
+        verifyNoInteractions(chatSessionQueryService);
+    }
+
+    private static ChatSessionMetadataVO metadata(String sessionId) {
+        ChatSessionMetadataVO metadata = new ChatSessionMetadataVO();
+        metadata.setSessionId(sessionId);
+        metadata.setTitle("Priority case");
+        metadata.setPriority("HIGH");
+        metadata.setCategory("PAYMENT");
+        metadata.setTags(List.of("vip"));
+        return metadata;
+    }
+
+    private static ChatSessionMetadataUpdateDTO metadataUpdateRequest() {
+        ChatSessionMetadataUpdateDTO request = new ChatSessionMetadataUpdateDTO();
+        request.setTitle("Updated title");
+        request.setPriority("URGENT");
+        request.setCategory("TECHNICAL");
+        request.setTags(List.of("vip", "billing"));
+        return request;
     }
 }

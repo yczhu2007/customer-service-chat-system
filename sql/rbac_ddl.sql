@@ -359,6 +359,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_SESSION_METADATA_UPDATE',
+        'chat:session:metadata:update',
+        '会话元数据更新',
+        'API',
+        'PUT',
+        '/chat/sessions/*/metadata',
+        '允许客服更新自己参与会话的标题、优先级、分类和标签',
+        'ENABLED'
+    ),
+    (
         'P_USER_MANAGE',
         'user:manage',
         '用户管理',
@@ -426,7 +436,8 @@ VALUES
     ('R_AGENT', 'P_CHAT_USER_PROFILE_VIEW'),
     ('R_AGENT', 'P_CHAT_AGENT_DASHBOARD_VIEW'),
     ('R_AGENT', 'P_CHAT_RATING_STATS_VIEW'),
-    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER_LOG_VIEW')
+    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER_LOG_VIEW'),
+    ('R_AGENT', 'P_CHAT_SESSION_METADATA_UPDATE')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 

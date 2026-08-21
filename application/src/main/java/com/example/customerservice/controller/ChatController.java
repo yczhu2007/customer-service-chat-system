@@ -350,6 +350,51 @@ public class ChatController {
                         currentUser.getUserId(), sessionId));
     }
 
+    /** 查看会话元数据。 */
+    @GetMapping("/sessions/{sessionId}/metadata")
+    public Result<ChatSessionMetadataVO> getSessionMetadata(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId
+    ) {
+        Set<String> roleCodes = currentUser.getRoleCodes();
+        String actorId = currentUser.getUserId();
+        if (roleCodes != null && roleCodes.contains("ADMIN")) {
+            currentUser.requireRole("ADMIN");
+            currentUser.requirePermission("chat:session:audit:view");
+            return Result.success(
+                    chatSessionQueryService.getSessionMetadata(actorId, true, sessionId)
+            );
+        }
+        if (roleCodes != null
+                && (roleCodes.contains("USER") || roleCodes.contains("AGENT"))) {
+            currentUser.requirePermission("chat:session:view-own");
+            return Result.success(
+                    chatSessionQueryService.getSessionMetadata(actorId, false, sessionId)
+            );
+        }
+        throw new IllegalArgumentException("只有普通用户、客服或管理员可以查看会话元数据");
+    }
+
+    /** 客服更新自己参与会话的元数据。 */
+    @PutMapping("/sessions/{sessionId}/metadata")
+    public Result<ChatSessionMetadataVO> updateSessionMetadata(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId,
+            @Valid @RequestBody ChatSessionMetadataUpdateDTO request
+    ) {
+        Set<String> roleCodes = currentUser.getRoleCodes();
+        if (roleCodes != null && roleCodes.contains("ADMIN")) {
+            throw new IllegalArgumentException("管理员不能更新会话元数据");
+        }
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:metadata:update");
+        return Result.success(
+                chatSessionQueryService.updateSessionMetadata(
+                        currentUser.getUserId(),
+                        sessionId,
+                        request
+                )
+        );
+    }
+
     /** 查询当前排队状态（在线客服数、队列大小、我的位置、预估等待时间）。 */
     @GetMapping("/queue-status")
     public Result<QueueStatusVO> getQueueStatus() {
