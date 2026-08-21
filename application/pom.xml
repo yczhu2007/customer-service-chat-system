@@ -50,9 +50,6 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <!-- 让@TempDir位于项目target中，测试结束后由JUnit自动清理。
-                         另外JDK 21+默认禁止self-attach，Mockito inline mock maker需要打开，否则报
-                         "Could not self-attach to current VM"。 -->
                     <argLine>-Djava.io.tmpdir=${project.build.directory} --enable-final-field-mutation=ALL-UNNAMED -Djdk.attach.allowAttachSelf=true</argLine>
                 </configuration>
             </plugin>
@@ -66,5 +63,65 @@
             </plugin>
         </plugins>
     </build>
+
+    <!-- activate with: mvn package -P frontend -->
+    <profiles>
+        <profile>
+            <id>frontend</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>com.github.eirslett</groupId>
+                        <artifactId>frontend-maven-plugin</artifactId>
+                        <version>1.15.1</version>
+                        <configuration>
+                            <workingDirectory>${project.parent.basedir}/frontend</workingDirectory>
+                            <nodeVersion>v24.19.0</nodeVersion>
+                            <npmVersion>11.17.0</npmVersion>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>install-node-and-npm</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>install-node-and-npm</goal></goals>
+                            </execution>
+                            <execution>
+                                <id>npm-ci</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>npm</goal></goals>
+                                <configuration><arguments>ci</arguments></configuration>
+                            </execution>
+                            <execution>
+                                <id>npm-build</id>
+                                <phase>generate-resources</phase>
+                                <goals><goal>npm</goal></goals>
+                                <configuration><arguments>run build</arguments></configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-resources-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>copy-frontend</id>
+                                <phase>prepare-package</phase>
+                                <goals><goal>copy-resources</goal></goals>
+                                <configuration>
+                                    <outputDirectory>${project.build.outputDirectory}/static/frontend</outputDirectory>
+                                    <resources>
+                                        <resource>
+                                            <directory>${project.parent.basedir}/frontend/dist</directory>
+                                            <filtering>false</filtering>
+                                        </resource>
+                                    </resources>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

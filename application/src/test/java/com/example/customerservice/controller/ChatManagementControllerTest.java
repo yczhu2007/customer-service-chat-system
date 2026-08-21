@@ -77,8 +77,6 @@ class ChatManagementControllerTest {
 
     @Test
     void invalidViewCodeIsRejectedBeforeServiceCall() {
-        when(currentUser.getUserId()).thenReturn("A001");
-
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
                 () -> controller.findAgentViewSessions("queue_all", 1, 20)

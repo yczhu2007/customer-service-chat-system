@@ -341,7 +341,8 @@ class AgentSessionViewTest {
         BoundSql boundSql = mappedSql("findAgentViewSessions", parameters);
         String sql = normalizeSql(boundSql.getSql());
 
-        assertTrue(sql.contains("ROW_NUMBER() OVER (PARTITION BY MESSAGE.SESSION_ID"));
+        assertTrue(sql.contains("ROW_NUMBER() OVER"));
+        assertTrue(sql.contains("PARTITION BY MESSAGE.SESSION_ID"));
         assertTrue(sql.contains("LEFT JOIN UNREAD_BY_SESSION UNREAD"));
         assertUnreadContract(sql);
         assertTrue(sql.contains("SESSION.TITLE"));

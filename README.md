@@ -234,6 +234,44 @@ $env:RUN_REAL_INTEGRATION_TESTS='true'
 
 集成测试需要的环境变量：`DB_PASSWORD`、`ADMIN_BOOTSTRAP_PASSWORD`、`RUN_REAL_INTEGRATION_TESTS=true`。
 
+## Vue 前端
+
+### 开发模式
+
+```bash
+cd frontend
+npm install
+npm run dev    # http://localhost:5173（自动代理 /chat、/ws/chat 等到 localhost:8080）
+```
+
+启动后端：
+```powershell
+.\mvnw.cmd -pl application -am spring-boot:run
+```
+
+### 生产打包
+
+Maven 在 `generate-resources` 阶段自动执行 `npm ci` + `npm run build`，并将 `frontend/dist` 复制到 JAR 的 `static/frontend/` 目录。
+
+```powershell
+.\mvnw.cmd -pl application -am clean package -DskipTests
+java -jar application/target/*.jar
+```
+
+### 路由
+
+| 路径 | 说明 |
+|---|---|
+| `/user` | 用户工作台（排队、聊天、评价） |
+| `/agent` | 客服工作台（五视图、元数据、归档、转接、快捷回复） |
+| `/admin` | 管理员工作台（仪表盘、用户/角色管理、会话审计、归档统计、死信） |
+| `/login` | 登录页 |
+| `/stomp-test.html` | 旧功能验证页（保留至 Vue 回归测试通过） |
+
+### 前端技术栈
+
+Vue 3 + Vite + Vue Router + Pinia + `@stomp/stompjs`
+
 ## 前端测试页面
 
 `/stomp-test.html` 是一个单页应用，用于功能验证：
