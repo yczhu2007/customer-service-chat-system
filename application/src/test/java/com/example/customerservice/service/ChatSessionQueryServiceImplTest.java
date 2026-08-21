@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -81,6 +82,25 @@ class ChatSessionQueryServiceImplTest {
         );
 
         verifyNoInteractions(sessionMapper, messageReadMapper);
+    }
+
+    @Test
+    void legacyConstructorThrowsControlledExceptionForMetadataTagAccess() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setUserId("U001");
+        session.setAgentId("A001");
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+
+        IllegalStateException exception = assertThrows(
+                IllegalStateException.class,
+                () -> service.getSessionMetadata("U001", false, "S001")
+        );
+
+        assertEquals(
+                "Metadata operations require the ChatSessionTagMapper dependency",
+                exception.getMessage()
+        );
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

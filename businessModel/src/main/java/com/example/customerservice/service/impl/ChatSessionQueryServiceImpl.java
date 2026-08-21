@@ -185,7 +185,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             throw new IllegalArgumentException("无权查看该会话元数据");
         }
 
-        List<String> tags = tagMapper.selectBySessionId(sessionId).stream()
+        List<String> tags = requireTagMapper().selectBySessionId(sessionId).stream()
                 .map(ChatSessionTag::getTag)
                 .toList();
         return toMetadataVO(session, tags);
@@ -215,16 +215,26 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             throw new BusinessStateException("会话元数据更新失败");
         }
 
-        tagMapper.deleteBySessionId(sessionId);
+        ChatSessionTagMapper requiredTagMapper = requireTagMapper();
+        requiredTagMapper.deleteBySessionId(sessionId);
         for (String value : normalizedTags) {
             ChatSessionTag tag = new ChatSessionTag();
             tag.setSessionId(sessionId);
             tag.setTag(value);
-            if (tagMapper.insert(tag) != 1) {
+            if (requiredTagMapper.insert(tag) != 1) {
                 throw new BusinessStateException("会话标签更新失败");
             }
         }
         return toMetadataVO(session, normalizedTags);
+    }
+
+    private ChatSessionTagMapper requireTagMapper() {
+        if (tagMapper == null) {
+            throw new IllegalStateException(
+                    "Metadata operations require the ChatSessionTagMapper dependency"
+            );
+        }
+        return tagMapper;
     }
 
     private ChatSession requireSession(String sessionId) {
