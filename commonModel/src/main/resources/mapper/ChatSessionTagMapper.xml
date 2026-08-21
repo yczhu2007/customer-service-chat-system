@@ -27,4 +27,14 @@
         ORDER BY create_time ASC, tag ASC
     </select>
 
+    <select id="selectBySessionIds" resultMap="ChatSessionTagResultMap">
+        SELECT session_id, tag, create_time
+        FROM chat_session_tag
+        WHERE session_id IN
+        <foreach collection="sessionIds" item="sessionId" open="(" separator="," close=")">
+            #{sessionId}
+        </foreach>
+        ORDER BY session_id ASC, create_time ASC, tag ASC
+    </select>
+
 </mapper>

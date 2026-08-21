@@ -14,4 +14,6 @@ public interface ChatSessionTagMapper {
     int deleteBySessionId(@Param("sessionId") String sessionId);
 
     List<ChatSessionTag> selectBySessionId(@Param("sessionId") String sessionId);
+
+    List<ChatSessionTag> selectBySessionIds(@Param("sessionIds") List<String> sessionIds);
 }

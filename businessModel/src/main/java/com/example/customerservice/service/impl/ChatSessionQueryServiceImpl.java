@@ -27,6 +27,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -375,6 +376,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                 .toList();
 
         Map<String, Long> unreadCounts = loadUnreadCounts(sessionIds, participantId);
+        Map<String, List<String>> tagsBySessionId = loadSessionTags(sessionIds);
 
         List<ChatSessionListItemVO> records = page.getRecords().stream()
                 .map(s -> {
@@ -388,6 +390,11 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     vo.setArchiveStatus(s.getArchiveStatus());
                     vo.setArchiveRemark(s.getArchiveRemark());
                     vo.setArchivedAt(s.getArchivedAt());
+                    vo.setTitle(s.getTitle());
+                    vo.setPriority(s.getPriority());
+                    vo.setCategory(s.getCategory());
+                    vo.setMetadataUpdatedAt(s.getMetadataUpdatedAt());
+                    vo.setTags(tagsBySessionId.getOrDefault(s.getId(), List.of()));
                     vo.setUnreadCount(unreadCounts.getOrDefault(s.getId(), 0L));
                     return vo;
                 })
@@ -516,5 +523,26 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             log.warn("批量查询未读消息数失败，将返回全零结果，userId={}", userId, e);
             return Collections.emptyMap();
         }
+    }
+
+    private Map<String, List<String>> loadSessionTags(List<String> sessionIds) {
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        List<ChatSessionTag> tags = requireTagMapper().selectBySessionIds(sessionIds);
+        if (tags == null || tags.isEmpty()) {
+            return Collections.emptyMap();
+        }
+
+        Map<String, List<String>> result = new HashMap<>();
+        for (ChatSessionTag tag : tags) {
+            if (tag.getSessionId() == null || tag.getTag() == null) {
+                continue;
+            }
+            result.computeIfAbsent(tag.getSessionId(), ignored -> new ArrayList<>())
+                    .add(tag.getTag());
+        }
+        return result;
     }
 }
