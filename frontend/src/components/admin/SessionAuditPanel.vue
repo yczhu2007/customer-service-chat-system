@@ -21,7 +21,6 @@ const filters = ref({
 })
 
 const statusOptions = ['', 'ACTIVE', 'CLOSED', 'PENDING']
-const archiveStatusOptions = ['', 'COMPLETED', 'PENDING', 'ON_HOLD', 'OTHER', 'UNARCHIVED']
 
 async function loadSessions() {
   loading.value = true
@@ -33,7 +32,6 @@ async function loadSessions() {
     if (filters.value.userId) qs.set('userId', filters.value.userId)
     if (filters.value.agentId) qs.set('agentId', filters.value.agentId)
     if (filters.value.status) qs.set('status', filters.value.status)
-    if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
     if (filters.value.rating) qs.set('rating', filters.value.rating)
     if (filters.value.from) qs.set('from', filters.value.from)
     if (filters.value.to) qs.set('to', filters.value.to)
@@ -84,9 +82,6 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       <select v-model="filters.status">
         <option v-for="s in statusOptions" :key="s" :value="s">{{ s || '全部状态' }}</option>
       </select>
-      <select v-model="filters.archiveStatus">
-        <option v-for="s in archiveStatusOptions" :key="s" :value="s">{{ s || '全部归档状态' }}</option>
-      </select>
       <input v-model="filters.rating" placeholder="评分 (1-5)" type="number" min="1" max="5" style="width:80px" />
       <input v-model="filters.from" type="datetime-local" title="开始时间" />
       <input v-model="filters.to" type="datetime-local" title="结束时间" />
@@ -104,10 +99,9 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <th>用户 ID</th>
             <th>客服 ID</th>
             <th>状态</th>
-            <th>归档状态</th>
             <th>评分</th>
             <th>创建时间</th>
-            <th>更新时间</th>
+            <th>结束时间</th>
           </tr>
         </thead>
         <tbody>
@@ -116,13 +110,12 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <td class="mono">{{ s.userId }}</td>
             <td class="mono">{{ s.agentId || '-' }}</td>
             <td>{{ s.status }}</td>
-            <td>{{ s.archiveStatus || '-' }}</td>
             <td :title="s.rating + '/5'">{{ ratingStars(s.rating) }}</td>
-            <td>{{ formatDate(s.createdAt) }}</td>
-            <td>{{ formatDate(s.updatedAt) }}</td>
+            <td>{{ formatDate(s.createTime) }}</td>
+            <td>{{ formatDate(s.endTime) }}</td>
           </tr>
           <tr v-if="sessions.length === 0">
-            <td colspan="8" class="empty">暂无数据</td>
+            <td colspan="7" class="empty">暂无数据</td>
           </tr>
         </tbody>
       </table>

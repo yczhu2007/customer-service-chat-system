@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
 
 // ─── Mock API modules ───
-vi.mock('../../api/chat-api', () => ({
+vi.mock('../api/chat-api', () => ({
   listSessions: vi.fn(() => Promise.resolve({ data: { records: [] } })),
   listAgentViews: vi.fn(() =>
     Promise.resolve({
@@ -98,7 +98,7 @@ vi.mock('../../api/chat-api', () => ({
   fetchAttachmentBlob: vi.fn(() => Promise.resolve('blob:test')),
 }))
 
-vi.mock('../../services/stomp-client', () => ({
+vi.mock('../services/stomp-client', () => ({
   createStompClient: vi.fn(() => ({
     connect: vi.fn(),
     disconnect: vi.fn(),
@@ -108,8 +108,8 @@ vi.mock('../../services/stomp-client', () => ({
 }))
 
 // ─── Import after mocks ───
-import { useChatStore } from '../../stores/chat'
-import { useAuthStore } from '../../stores/auth'
+import { useChatStore } from '../stores/chat'
+import { useAuthStore } from '../stores/auth'
 import {
   listAgentViews,
   listAgentViewSessions,
@@ -121,7 +121,7 @@ import {
   createQuickReply,
   deleteQuickReply,
   agentOnline,
-} from '../../api/chat-api'
+} from '../api/chat-api'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -143,7 +143,7 @@ describe('Chat Store - Agent Workspace', () => {
   it('loads sessions for a specific agent view', async () => {
     const chat = useChatStore()
     await chat.loadAgentViewSessions('MY_ACTIVE')
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE')
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', {})
     expect(chat.sessions).toHaveLength(2)
     expect(chat.sessions[0].sessionId).toBe('s1')
   })
@@ -152,7 +152,7 @@ describe('Chat Store - Agent Workspace', () => {
     const chat = useChatStore()
     await chat.switchAgentView('MY_UNREAD')
     expect(chat.activeAgentView).toBe('MY_UNREAD')
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_UNREAD')
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_UNREAD', {})
   })
 
   it('loads session metadata', async () => {
@@ -187,7 +187,7 @@ describe('Chat Store - Agent Workspace', () => {
     await chat.updateArchiveStatus('s1', { archiveStatus: 'COMPLETED' })
     expect(setArchiveStatus).toHaveBeenCalledWith('s1', { archiveStatus: 'COMPLETED' })
     // Should reload sessions after archive
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE')
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', {})
   })
 
   it('loads user profile', async () => {

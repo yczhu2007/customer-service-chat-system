@@ -1,10 +1,14 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
 
 const chat = useChatStore()
+const props = defineProps({
+  quickReplyContent: { type: String, default: '' },
+})
+const emit = defineEmits(['quick-reply-inserted'])
 const session = computed(() => chat.activeSession)
 const isClosed = computed(() => session.value?.status === 'CLOSED')
 const canSend = computed(() => session.value && !isClosed.value && chat.connected)
@@ -74,11 +78,11 @@ async function endSession() {
 const composerRef = ref(null)
 const insertText = ref('')
 
-function onQuickReplyInsert(content) {
+watch(() => props.quickReplyContent, (content) => {
+  if (!content) return
   insertText.value = content
-}
-
-/** Expose insertText to MessageComposer via prop or event */
+  emit('quick-reply-inserted')
+})
 </script>
 
 <template>

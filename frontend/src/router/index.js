@@ -13,7 +13,7 @@ const routes = [
   { path: '/', redirect: '/login' },
 ]
 
-const router = createRouter({ history: createWebHistory(), routes })
+const router = createRouter({ history: createWebHistory(import.meta.env.BASE_URL), routes })
 router.beforeEach((to) => {
   const auth = useAuthStore()
   if (to.path === '/login') return auth.isAuthenticated ? `/${auth.homeRole.toLowerCase()}` : true

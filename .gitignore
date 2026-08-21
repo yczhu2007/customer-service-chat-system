@@ -38,3 +38,5 @@ target-runtime-test/
 data/
 # Local implementation worktrees
 .worktrees/
+frontend/node/
+frontend/.npm-cache/

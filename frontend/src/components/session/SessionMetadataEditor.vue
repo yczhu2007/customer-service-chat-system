@@ -37,14 +37,14 @@ watch(
   { immediate: true }
 )
 
-/** Parse comma-separated tags, normalize, deduplicate, limit to 10 */
+/** Parse comma-separated tags and normalize/deduplicate them. */
 function parseTags() {
   return [...new Set(
     tagsInput.value
       .split(',')
       .map((t) => t.trim().toLowerCase())
       .filter(Boolean)
-  )].slice(0, 10)
+  )]
 }
 
 async function save() {

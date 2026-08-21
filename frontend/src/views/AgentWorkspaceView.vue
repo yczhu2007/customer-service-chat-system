@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import { agentOnline, agentOffline } from '../api/chat-api'
@@ -13,6 +13,7 @@ import QuickReplyPanel from '../components/agent/QuickReplyPanel.vue'
 
 const chat = useChatStore()
 const auth = useAuthStore()
+const pendingQuickReply = ref('')
 
 const QUICK_REPLY_LABELS = {
   MY_ACTIVE: '处理中',
@@ -49,8 +50,7 @@ async function goOffline() {
 
 /** Handle quick reply insert into composer */
 function onQuickReplyInsert(content) {
-  // This will be passed to AgentChatWindow via the insertText mechanism
-  chat._pendingInsertText = content
+  pendingQuickReply.value = content
 }
 
 onMounted(async () => {
@@ -98,7 +98,10 @@ onUnmounted(() => {
 
       <!-- Center: chat window -->
       <main class="chat-area">
-        <AgentChatWindow />
+        <AgentChatWindow
+          :quick-reply-content="pendingQuickReply"
+          @quick-reply-inserted="pendingQuickReply = ''"
+        />
       </main>
 
       <!-- Right sidebar: metadata + user profile -->

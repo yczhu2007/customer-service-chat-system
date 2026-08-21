@@ -1,27 +1,19 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { listUsers, listRoles, findArchiveStats } from '../../api/admin-api'
+import { findAdminDashboard } from '../../api/admin-api'
 
 const emit = defineEmits(['navigate'])
 
 const loading = ref(true)
 const error = ref(null)
-const totalUsers = ref(0)
-const totalRoles = ref(0)
-const archiveStats = ref(null)
+const dashboard = ref(null)
 
 async function loadDashboard() {
   loading.value = true
   error.value = null
   try {
-    const [usersRes, rolesRes, statsRes] = await Promise.all([
-      listUsers({ pageNo: 1, pageSize: 1 }),
-      listRoles({ pageNo: 1, pageSize: 1 }),
-      findArchiveStats(),
-    ])
-    totalUsers.value = usersRes.data?.total ?? 0
-    totalRoles.value = rolesRes.data?.total ?? 0
-    archiveStats.value = statsRes.data
+    const dashboardRes = await findAdminDashboard()
+    dashboard.value = dashboardRes.data
   } catch (e) {
     error.value = e.message
   } finally {
@@ -49,16 +41,20 @@ const quickLinks = [
     <template v-else>
       <div class="summary-cards">
         <div class="card">
-          <div class="card-value">{{ totalUsers }}</div>
-          <div class="card-label">总用户数</div>
+          <div class="card-value">{{ dashboard?.onlineAgentCount ?? 0 }}</div>
+          <div class="card-label">在线客服</div>
         </div>
         <div class="card">
-          <div class="card-value">{{ totalRoles }}</div>
-          <div class="card-label">总角色数</div>
+          <div class="card-value">{{ dashboard?.totalQueueSize ?? 0 }}</div>
+          <div class="card-label">当前排队数</div>
         </div>
-        <div class="card" v-if="archiveStats">
-          <div class="card-value">{{ archiveStats.total ?? 0 }}</div>
-          <div class="card-label">已结束会话</div>
+        <div class="card">
+          <div class="card-value">{{ dashboard?.todaySessionCount ?? 0 }}</div>
+          <div class="card-label">今日会话数</div>
+        </div>
+        <div class="card">
+          <div class="card-value">{{ dashboard?.todayMessageCount ?? 0 }}</div>
+          <div class="card-label">今日消息数</div>
         </div>
       </div>
 

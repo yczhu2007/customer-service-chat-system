@@ -103,6 +103,10 @@ export function replayDeadLetter(messageId) {
 
 // ─── Archive Statistics ─────────────────────────────────────
 
+export function findAdminDashboard() {
+  return request('/chat/admin/dashboard')
+}
+
 export function findArchiveStats() {
   return request('/chat/admin/archive-stats')
 }

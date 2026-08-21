@@ -169,6 +169,12 @@ public class ShiroConfig {
                 "anon"
         );
 
+        /* Vue 构建产物只包含页面、脚本和样式；业务接口仍由后续规则保护。 */
+        filterChain.put(
+                "/frontend/**",
+                "anon"
+        );
+
 
         /*
          * Spring错误处理地址允许匿名访问。

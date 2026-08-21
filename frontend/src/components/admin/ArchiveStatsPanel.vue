@@ -28,6 +28,8 @@ const statusCards = [
   { key: 'other', label: '其他 (OTHER)', color: '#8b5cf6', icon: '📋' },
   { key: 'unarchived', label: '未归档', color: '#94a3b8', icon: '📭' },
 ]
+
+const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.key] ?? 0), 0)
 </script>
 
 <template>
@@ -43,7 +45,7 @@ const statusCards = [
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else-if="stats">
       <div class="total-card">
-        <div class="total-value">{{ stats.total ?? 0 }}</div>
+        <div class="total-value">{{ total() }}</div>
         <div class="total-label">已结束会话总数</div>
       </div>
 
