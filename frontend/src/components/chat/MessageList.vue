@@ -30,14 +30,19 @@ function formatTime(ts) {
   return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
 
+function formatFileSize(size) {
+  if (!Number.isFinite(size)) return ''
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
 /** Fetch blob URL for IMAGE/FILE messages */
 async function loadBlob(msg) {
   if (!msg.id) return
   if (blobCache.value[msg.id]) return
-  // Content contains the attachment ID for IMAGE/FILE types
   try {
-    const url = await fetchAttachmentBlob(msg.content)
-    blobCache.value[msg.id] = url
+    blobCache.value[msg.id] = await fetchAttachmentBlob(msg.content)
   } catch {
     blobCache.value[msg.id] = null
   }
@@ -54,7 +59,13 @@ function scrollToBottom() {
 
 watch(
   () => chat.messages.length,
-  () => scrollToBottom()
+  () => {
+    scrollToBottom()
+    chat.messages
+      .filter((msg) => (msg.type === 'IMAGE' || msg.type === 'FILE') && !msg.recalled)
+      .forEach((msg) => loadBlob(msg))
+  },
+  { immediate: true }
 )
 
 onMounted(() => scrollToBottom())
@@ -62,6 +73,14 @@ onMounted(() => scrollToBottom())
 
 <template>
   <div ref="listEl" class="message-list" role="log" aria-live="polite">
+    <button
+      v-if="chat.activeSessionId === props.sessionId && chat.historyHasMore"
+      class="load-more-btn"
+      :disabled="chat.historyLoadingMore"
+      @click="chat.loadMoreHistory(props.sessionId)"
+    >
+      {{ chat.historyLoadingMore ? '加载中…' : '加载更早消息' }}
+    </button>
     <div v-if="chat.messagesLoading" class="loading-hint">加载历史消息中…</div>
     <template v-for="msg in chat.messages" :key="msg.clientMsgId || msg.id">
       <!-- System messages -->
@@ -78,11 +97,23 @@ onMounted(() => scrollToBottom())
           <span class="time">{{ formatTime(msg.createTime) }}</span>
           <span v-if="msg.edited" class="edited-tag">(已编辑)</span>
           <span v-if="msg.recalled" class="recalled-tag">(已撤回)</span>
+          <span v-if="msg.ackStatus === 'STORED'" class="message-state">已保存</span>
+          <span v-else-if="msg.ackStatus === 'DELIVERED'" class="message-state">已送达</span>
+        </div>
+
+        <div v-if="chat.editingMessageId === msg.id" class="edit-area">
+          <input v-model="chat.editingContent" class="edit-input" @keyup.enter="chat.editMessage(msg.id)" />
+          <button class="message-action" @click="chat.editMessage(msg.id)">保存</button>
+          <button class="message-action" @click="chat.cancelEditing">取消</button>
         </div>
 
         <!-- TEXT message -->
-        <div v-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
+        <div v-else-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
           <span>{{ msg.content }}</span>
+          <div v-if="isMine(msg)" class="message-actions">
+            <button class="message-action" @click="chat.startEditing(msg)">编辑</button>
+            <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
+          </div>
         </div>
 
         <!-- IMAGE message -->
@@ -93,7 +124,7 @@ onMounted(() => scrollToBottom())
           <template v-else>
             <img
               v-if="blobCache[msg.id]"
-              :src="blobCache[msg.id]"
+              :src="blobCache[msg.id].url"
               alt="图片消息"
               class="msg-image"
             />
@@ -110,14 +141,15 @@ onMounted(() => scrollToBottom())
           <template v-else>
             <a
               v-if="blobCache[msg.id]"
-              :href="blobCache[msg.id]"
-              :download="msg.content"
+              :href="blobCache[msg.id].url"
+              :download="blobCache[msg.id].name"
               class="file-link"
             >
-              附件：{{ msg.content }}
+              <strong>{{ blobCache[msg.id].name }}</strong>
+              <span class="file-info">{{ blobCache[msg.id].type || '文件' }} · {{ formatFileSize(blobCache[msg.id].size) }}</span>
             </a>
             <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
-            <button v-else class="load-btn" @click="loadBlob(msg)">下载文件</button>
+            <span v-else class="load-error">文件加载中…</span>
           </template>
         </div>
 
@@ -207,7 +239,19 @@ onMounted(() => scrollToBottom())
 .file-link {
   color: inherit;
   text-decoration: underline;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
 }
+.load-more-btn { align-self: center; padding: 0.35rem 0.75rem; border: 1px solid #d1d5db; border-radius: 999px; background: white; color: #374151; cursor: pointer; font-size: 0.75rem; }
+.load-more-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.message-actions { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
+.message-action { border: 0; padding: 0; background: transparent; color: inherit; font-size: 0.7rem; cursor: pointer; opacity: 0.7; }
+.message-action:hover { opacity: 1; text-decoration: underline; }
+.edit-area { display: flex; gap: 0.35rem; align-items: center; }
+.edit-input { min-width: 180px; padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; }
+.message-state { font-size: 0.7rem; color: #6b7280; }
+.file-info { font-size: 0.75rem; opacity: 0.75; }
 .mine .file-link {
   color: #dbeafe;
 }

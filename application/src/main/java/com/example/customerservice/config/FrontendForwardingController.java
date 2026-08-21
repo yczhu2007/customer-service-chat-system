@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class FrontendForwardingController {
 
-    @GetMapping({"/frontend", "/frontend/", "/frontend/user", "/frontend/user/**", "/user", "/user/**"})
+    @GetMapping({"/frontend", "/frontend/", "/frontend/login", "/frontend/user", "/frontend/user/**", "/user", "/user/**"})
     public String userWorkspace() {
         return "forward:/frontend/index.html";
     }

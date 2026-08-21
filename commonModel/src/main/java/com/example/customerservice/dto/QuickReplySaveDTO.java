@@ -9,7 +9,6 @@ import java.io.Serializable;
 
 public class QuickReplySaveDTO implements Serializable {
     private static final long serialVersionUID = 1L;
-    @NotBlank(message = "快捷回复标题不能为空")
     @Size(max = 50, message = "快捷回复标题不能超过50个字符")
     private String title;
     @NotBlank(message = "快捷回复内容不能为空")

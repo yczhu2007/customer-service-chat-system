@@ -48,6 +48,10 @@ async function submit() {
       </label>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
       <button class="login-submit" :disabled="submitting">{{ submitting ? '登录中…' : '进入工作台' }}</button>
+      <div class="login-links">
+        <RouterLink to="/register">注册普通用户</RouterLink>
+        <RouterLink to="/forgot-password">忘记密码</RouterLink>
+      </div>
     </form>
   </section>
 </template>

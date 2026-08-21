@@ -12,6 +12,9 @@ import {
   updateSessionMetadata,
   setArchiveStatus,
   getUserProfile,
+  findAgentDashboard,
+  findAgentRatingSummary,
+  findTransferLogs,
 } from '../api/chat-api'
 import { createStompClient } from '../services/stomp-client'
 
@@ -29,6 +32,12 @@ export const useChatStore = defineStore('chat', {
     unreadCounts: {},
     /** Whether STOMP is connected */
     connected: false,
+    connectionState: 'disconnected',
+    connectionError: null,
+    connectionLogs: [],
+    reconnectAttempts: 0,
+    lastActivityAt: null,
+    manualDisconnect: false,
     /** STOMP client instance (internal) */
     _stomp: null,
     /** Dedup set for client message IDs already rendered */
@@ -37,6 +46,10 @@ export const useChatStore = defineStore('chat', {
     sessionsLoading: false,
     /** Loading state for messages */
     messagesLoading: false,
+    /** Cursor state for loading earlier messages */
+    historyCursor: null,
+    historyHasMore: false,
+    historyLoadingMore: false,
     /** Error message */
     error: null,
     // ─── Agent workspace state ───
@@ -50,6 +63,12 @@ export const useChatStore = defineStore('chat', {
     activeUserProfile: null,
     /** Agent online status */
     agentOnline: false,
+    agentDashboard: null,
+    agentRatingSummary: null,
+    transferLogs: [],
+    /** Message currently being edited */
+    editingMessageId: null,
+    editingContent: '',
   }),
 
   getters: {
@@ -65,7 +84,31 @@ export const useChatStore = defineStore('chat', {
     },
   },
 
-  actions: {
+    actions: {
+    logConnection(message) {
+      this.connectionLogs = [...this.connectionLogs.slice(-19), { message, time: new Date().toISOString() }]
+      this.lastActivityAt = new Date().toISOString()
+    },
+
+    handleConnectionError(message) {
+      this.connectionState = 'error'
+      this.connectionError = message || 'WebSocket 连接失败'
+      this.logConnection(this.connectionError)
+    },
+
+    reconnectStomp() {
+      if (this.reconnectAttempts >= 5) {
+        this.connectionError = '自动重连次数已达上限，请手动重连'
+        return
+      }
+      this.disconnectStomp(false)
+      this.reconnectAttempts += 1
+      const delay = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 10000)
+      this.connectionState = 'reconnecting'
+      this.logConnection(`正在进行第 ${this.reconnectAttempts} 次重连`)
+      this._reconnectTimer = setTimeout(() => this.connectStomp(), delay)
+    },
+
     /**
      * Load sessions from REST.
      */
@@ -91,6 +134,11 @@ export const useChatStore = defineStore('chat', {
       this.activeSessionId = sessionId
       this.messages = []
       this._sentClientMsgIds.clear()
+      this.editingMessageId = null
+      this.editingContent = ''
+      this.historyCursor = null
+      this.historyHasMore = false
+      this.historyLoadingMore = false
       // Reset unread count
       if (this.unreadCounts[sessionId]) {
         this.unreadCounts[sessionId] = 0
@@ -119,6 +167,25 @@ export const useChatStore = defineStore('chat', {
         this.error = e.message
       } finally {
         this.messagesLoading = false
+      }
+    },
+
+    /** Load the next page of older messages for the active session. */
+    async loadMoreHistory(sessionId, pageSize = 50) {
+      if (sessionId !== this.activeSessionId || !this.historyHasMore || this.historyLoadingMore) return
+      if (!this.historyCursor) return
+      this.historyLoadingMore = true
+      this.error = null
+      try {
+        this._stomp.publish('/app/chat.history', {
+          sessionId,
+          beforeMessageId: this.historyCursor,
+          pageSize,
+        })
+      } catch (e) {
+        this.error = e.message
+      } finally {
+        this.historyLoadingMore = false
       }
     },
 
@@ -151,6 +218,35 @@ export const useChatStore = defineStore('chat', {
       })
     },
 
+    startEditing(message) {
+      const auth = useAuthStore()
+      if (!message || message.senderId !== auth.userId || message.type !== 'TEXT' || message.recalled) return
+      this.editingMessageId = message.id
+      this.editingContent = message.content || ''
+    },
+
+    cancelEditing() {
+      this.editingMessageId = null
+      this.editingContent = ''
+    },
+
+    editMessage(messageId, content = this.editingContent) {
+      const auth = useAuthStore()
+      const message = this.messages.find((item) => item.id === messageId)
+      const value = content.trim()
+      if (!message || message.senderId !== auth.userId || message.type !== 'TEXT' || !value) return
+      if (!this._stomp || !this.connected) { this.error = '未连接到服务器'; return }
+      this._stomp.publish('/app/chat.message.edit', { messageId, content: value })
+    },
+
+    recallMessage(messageId) {
+      const auth = useAuthStore()
+      const message = this.messages.find((item) => item.id === messageId)
+      if (!message || message.senderId !== auth.userId || message.recalled) return
+      if (!this._stomp || !this.connected) { this.error = '未连接到服务器'; return }
+      this._stomp.publish('/app/chat.message.recall', { messageId })
+    },
+
     /**
      * Start a consultation (USER only).
      */
@@ -160,6 +256,8 @@ export const useChatStore = defineStore('chat', {
         return
       }
       this._stomp.publish('/app/chat.start', {})
+      // The session-assigned event is asynchronous; refresh once as a fallback.
+      setTimeout(() => this.loadSessions(), 500)
     },
 
     /**
@@ -225,12 +323,41 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async loadAgentDashboard() {
+      try {
+        const [dashboardResult, ratingResult] = await Promise.all([
+          findAgentDashboard(),
+          findAgentRatingSummary(),
+        ])
+        this.agentDashboard = dashboardResult?.data || dashboardResult
+        this.agentRatingSummary = ratingResult?.data || ratingResult
+      } catch (e) {
+        this.error = e.message
+      }
+    },
+
+    async loadTransferLogs(sessionId) {
+      if (!sessionId) { this.transferLogs = []; return }
+      try {
+        const result = await findTransferLogs(sessionId)
+        this.transferLogs = result?.data || result || []
+      } catch (e) {
+        this.transferLogs = []
+        this.error = e.message
+      }
+    },
+
     /**
      * Connect STOMP and subscribe to user queues.
      */
     connectStomp() {
       const auth = useAuthStore()
       if (!auth.token) return
+      if (this.connected || this.connectionState === 'connecting') return
+      this.connectionState = 'connecting'
+      this.connectionError = null
+      this.manualDisconnect = false
+      this.logConnection('正在连接 WebSocket')
 
       // Acquire ws ticket, then connect
       fetch('/chat/ws-ticket', {
@@ -258,6 +385,9 @@ export const useChatStore = defineStore('chat', {
             connectHeaders: { Authorization: `Bearer ${auth.token}` },
             onConnect: () => {
               this.connected = true
+              this.connectionState = 'connected'
+              this.reconnectAttempts = 0
+              this.logConnection('WebSocket 已连接')
               // Subscribe to chat events
               stomp.subscribe('/user/queue/chat', (frame) => {
                 const body = JSON.parse(frame.body)
@@ -268,11 +398,28 @@ export const useChatStore = defineStore('chat', {
                 const body = JSON.parse(frame.body)
                 this._handleMessageEvent(body)
               })
+              stomp.subscribe('/user/queue/errors', (frame) => {
+                try {
+                  const body = JSON.parse(frame.body)
+                  this.handleConnectionError(body.message || body.error || '收到 WebSocket 错误')
+                } catch {
+                  this.handleConnectionError(frame.body || '收到 WebSocket 错误')
+                }
+              })
               // Pull offline messages on connect
               this.pullOfflineMessages()
             },
             onMessage: (frame) => {
               // fallback handler
+            },
+            onError: (message) => this.handleConnectionError(message),
+            onDisconnect: () => {
+              const wasManual = this.manualDisconnect
+              this.manualDisconnect = false
+              this.connected = false
+              this.connectionState = 'disconnected'
+              this.logConnection('WebSocket 已断开')
+              if (!wasManual) this.reconnectStomp()
             },
           })
 
@@ -283,22 +430,32 @@ export const useChatStore = defineStore('chat', {
           this._deactivateStomp = () => {
             stomp.disconnect()
             this.connected = false
+            this.connectionState = 'disconnected'
             this._stomp = null
           }
         })
         .catch((e) => {
           this.error = 'WebSocket连接失败: ' + e.message
+          this.handleConnectionError(this.error)
         })
     },
 
     /**
      * Disconnect STOMP.
      */
-    disconnectStomp() {
+    disconnectStomp(scheduleReconnect = true) {
+      if (this._reconnectTimer) {
+        clearTimeout(this._reconnectTimer)
+        this._reconnectTimer = null
+      }
       if (this._deactivateStomp) {
+        this.manualDisconnect = true
         this._deactivateStomp()
         this._deactivateStomp = null
       }
+      this.connectionState = 'disconnected'
+      this.connected = false
+      if (scheduleReconnect) this.logConnection('已手动断开 WebSocket')
     },
 
     // ─── Agent workspace actions ──────────────────────────────
@@ -425,6 +582,13 @@ export const useChatStore = defineStore('chat', {
           this.messages = [...incoming, ...this.messages]
           // Deduplicate by clientMsgId
           this._deduplicateMessages()
+          const auth = useAuthStore()
+          const latestReceived = [...incoming]
+            .reverse()
+            .find((message) => message?.id && message.senderId !== auth.userId)
+          if (latestReceived) this.markRead(body.sessionId, latestReceived.id)
+          this.historyCursor = body.nextCursor || null
+          this.historyHasMore = Boolean(body.hasMore && body.nextCursor)
         }
         return
       }
@@ -461,10 +625,15 @@ export const useChatStore = defineStore('chat', {
         return
       }
 
-      // SESSION_ASSIGNED, SESSION_ENDED, etc.
-      if (event === 'SESSION_ASSIGNED' || event === 'SESSION_ENDED') {
-        // Refresh sessions
-        this.loadSessions()
+      if (event === 'SESSION_CREATED' || event === 'SESSION_RECONNECTED' || event === 'SESSION_TRANSFERRED' || event === 'SESSION_ENDED' || event === 'SESSION_CLOSED') {
+        const auth = useAuthStore()
+        if (auth.role === 'AGENT') {
+          this.loadAgentViewCounts()
+          this.loadAgentViewSessions(this.activeAgentView)
+        } else {
+          this.loadSessions()
+          this.loadQueueStatus()
+        }
       }
     },
 
@@ -490,6 +659,7 @@ export const useChatStore = defineStore('chat', {
             editedAt: body.editedAt,
           }
         }
+        if (this.editingMessageId === body.messageId) this.cancelEditing()
         return
       }
 
@@ -503,6 +673,7 @@ export const useChatStore = defineStore('chat', {
             recalledAt: body.recalledAt,
           }
         }
+        if (this.editingMessageId === body.messageId) this.cancelEditing()
         return
       }
 

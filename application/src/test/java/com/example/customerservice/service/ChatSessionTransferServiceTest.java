@@ -31,6 +31,32 @@ class ChatSessionTransferServiceTest {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     @Test
+    void transferAcceptsTargetAgentsUsernameAndUsesItsInternalId() {
+        ChatRedisRepository redis = mock(ChatRedisRepository.class);
+        ChatSessionMapper sessions = mock(ChatSessionMapper.class);
+        ChatSessionTransferLogMapper logs = mock(ChatSessionTransferLogMapper.class);
+        SysUserMapper users = mock(SysUserMapper.class);
+        SysUserRoleMapper roles = mock(SysUserRoleMapper.class);
+        TransactionTemplate transactions = mock(TransactionTemplate.class);
+        ChatSession session = new ChatSession(); session.setId("S001"); session.setUserId("U001"); session.setAgentId("A001"); session.setStatus(ChatConstants.SESSION_STATUS_ACTIVE);
+        SysUser target = new SysUser(); target.setId("A002"); target.setUsername("agent002");
+        when(redis.acquireSessionOperationLock("S001")).thenReturn("LOCK");
+        when(sessions.selectById("S001")).thenReturn(session);
+        when(users.findByUsername("agent002")).thenReturn(target);
+        when(roles.findRoleCodesByUserId("A002")).thenReturn(Set.of("AGENT"));
+        when(redis.execute(any(RedisScript.class), anyList(), any(Object[].class))).thenReturn(1L);
+        when(sessions.transferSession("S001", "A001", "A002")).thenReturn(1);
+        when(logs.insert(any(ChatSessionTransferLog.class))).thenReturn(1);
+        when(transactions.execute(any())).thenAnswer(invocation -> ((TransactionCallback<Integer>) invocation.getArgument(0)).doInTransaction(mock(TransactionStatus.class)));
+
+        new ChatSessionTransferService(redis, sessions, logs, users, roles, mock(SimpMessagingTemplate.class), transactions, 5)
+                .transferSession("S001", "A001", "agent002");
+
+        verify(sessions).transferSession("S001", "A001", "A002");
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    @Test
     void successfulTransferUpdatesOwnershipAndPersistsAuditLogInTransaction() {
         ChatRedisRepository redisRepository = mock(ChatRedisRepository.class);
         ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);

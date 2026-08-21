@@ -37,6 +37,10 @@ function truncate(text, max = 30) {
   return text.length > max ? text.slice(0, max) + '…' : text
 }
 
+function preview(content) {
+  return content?.startsWith('/chat/attachments/') ? '附件消息' : content
+}
+
 /** Select a session */
 function selectSession(sessionId) {
   chat.selectSession(sessionId)
@@ -104,7 +108,7 @@ onMounted(() => {
           <span class="time">{{ formatTime(session.lastMessageTime || session.createTime) }}</span>
         </div>
         <div class="item-body">
-          <span class="last-msg">{{ truncate(session.lastMessageContent) || '暂无消息' }}</span>
+          <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || '暂无消息' }}</span>
           <span class="status-badge" :class="statusClass(session.status)">
             {{ statusLabel(session.status) }}
           </span>
@@ -128,6 +132,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: white;
   border-right: 1px solid #e5e7eb;
 }

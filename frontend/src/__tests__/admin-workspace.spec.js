@@ -148,3 +148,39 @@ describe('DeadLetterPanel', () => {
     expect(wrapper.text()).toContain('msg-001')
   })
 })
+
+describe('RoleManagementPanel', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('renders roleCode and roleName returned by the role API', async () => {
+    const { listRoles } = await import('../api/admin-api')
+    listRoles.mockResolvedValueOnce({
+      data: { records: [{ id: 'role-agent', roleCode: 'AGENT', roleName: '客服' }], total: 1 },
+    })
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('AGENT')
+    expect(wrapper.text()).toContain('客服')
+  })
+
+  it('renders permissionCode and permissionName returned by the permission API', async () => {
+    const { listPermissions } = await import('../api/admin-api')
+    listPermissions.mockResolvedValueOnce({
+      data: { records: [{ id: 'perm-chat', permissionCode: 'chat:read', permissionName: '查看会话' }], total: 1 },
+    })
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('chat:read')
+    expect(wrapper.text()).toContain('查看会话')
+  })
+})

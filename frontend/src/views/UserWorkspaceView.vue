@@ -5,6 +5,7 @@ import { useAuthStore } from '../stores/auth'
 import ChatWindow from '../components/chat/ChatWindow.vue'
 import UserSessionList from '../components/session/UserSessionList.vue'
 import SessionRatingForm from '../components/session/SessionRatingForm.vue'
+import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -39,6 +40,10 @@ onMounted(() => {
   chat.loadQueueStatus()
   // Load sessions
   chat.loadSessions()
+  // Assignment can happen after the initial page load when an agent comes online.
+  chat._sessionTimer = setInterval(() => {
+    chat.loadSessions()
+  }, 5000)
   // Refresh queue status periodically
   chat._queueTimer = setInterval(() => {
     chat.loadQueueStatus()
@@ -50,6 +55,10 @@ onUnmounted(() => {
   if (chat._queueTimer) {
     clearInterval(chat._queueTimer)
     chat._queueTimer = null
+  }
+  if (chat._sessionTimer) {
+    clearInterval(chat._sessionTimer)
+    chat._sessionTimer = null
   }
 })
 </script>
@@ -86,6 +95,7 @@ onUnmounted(() => {
           <button class="refresh-queue-btn" @click="refreshQueue">刷新</button>
         </div>
       </div>
+      <ConnectionStatus class="connection-panel" />
 
       <!-- Session list -->
       <UserSessionList class="session-list-container" />
@@ -107,8 +117,10 @@ onUnmounted(() => {
 <style scoped>
 .user-workspace {
   display: flex;
-  min-height: calc(100vh - 54px);
+  height: calc(100vh - 54px);
+  min-height: 0;
   background: var(--color-bg);
+  overflow: hidden;
 }
 .left-panel {
   width: 320px;
@@ -117,6 +129,7 @@ onUnmounted(() => {
   flex-direction: column;
   border-right: 1px solid var(--color-line);
   background: var(--color-paper);
+  min-height: 0;
 }
 .queue-panel {
   padding: 1rem;
@@ -191,5 +204,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  min-height: 0;
 }
 </style>

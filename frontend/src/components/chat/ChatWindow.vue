@@ -66,6 +66,7 @@ const priorityClass = computed(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: var(--color-bg);
   border: 1px solid var(--color-line);
   border-radius: 10px;

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { nextTick } from 'vue'
+import { mount } from '@vue/test-utils'
 
 // ─── Mock API modules ───
 vi.mock('../api/chat-api', () => ({
@@ -74,6 +75,9 @@ vi.mock('../api/chat-api', () => ({
       },
     })
   ),
+  findAgentDashboard: vi.fn(() => Promise.resolve({ data: { queueSize: 2, activeSessions: [], todayClosedSessions: 4 } })),
+  findAgentRatingSummary: vi.fn(() => Promise.resolve({ data: { averageRating: 4.5, ratingCount: 8 } })),
+  findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
   listQuickReplies: vi.fn(() =>
     Promise.resolve({
       data: [
@@ -121,6 +125,9 @@ import {
   createQuickReply,
   deleteQuickReply,
   agentOnline,
+  findAgentDashboard,
+  findAgentRatingSummary,
+  findTransferLogs,
 } from '../api/chat-api'
 
 // ─── Store tests ───
@@ -153,6 +160,56 @@ describe('Chat Store - Agent Workspace', () => {
     await chat.switchAgentView('MY_UNREAD')
     expect(chat.activeAgentView).toBe('MY_UNREAD')
     expect(listAgentViewSessions).toHaveBeenCalledWith('MY_UNREAD', {})
+  })
+
+  it('loads agent dashboard and rating summary data', async () => {
+    const chat = useChatStore()
+    await chat.loadAgentDashboard()
+
+    expect(findAgentDashboard).toHaveBeenCalled()
+    expect(findAgentRatingSummary).toHaveBeenCalled()
+    expect(chat.agentDashboard.queueSize).toBe(2)
+    expect(chat.agentRatingSummary.averageRating).toBe(4.5)
+  })
+
+  it('loads transfer logs for the selected session', async () => {
+    const chat = useChatStore()
+    await chat.loadTransferLogs('s1')
+    expect(findTransferLogs).toHaveBeenCalledWith('s1')
+    expect(chat.transferLogs).toEqual([])
+  })
+
+  it('records readable WebSocket errors and connection activity', () => {
+    const chat = useChatStore()
+    chat.handleConnectionError('连接被服务器关闭')
+
+    expect(chat.connectionState).toBe('error')
+    expect(chat.connectionError).toBe('连接被服务器关闭')
+    expect(chat.connectionLogs.at(-1).message).toBe('连接被服务器关闭')
+  })
+
+  it('refreshes the fixed view immediately when the server creates a session', () => {
+    const chat = useChatStore()
+    chat.activeAgentView = 'MY_ACTIVE'
+    const refreshCounts = vi.spyOn(chat, 'loadAgentViewCounts')
+    const refreshSessions = vi.spyOn(chat, 'loadAgentViewSessions')
+
+    chat._handleChatEvent({ event: 'SESSION_CREATED', session: { sessionId: 's1' } })
+
+    expect(refreshCounts).toHaveBeenCalled()
+    expect(refreshSessions).toHaveBeenCalledWith('MY_ACTIVE')
+  })
+
+  it('refreshes the fixed view immediately when the server transfers a session', () => {
+    const chat = useChatStore()
+    chat.activeAgentView = 'MY_ACTIVE'
+    const refreshCounts = vi.spyOn(chat, 'loadAgentViewCounts')
+    const refreshSessions = vi.spyOn(chat, 'loadAgentViewSessions')
+
+    chat._handleChatEvent({ event: 'SESSION_TRANSFERRED', sessionId: 's1' })
+
+    expect(refreshCounts).toHaveBeenCalled()
+    expect(refreshSessions).toHaveBeenCalledWith('MY_ACTIVE')
   })
 
   it('loads session metadata', async () => {
@@ -207,6 +264,37 @@ describe('Chat Store - Agent Workspace', () => {
     expect(chat.activeSessionId).toBe('s1')
     expect(getSessionMetadata).toHaveBeenCalledWith('s1')
     expect(getUserProfile).toHaveBeenCalledWith('s1')
+  })
+
+  it('marks the newest counterpart message as read even when the newest history item was sent by the agent', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.markRead = vi.fn()
+
+    chat._handleChatEvent({
+      event: 'CHAT_HISTORY',
+      sessionId: 's1',
+      messages: [
+        { id: 'm-user', sessionId: 's1', senderId: 'user-1' },
+        { id: 'm-agent', sessionId: 's1', senderId: 'agent-1' },
+      ],
+    })
+
+    expect(chat.markRead).toHaveBeenCalledWith('s1', 'm-user')
+  })
+
+  it('uses a readable attachment label instead of exposing an attachment address in the session preview', async () => {
+    const chat = useChatStore()
+    chat.sessions = [{
+      sessionId: 's1',
+      title: '附件会话',
+      lastMessageContent: '/chat/attachments/3efd884bbaf7/content',
+    }]
+    const AgentSessionList = (await import('../components/session/AgentSessionList.vue')).default
+    const wrapper = mount(AgentSessionList)
+
+    expect(wrapper.text()).toContain('附件消息')
+    expect(wrapper.text()).not.toContain('/chat/attachments/')
   })
 })
 

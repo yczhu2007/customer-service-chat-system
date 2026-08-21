@@ -62,8 +62,10 @@ public class QuickReplyServiceImpl implements QuickReplyService {
         return reply;
     }
     private void apply(ChatQuickReply reply, QuickReplySaveDTO request) {
-        reply.setTitle(request.getTitle() == null ? "" : request.getTitle().trim());
-        reply.setContent(request.getContent() == null ? "" : request.getContent().trim());
+        String content = request.getContent() == null ? "" : request.getContent().trim();
+        String title = request.getTitle() == null ? "" : request.getTitle().trim();
+        reply.setTitle(title.isBlank() ? content.substring(0, Math.min(content.length(), 50)) : title);
+        reply.setContent(content);
         reply.setSortOrder(request.getSortOrder() == null ? 0 : request.getSortOrder());
     }
     private QuickReplyVO toVO(ChatQuickReply reply) {

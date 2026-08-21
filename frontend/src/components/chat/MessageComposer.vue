@@ -51,8 +51,8 @@ async function onFileChange(e) {
   try {
     const result = await chat.uploadAttachment(props.sessionId, file)
     // Send as IMAGE or FILE message via STOMP
-    const type = file.type.startsWith('image/') ? 'IMAGE' : 'FILE'
-    chat.sendMessage(props.sessionId, type, result?.id || file.name)
+    const type = result?.messageType || (file.type.startsWith('image/') ? 'IMAGE' : 'FILE')
+    chat.sendMessage(props.sessionId, type, result?.contentUrl)
   } catch {
     // Error handled by store
   } finally {

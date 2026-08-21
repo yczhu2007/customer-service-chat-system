@@ -107,6 +107,15 @@ export function findAdminDashboard() {
   return request('/chat/admin/dashboard')
 }
 
+export function findAdminRatingSummary(params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return request(`/chat/admin/ratings/summary${qs ? '?' + qs : ''}`)
+}
+
+export function findTransferLogs(sessionId) {
+  return request(`/chat/sessions/${encodeURIComponent(sessionId)}/transfers`)
+}
+
 export function findArchiveStats() {
   return request('/chat/admin/archive-stats')
 }

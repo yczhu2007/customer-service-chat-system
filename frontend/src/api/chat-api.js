@@ -71,14 +71,22 @@ export const uploadAttachment = (sessionId, file) => {
  * Fetch an attachment blob with auth header (for IMAGE/FILE rendering).
  * Returns a blob URL string.
  */
-export const fetchAttachmentBlob = async (attachmentId) => {
+export const fetchAttachmentBlob = async (contentUrl) => {
   const auth = useAuthStore()
   const headers = {}
   if (auth.token) headers.Authorization = `Bearer ${auth.token}`
-  const res = await fetch(`/chat/attachments/${attachmentId}/content`, { headers })
+  const res = await fetch(contentUrl, { headers })
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const blob = await res.blob()
-  return URL.createObjectURL(blob)
+  const disposition = res.headers.get('content-disposition') || ''
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+  return {
+    url: URL.createObjectURL(blob),
+    name: encodedName ? decodeURIComponent(encodedName) : (plainName || '附件'),
+    size: blob.size,
+    type: blob.type,
+  }
 }
 
 // ─── Agent workspace APIs ────────────────────────────────────────
@@ -94,6 +102,16 @@ export const agentOnline = () =>
  */
 export const agentOffline = () =>
   request('/chat/agent/offline', { method: 'POST' })
+
+export const findAgentDashboard = () => request('/chat/agent/dashboard')
+
+export const findAgentRatingSummary = (params = {}) => {
+  const qs = new URLSearchParams(params).toString()
+  return request(`/chat/agent/ratings/summary${qs ? '?' + qs : ''}`)
+}
+
+export const findTransferLogs = (sessionId) =>
+  request(`/chat/sessions/${encodeURIComponent(sessionId)}/transfers`)
 
 /**
  * Get session metadata (title, priority, category, tags).
@@ -137,7 +155,7 @@ export const listQuickReplies = () =>
 
 /**
  * Create a new quick reply.
- * data: { title, content, sortOrder? }
+ * data: { content }
  */
 export const createQuickReply = (data) =>
   request('/chat/quick-replies', {
@@ -148,7 +166,7 @@ export const createQuickReply = (data) =>
 
 /**
  * Update an existing quick reply.
- * data: { title, content, sortOrder? }
+ * data: { content }
  */
 export const updateQuickReply = (id, data) =>
   request(`/chat/quick-replies/${id}`, {

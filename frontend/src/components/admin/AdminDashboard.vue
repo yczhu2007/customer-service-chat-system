@@ -1,19 +1,21 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { findAdminDashboard } from '../../api/admin-api'
+import { findAdminDashboard, findAdminRatingSummary } from '../../api/admin-api'
 
 const emit = defineEmits(['navigate'])
 
 const loading = ref(true)
 const error = ref(null)
 const dashboard = ref(null)
+const ratingSummary = ref(null)
 
 async function loadDashboard() {
   loading.value = true
   error.value = null
   try {
-    const dashboardRes = await findAdminDashboard()
+    const [dashboardRes, ratingRes] = await Promise.all([findAdminDashboard(), findAdminRatingSummary()])
     dashboard.value = dashboardRes.data
+    ratingSummary.value = ratingRes.data
   } catch (e) {
     error.value = e.message
   } finally {
@@ -59,6 +61,7 @@ const quickLinks = [
       </div>
 
       <h3>快捷入口</h3>
+      <div class="rating-summary">满意度：{{ ratingSummary?.averageRating ?? '—' }} 分，共 {{ ratingSummary?.ratingCount ?? 0 }} 条评价</div>
       <div class="quick-links">
         <button
           v-for="link in quickLinks"

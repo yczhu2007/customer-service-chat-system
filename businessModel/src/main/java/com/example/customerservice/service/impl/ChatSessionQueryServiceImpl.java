@@ -13,6 +13,7 @@ import com.example.customerservice.dto.*;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
+import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.ChatSessionRatingMapper;
 import com.example.customerservice.mapper.ChatSessionTagMapper;
@@ -44,6 +45,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
     private final ChatSessionRatingMapper ratingMapper;
     private final SysUserMapper userMapper;
     private final ChatMessageReadMapper messageReadMapper;
+    private final ChatMessageMapper messageMapper;
     private final ChatRedisRepository chatRedisRepository;
     private final ChatSessionTagMapper tagMapper;
     private final long averageHandleSeconds;
@@ -55,7 +57,18 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                                        ChatRedisRepository chatRedisRepository,
                                        long averageHandleSeconds) {
         this(sessionMapper, ratingMapper, userMapper, messageReadMapper,
-                chatRedisRepository, null, averageHandleSeconds);
+                chatRedisRepository, null, null, averageHandleSeconds);
+    }
+
+    public ChatSessionQueryServiceImpl(ChatSessionMapper sessionMapper,
+                                       ChatSessionRatingMapper ratingMapper,
+                                       SysUserMapper userMapper,
+                                       ChatMessageReadMapper messageReadMapper,
+                                       ChatRedisRepository chatRedisRepository,
+                                       ChatSessionTagMapper tagMapper,
+                                       long averageHandleSeconds) {
+        this(sessionMapper, ratingMapper, userMapper, messageReadMapper,
+                chatRedisRepository, tagMapper, null, averageHandleSeconds);
     }
 
     @Autowired
@@ -65,11 +78,13 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                                        ChatMessageReadMapper messageReadMapper,
                                        ChatRedisRepository chatRedisRepository,
                                        ChatSessionTagMapper tagMapper,
+                                       ChatMessageMapper messageMapper,
                                        @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds) {
         this.sessionMapper = sessionMapper;
         this.ratingMapper = ratingMapper;
         this.userMapper = userMapper;
         this.messageReadMapper = messageReadMapper;
+        this.messageMapper = messageMapper;
         this.chatRedisRepository = chatRedisRepository;
         this.tagMapper = tagMapper;
         this.averageHandleSeconds = Math.max(30L, averageHandleSeconds);
@@ -396,6 +411,15 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     vo.setMetadataUpdatedAt(s.getMetadataUpdatedAt());
                     vo.setTags(tagsBySessionId.getOrDefault(s.getId(), List.of()));
                     vo.setUnreadCount(unreadCounts.getOrDefault(s.getId(), 0L));
+                    if (messageMapper != null) {
+                        List<com.example.customerservice.domain.ChatMessage> messages = messageMapper.selectLatestHistory(s.getId(), 1);
+                        if (!messages.isEmpty()) {
+                            var last = messages.get(0);
+                            vo.setLastMessageContent(last.getContent());
+                            vo.setLastMessageSenderId(last.getSenderId());
+                            vo.setLastMessageTime(last.getCreateTime());
+                        }
+                    }
                     return vo;
                 })
                 .toList();
@@ -457,14 +481,18 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         /* 使用 WHERE archive_status = :expected 防止并发覆盖 */
         String previousStatus = session.getArchiveStatus();
         session.setArchiveStatus(target);
-        int updated = sessionMapper.update(session,
-                Wrappers.<ChatSession>lambdaUpdate()
-                        .eq(ChatSession::getId, sessionId)
-                        .eq(ChatSession::getArchiveStatus, previousStatus)
-                        .set(ChatSession::getArchiveStatus, target)
-                        .set(ChatSession::getArchiveRemark, request.getRemark())
-                        .set(ChatSession::getArchivedBy, agentId)
-                        .set(ChatSession::getArchivedAt, LocalDateTime.now()));
+        var update = Wrappers.<ChatSession>lambdaUpdate()
+                .eq(ChatSession::getId, sessionId);
+        if (previousStatus == null) {
+            update.isNull(ChatSession::getArchiveStatus);
+        } else {
+            update.eq(ChatSession::getArchiveStatus, previousStatus);
+        }
+        int updated = sessionMapper.update(session, update
+                .set(ChatSession::getArchiveStatus, target)
+                .set(ChatSession::getArchiveRemark, request.getRemark())
+                .set(ChatSession::getArchivedBy, agentId)
+                .set(ChatSession::getArchivedAt, LocalDateTime.now()));
         if (updated != 1) {
             throw new BusinessStateException("归档状态已被其他操作修改，请刷新后重试");
         }

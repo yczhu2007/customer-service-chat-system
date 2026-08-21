@@ -11,6 +11,7 @@ import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
 import com.example.customerservice.dto.ChatSessionMetadataVO;
 import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SessionArchiveDTO;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -253,6 +254,23 @@ class ChatSessionMetadataTest {
 
         assertTrue(result.getRecords().isEmpty());
         verifyNoInteractions(tagMapper);
+    }
+
+    @Test
+    void firstArchiveOfAnUnarchivedSessionUsesAnIsNullCondition() {
+        ChatSession session = session("S001", "U001", "A001");
+        session.setStatus(ChatConstants.SESSION_STATUS_CLOSED);
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+        when(sessionMapper.update(any(ChatSession.class), any())).thenReturn(1);
+        SessionArchiveDTO request = new SessionArchiveDTO();
+        request.setArchiveStatus(ChatConstants.ARCHIVE_PENDING);
+
+        service.setArchiveStatus("A001", "S001", request);
+
+        ArgumentCaptor<com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper<ChatSession>> wrapper =
+                ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
+        verify(sessionMapper).update(org.mockito.ArgumentMatchers.any(ChatSession.class), wrapper.capture());
+        assertTrue(wrapper.getValue().getSqlSegment().contains("archive_status IS NULL"));
     }
 
     private static ChatSession session(String id, String userId, String agentId) {

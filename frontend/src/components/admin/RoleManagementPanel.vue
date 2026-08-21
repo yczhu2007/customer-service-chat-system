@@ -91,7 +91,7 @@ function openCreateRole() {
 
 function openEditRole(role) {
   roleDialogMode.value = 'edit'
-  roleForm.value = { code: role.code || '', name: role.name || '', description: role.description || '' }
+  roleForm.value = { code: role.roleCode || '', name: role.roleName || '', description: role.description || '' }
   roleForm.value._id = role.id
   roleFormError.value = null
   showRoleDialog.value = true
@@ -101,9 +101,9 @@ async function submitRoleForm() {
   roleFormError.value = null
   try {
     if (roleDialogMode.value === 'create') {
-      await createRole({ code: roleForm.value.code, name: roleForm.value.name, description: roleForm.value.description })
+      await createRole({ roleCode: roleForm.value.code, roleName: roleForm.value.name, description: roleForm.value.description })
     } else {
-      await updateRole(roleForm.value._id, { name: roleForm.value.name, description: roleForm.value.description })
+      await updateRole(roleForm.value._id, { roleName: roleForm.value.name, description: roleForm.value.description })
     }
     showRoleDialog.value = false
     await loadRoles()
@@ -184,8 +184,8 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
               :class="{ selected: selectedRoleId === role.id }"
               @click="loadRolePermissions(role.id)"
             >
-              <td>{{ role.code }}</td>
-              <td>{{ role.name }}</td>
+              <td>{{ role.roleCode }}</td>
+              <td>{{ role.roleName }}</td>
               <td class="actions">
                 <button class="btn btn-sm" @click.stop="openEditRole(role)">编辑</button>
                 <button class="btn btn-sm btn-danger" @click.stop="confirmDeleteRole(role.id)">删除</button>
@@ -207,7 +207,7 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
       <div class="col">
         <h3>权限管理</h3>
         <p v-if="selectedRoleId" class="hint">
-          点击勾选为选中角色分配权限（当前角色: {{ roles.find(r => r.id === selectedRoleId)?.code }})
+          点击勾选为选中角色分配权限（当前角色: {{ roles.find(r => r.id === selectedRoleId)?.roleCode }})
         </p>
         <p v-else class="hint">请先点击左侧角色以查看/编辑其权限</p>
         <div v-if="permissionsLoading" class="loading">加载中...</div>
@@ -224,13 +224,13 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
               <td>
                 <input
                   type="checkbox"
-                  :checked="selectedRolePerms.has(perm.id)"
+                  :checked="selectedRolePerms.has(perm.permissionCode)"
                   :disabled="!selectedRoleId || permAssignLoading"
                   @change="togglePermission(perm.id)"
                 />
               </td>
-              <td>{{ perm.code }}</td>
-              <td>{{ perm.name }}</td>
+              <td>{{ perm.permissionCode }}</td>
+              <td>{{ perm.permissionName }}</td>
             </tr>
             <tr v-if="permissions.length === 0">
               <td colspan="3" class="empty">暂无数据</td>

@@ -124,7 +124,7 @@ watch(() => props.quickReplyContent, (content) => {
           v-model="targetAgentId"
           type="text"
           class="transfer-input"
-          placeholder="目标客服ID"
+          placeholder="目标客服账号或ID（如 agent002 / A002）"
           maxlength="64"
         />
         <button :disabled="transferring || !targetAgentId.trim()" class="transfer-confirm" @click="doTransfer">
@@ -159,6 +159,7 @@ watch(() => props.quickReplyContent, (content) => {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 0;
   background: #f9fafb;
   border-radius: 0.5rem;
   overflow: hidden;

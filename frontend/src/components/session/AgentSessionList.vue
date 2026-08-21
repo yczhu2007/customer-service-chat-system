@@ -40,6 +40,10 @@ function formatTime(ts) {
   return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
+function preview(content) {
+  return content?.startsWith('/chat/attachments/') ? '附件消息' : content
+}
+
 /** Archive status label */
 function archiveLabel(status) {
   const map = {
@@ -82,7 +86,7 @@ function selectSession(sessionId) {
           <span v-if="s.unreadCount > 0" class="unread-badge">{{ s.unreadCount }}</span>
         </div>
         <div v-if="s.lastMessageContent" class="session-preview">
-          {{ s.lastMessageContent.slice(0, 50) }}{{ s.lastMessageContent.length > 50 ? '…' : '' }}
+          {{ preview(s.lastMessageContent).slice(0, 50) }}{{ preview(s.lastMessageContent).length > 50 ? '…' : '' }}
         </div>
       </li>
     </ul>

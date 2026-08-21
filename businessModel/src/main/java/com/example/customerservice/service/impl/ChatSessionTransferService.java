@@ -110,6 +110,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
         }
 
         boolean redisTransferred = false;
+        String resolvedTargetAgentId = targetAgentId;
         try {
             ChatSession session = chatSessionMapper.selectById(sessionId);
             if (session == null
@@ -121,9 +122,13 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             }
 
             SysUser targetAgent = sysUserMapper.selectById(targetAgentId);
+            if (targetAgent == null) {
+                targetAgent = sysUserMapper.findByUsername(targetAgentId);
+            }
+            resolvedTargetAgentId = targetAgent == null ? null : targetAgent.getId();
             Set<String> targetRoleCodes = targetAgent == null
                     ? Set.of()
-                    : sysUserRoleMapper.findRoleCodesByUserId(targetAgentId);
+                    : sysUserRoleMapper.findRoleCodesByUserId(resolvedTargetAgentId);
             if (targetRoleCodes == null || !targetRoleCodes.contains("AGENT")) {
                 throw new IllegalArgumentException("目标用户不是客服");
             }
@@ -132,7 +137,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                     TRANSFER_SESSION_REDIS_SCRIPT,
                     List.of(
                             RedisConstants.agentSessionsKey(sourceAgentId),
-                            RedisConstants.agentSessionsKey(targetAgentId),
+                            RedisConstants.agentSessionsKey(resolvedTargetAgentId),
                             RedisConstants.AGENT_LOAD,
                             RedisConstants.SESSION_AGENT + sessionId,
                             RedisConstants.SESSION_META + sessionId,
@@ -140,7 +145,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                     ),
                     sessionId,
                     sourceAgentId,
-                    targetAgentId,
+                    resolvedTargetAgentId,
                     String.valueOf(agentMaxConcurrency),
                     String.valueOf(System.currentTimeMillis())
             );
@@ -148,12 +153,13 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                 throw new IllegalArgumentException("目标客服不在线或已达到最大接待数量");
             }
             redisTransferred = true;
+            final String persistedTargetAgentId = resolvedTargetAgentId;
 
             Integer updatedRows = transactionTemplate.execute(status -> {
                 int updated = chatSessionMapper.transferSession(
                         sessionId,
                         sourceAgentId,
-                        targetAgentId
+                        persistedTargetAgentId
                 );
                 if (updated != 1) {
                     return updated;
@@ -162,7 +168,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                 transferLog.setId(UUID.randomUUID().toString().replace("-", ""));
                 transferLog.setSessionId(sessionId);
                 transferLog.setSourceAgentId(sourceAgentId);
-                transferLog.setTargetAgentId(targetAgentId);
+                transferLog.setTargetAgentId(persistedTargetAgentId);
                 transferLog.setReason("MANUAL_TRANSFER");
                 transferLog.setCreateTime(LocalDateTime.now());
                 if (transferLogMapper.insert(transferLog) != 1) {
@@ -177,9 +183,9 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             // 数据库事务已经提交，之后即使通知失败也不能再回滚 Redis 归属。
             redisTransferred = false;
 
-            session.setAgentId(targetAgentId);
+            session.setAgentId(resolvedTargetAgentId);
             try {
-                notifySessionTransferred(session, sourceAgentId, targetAgentId);
+                notifySessionTransferred(session, sourceAgentId, resolvedTargetAgentId);
             } catch (RuntimeException exception) {
                 log.error(
                         "会话已完成转接，但发送转接通知失败，sessionId={}",
@@ -191,12 +197,12 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
                     "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
                     sessionId,
                     sourceAgentId,
-                    targetAgentId
+                    resolvedTargetAgentId
             );
         } catch (RuntimeException exception) {
             if (redisTransferred) {
                 try {
-                    rollbackTransferredSessionInRedis(sessionId, sourceAgentId, targetAgentId);
+                    rollbackTransferredSessionInRedis(sessionId, sourceAgentId, resolvedTargetAgentId);
                 } catch (RuntimeException rollbackException) {
                     log.error(
                             "会话转接失败且Redis回滚失败，等待对账任务修复，sessionId={}",

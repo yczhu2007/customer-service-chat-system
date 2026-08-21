@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { login } from '../api/auth-api'
+import { login, logout, register, resetPassword, getProfile, updateProfile, updatePassword, regenerateRecoveryCode } from '../api/auth-api'
+import { useAuthStore } from '../stores/auth'
 
 describe('authentication API', () => {
   beforeEach(() => {
@@ -16,5 +17,40 @@ describe('authentication API', () => {
     await login({ username: 'user', password: 'password' })
 
     expect(fetch).toHaveBeenCalledWith('/chat/login', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('posts to the backend logout endpoint with the current token', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 'session-token', userId: 'user-1', role: 'USER' })
+
+    await logout()
+
+    expect(fetch).toHaveBeenCalledWith('/chat/logout', expect.objectContaining({
+      method: 'POST',
+      headers: expect.objectContaining({ Authorization: 'Bearer session-token' }),
+    }))
+  })
+
+  it('supports account registration and password recovery endpoints', async () => {
+    await register({ username: 'new_user', password: 'password123' })
+    await resetPassword({ username: 'new_user', recoveryCode: '1111-2222-3333-4444', newPassword: 'password123' })
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/account/register', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenNthCalledWith(2, '/account/forgot-password', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('uses the authenticated account endpoints for profile, password, and recovery code', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 'session-token', userId: 'user-1', role: 'USER' })
+
+    await getProfile()
+    await updateProfile({ username: 'renamed_user' })
+    await updatePassword({ currentPassword: 'old-password', newPassword: 'new-password' })
+    await regenerateRecoveryCode()
+
+    expect(fetch).toHaveBeenCalledWith('/account/profile', expect.objectContaining({ headers: expect.any(Object) }))
+    expect(fetch).toHaveBeenCalledWith('/account/profile', expect.objectContaining({ method: 'PUT' }))
+    expect(fetch).toHaveBeenCalledWith('/account/password', expect.objectContaining({ method: 'PUT' }))
+    expect(fetch).toHaveBeenCalledWith('/account/recovery-code', expect.objectContaining({ method: 'POST' }))
   })
 })

@@ -15,9 +15,7 @@ const errorMsg = ref('')
 
 // Form state
 const editing = ref(false) // false = create, object = editing
-const formTitle = ref('')
 const formContent = ref('')
-const formSortOrder = ref(0)
 const saving = ref(false)
 
 async function loadReplies() {
@@ -35,37 +33,23 @@ async function loadReplies() {
 
 function startCreate() {
   editing.value = null
-  formTitle.value = ''
   formContent.value = ''
-  formSortOrder.value = 0
 }
 
 function startEdit(reply) {
   editing.value = reply
-  formTitle.value = reply.title
   formContent.value = reply.content
-  formSortOrder.value = reply.sortOrder || 0
 }
 
 function cancelForm() {
   editing.value = false
-  formTitle.value = ''
   formContent.value = ''
-  formSortOrder.value = 0
 }
 
 async function saveForm() {
   errorMsg.value = ''
-  if (!formTitle.value.trim()) {
-    errorMsg.value = '标题不能为空'
-    return
-  }
   if (!formContent.value.trim()) {
     errorMsg.value = '内容不能为空'
-    return
-  }
-  if (formTitle.value.length > 50) {
-    errorMsg.value = '标题不能超过50个字符'
     return
   }
   if (formContent.value.length > 1000) {
@@ -74,9 +58,7 @@ async function saveForm() {
   }
 
   const data = {
-    title: formTitle.value.trim(),
     content: formContent.value.trim(),
-    sortOrder: formSortOrder.value || 0,
   }
 
   saving.value = true
@@ -126,8 +108,7 @@ onMounted(loadReplies)
     <ul v-if="replies.length && editing === false" class="reply-list">
       <li v-for="r in replies" :key="r.id" class="reply-item">
         <div class="reply-info" @click="insertReply(r)">
-          <span class="reply-title">{{ r.title }}</span>
-          <span class="reply-preview">{{ r.content.slice(0, 60) }}{{ r.content.length > 60 ? '…' : '' }}</span>
+          <span class="reply-preview">{{ r.content }}</span>
         </div>
         <div class="reply-actions">
           <button class="action-btn" @click="startEdit(r)">编辑</button>
@@ -143,16 +124,8 @@ onMounted(loadReplies)
     <!-- Edit/Create form -->
     <div v-if="editing !== false" class="form-area">
       <div class="form-field">
-        <label class="form-label">标题</label>
-        <input v-model="formTitle" maxlength="50" class="form-input" placeholder="快捷回复标题" />
-      </div>
-      <div class="form-field">
         <label class="form-label">内容</label>
         <textarea v-model="formContent" rows="4" maxlength="1000" class="form-textarea" placeholder="回复内容" />
-      </div>
-      <div class="form-field">
-        <label class="form-label">排序</label>
-        <input v-model.number="formSortOrder" type="number" min="0" max="9999" class="form-input short" />
       </div>
       <div v-if="errorMsg" class="error">{{ errorMsg }}</div>
       <div class="form-buttons">
@@ -227,22 +200,13 @@ onMounted(loadReplies)
   cursor: pointer;
   min-width: 0;
 }
-.reply-info:hover .reply-title {
+.reply-info:hover .reply-preview {
   color: #2563eb;
-}
-.reply-title {
-  display: block;
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: #111827;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .reply-preview {
   display: block;
-  font-size: 0.7rem;
-  color: #9ca3af;
+  font-size: 0.8rem;
+  color: #111827;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -296,9 +260,6 @@ onMounted(loadReplies)
 .form-input:focus,
 .form-textarea:focus {
   border-color: #3b82f6;
-}
-.form-input.short {
-  width: 6rem;
 }
 .form-textarea {
   resize: none;

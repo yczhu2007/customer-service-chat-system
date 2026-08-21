@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
+import { findTransferLogs } from '../../api/admin-api'
 
 const loading = ref(false)
 const error = ref(null)
@@ -8,6 +9,8 @@ const sessions = ref([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const expandedSessionId = ref(null)
+const transferLogs = ref({})
 
 // Filters
 const filters = ref({
@@ -18,6 +21,7 @@ const filters = ref({
   rating: '',
   from: '',
   to: '',
+  archiveStatus: '',
 })
 
 const statusOptions = ['', 'ACTIVE', 'CLOSED', 'PENDING']
@@ -33,6 +37,7 @@ async function loadSessions() {
     if (filters.value.agentId) qs.set('agentId', filters.value.agentId)
     if (filters.value.status) qs.set('status', filters.value.status)
     if (filters.value.rating) qs.set('rating', filters.value.rating)
+    if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
     if (filters.value.from) qs.set('from', filters.value.from)
     if (filters.value.to) qs.set('to', filters.value.to)
 
@@ -59,6 +64,15 @@ function clearFilters() {
   loadSessions()
 }
 
+async function toggleTransferLogs(sessionId) {
+  if (expandedSessionId.value === sessionId) { expandedSessionId.value = null; return }
+  expandedSessionId.value = sessionId
+  if (!transferLogs.value[sessionId]) {
+    try { const result = await findTransferLogs(sessionId); transferLogs.value[sessionId] = result?.data || [] }
+    catch (e) { error.value = e.message }
+  }
+}
+
 function formatDate(dt) {
   if (!dt) return '-'
   return new Date(dt).toLocaleString('zh-CN')
@@ -82,6 +96,9 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       <select v-model="filters.status">
         <option v-for="s in statusOptions" :key="s" :value="s">{{ s || '全部状态' }}</option>
       </select>
+      <select v-model="filters.archiveStatus">
+        <option value="">全部归档</option><option value="NONE">未归档</option><option value="COMPLETED">已完成</option><option value="PENDING">待处理</option><option value="ON_HOLD">搁置</option><option value="OTHER">其他</option>
+      </select>
       <input v-model="filters.rating" placeholder="评分 (1-5)" type="number" min="1" max="5" style="width:80px" />
       <input v-model="filters.from" type="datetime-local" title="开始时间" />
       <input v-model="filters.to" type="datetime-local" title="结束时间" />
@@ -102,6 +119,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <th>评分</th>
             <th>创建时间</th>
             <th>结束时间</th>
+            <th>转接记录</th>
           </tr>
         </thead>
         <tbody>
@@ -113,9 +131,13 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <td :title="s.rating + '/5'">{{ ratingStars(s.rating) }}</td>
             <td>{{ formatDate(s.createTime) }}</td>
             <td>{{ formatDate(s.endTime) }}</td>
+            <td><button class="btn" @click="toggleTransferLogs(s.sessionId)">{{ expandedSessionId === s.sessionId ? '收起' : '查看' }}</button></td>
+          </tr>
+          <tr v-if="expandedSessionId === s.sessionId" :key="s.sessionId + '-transfers'">
+            <td colspan="8"><div v-if="!transferLogs[s.sessionId]?.length" class="empty">暂无转接记录</div><div v-for="log in transferLogs[s.sessionId]" :key="log.id">{{ log.sourceAgentUsername || log.sourceAgentId }} → {{ log.targetAgentUsername || log.targetAgentId }}，{{ formatDate(log.createTime) }}</div></td>
           </tr>
           <tr v-if="sessions.length === 0">
-            <td colspan="7" class="empty">暂无数据</td>
+            <td colspan="8" class="empty">暂无数据</td>
           </tr>
         </tbody>
       </table>

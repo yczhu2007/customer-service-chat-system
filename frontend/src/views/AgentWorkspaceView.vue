@@ -10,10 +10,14 @@ import SessionMetadataEditor from '../components/session/SessionMetadataEditor.v
 import SessionArchiveActions from '../components/session/SessionArchiveActions.vue'
 import UserProfileSidebar from '../components/agent/UserProfileSidebar.vue'
 import QuickReplyPanel from '../components/agent/QuickReplyPanel.vue'
+import ConnectionStatus from '../components/common/ConnectionStatus.vue'
+import AgentOverviewPanel from '../components/agent/AgentOverviewPanel.vue'
+import TransferLogPanel from '../components/session/TransferLogPanel.vue'
 
 const chat = useChatStore()
 const auth = useAuthStore()
 const pendingQuickReply = ref('')
+let presenceTimer = null
 
 const QUICK_REPLY_LABELS = {
   MY_ACTIVE: '处理中',
@@ -58,9 +62,11 @@ onMounted(async () => {
   if (!chat.agentOnline) {
     await goOnline()
   }
+  presenceTimer = setInterval(() => agentOnline().catch(() => {}), 30000)
 })
 
 onUnmounted(() => {
+  if (presenceTimer) clearInterval(presenceTimer)
   // Optionally go offline on leave (commented out to persist across navigation)
   // goOffline()
 })
@@ -68,6 +74,7 @@ onUnmounted(() => {
 
 <template>
   <div class="agent-workspace">
+    <AgentOverviewPanel />
     <!-- Top bar -->
     <header class="workspace-header">
       <h1 class="workspace-title">客服工作台</h1>
@@ -78,9 +85,7 @@ onUnmounted(() => {
         </span>
         <button v-if="!chat.agentOnline" class="online-btn" @click="goOnline">上线</button>
         <button v-else class="offline-btn" @click="goOffline">下线</button>
-        <span class="ws-status" :class="{ connected: chat.connected }">
-          {{ chat.connected ? 'WS已连接' : 'WS未连接' }}
-        </span>
+        <ConnectionStatus />
       </div>
     </header>
 
@@ -109,6 +114,7 @@ onUnmounted(() => {
         <UserProfileSidebar />
         <div class="sidebar-divider" />
         <SessionMetadataEditor />
+        <TransferLogPanel :session-id="chat.activeSessionId" />
       </aside>
     </div>
 
@@ -129,9 +135,11 @@ onUnmounted(() => {
 .agent-workspace {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 54px);
+  height: calc(100vh - 54px);
+  min-height: 0;
   background: var(--color-bg);
   font-family: var(--font-sans);
+  overflow: hidden;
 }
 
 /* ─── Header ─── */
@@ -207,6 +215,7 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   overflow: hidden;
+  min-height: 0;
 }
 
 /* ─── Left sidebar ─── */
@@ -251,6 +260,7 @@ onUnmounted(() => {
 .chat-area {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }

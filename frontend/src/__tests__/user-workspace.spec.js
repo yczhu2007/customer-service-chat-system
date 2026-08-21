@@ -1,7 +1,10 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { mount } from '@vue/test-utils'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
+import MessageComposer from '../components/chat/MessageComposer.vue'
+import { fetchAttachmentBlob } from '../api/chat-api'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
@@ -103,6 +106,106 @@ describe('User Workspace', () => {
       expect(chat.activeSessionId).toBe('s1')
       expect(chat.messages).toEqual([])
       expect(chat.unreadCounts.s1).toBe(0)
+    })
+  })
+
+  it('loads earlier history with the server cursor', async () => {
+    const chat = useChatStore()
+    chat._stomp = { publish: vi.fn() }
+    chat.connected = true
+    chat.activeSessionId = 's1'
+    chat.historyCursor = 'm-oldest-visible'
+    chat.historyHasMore = true
+
+    await chat.loadMoreHistory('s1')
+
+    expect(chat._stomp.publish).toHaveBeenCalledWith('/app/chat.history', {
+      sessionId: 's1',
+      beforeMessageId: 'm-oldest-visible',
+      pageSize: 50,
+    })
+  })
+
+  describe('chat store — consultation start', () => {
+    it('refreshes the session list immediately when the server creates a session', () => {
+      const chat = useChatStore()
+      const loadSessions = vi.spyOn(chat, 'loadSessions')
+
+      chat._handleChatEvent({ event: 'SESSION_CREATED', session: { sessionId: 's1' } })
+
+      expect(loadSessions).toHaveBeenCalled()
+    })
+  })
+
+  describe('attachment sending', () => {
+    it('keeps the server-provided attachment filename when loading a file', async () => {
+      const auth = useAuthStore()
+      auth.login({ token: 't', userId: 'u1', role: 'USER' })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'content-disposition': "attachment; filename*=UTF-8''guide.pdf", 'content-type': 'application/pdf' }),
+        blob: () => Promise.resolve(new Blob(['content'], { type: 'application/pdf' })),
+      })
+
+      const attachment = await fetchAttachmentBlob('/chat/attachments/attachment-id/content')
+
+      expect(attachment.name).toBe('guide.pdf')
+      expect(attachment.url).toBe('blob:mock')
+    })
+
+    it('sends the uploaded attachment content address instead of its opaque id', async () => {
+      const chat = useChatStore()
+      chat.uploadAttachment = vi.fn(() => Promise.resolve({
+        id: 'attachment-id',
+        contentUrl: '/chat/attachments/attachment-id/content',
+        messageType: 'FILE',
+      }))
+      chat.sendMessage = vi.fn()
+
+      const wrapper = mount(MessageComposer, { props: { sessionId: 's1' } })
+      const file = new File(['content'], 'guide.pdf', { type: 'application/pdf' })
+      const input = wrapper.find('input[type="file"]')
+      Object.defineProperty(input.element, 'files', { value: [file] })
+      await input.trigger('change')
+      await Promise.resolve()
+
+      expect(chat.sendMessage).toHaveBeenCalledWith(
+        's1',
+        'FILE',
+        '/chat/attachments/attachment-id/content'
+      )
+    })
+  })
+
+  describe('message operations', () => {
+    it('publishes edit and recall operations for a selected own message', () => {
+      const auth = useAuthStore()
+      auth.login({ token: 't', userId: 'u1', role: 'USER' })
+      const chat = useChatStore()
+      chat._stomp = { publish: vi.fn() }
+      chat.connected = true
+      chat.messages = [{ id: 'm1', senderId: 'u1', type: 'TEXT', content: '原内容' }]
+
+      chat.editMessage('m1', '修改后的内容')
+      chat.recallMessage('m1')
+
+      expect(chat._stomp.publish).toHaveBeenNthCalledWith(1, '/app/chat.message.edit', {
+        messageId: 'm1', content: '修改后的内容',
+      })
+      expect(chat._stomp.publish).toHaveBeenNthCalledWith(2, '/app/chat.message.recall', {
+        messageId: 'm1',
+      })
+    })
+
+    it('applies edited and recalled events to the current message', () => {
+      const chat = useChatStore()
+      chat.messages = [{ id: 'm1', type: 'TEXT', content: '原内容' }]
+
+      chat._handleMessageEvent({ event: 'MESSAGE_EDITED', messageId: 'm1', content: '新内容' })
+      expect(chat.messages[0]).toMatchObject({ content: '新内容', edited: true })
+
+      chat._handleMessageEvent({ event: 'MESSAGE_RECALLED', messageId: 'm1' })
+      expect(chat.messages[0]).toMatchObject({ recalled: true, content: null })
     })
   })
 
@@ -267,6 +370,19 @@ describe('User Workspace', () => {
   })
 
   describe('chat store — message deduplication', () => {
+    it('marks the newest received history message as read for the active session', () => {
+      const chat = useChatStore()
+      chat.activeSessionId = 's1'
+      chat.markRead = vi.fn()
+
+      chat._handleChatEvent({
+        event: 'CHAT_HISTORY', sessionId: 's1',
+        messages: [{ id: 'm1', sessionId: 's1', senderId: 'agent-1' }],
+      })
+
+      expect(chat.markRead).toHaveBeenCalledWith('s1', 'm1')
+    })
+
     it('deduplicates by clientMsgId', () => {
       const chat = useChatStore()
       chat.messages = [
