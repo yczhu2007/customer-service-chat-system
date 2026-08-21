@@ -16,6 +16,10 @@ public class ChatSession {
     private String status;
     private LocalDateTime createTime;
     private LocalDateTime endTime;
+    private String title;
+    private String priority;
+    private String category;
+    private LocalDateTime metadataUpdatedAt;
     /** 归档状态：COMPLETED / PENDING / ON_HOLD / OTHER，NULL 表示未归档。 */
     private String archiveStatus;
     /** 归档备注（OTHER 时建议必填，其余可选）。 */
@@ -73,6 +77,38 @@ public class ChatSession {
         this.endTime = endTime;
     }
 
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    public String getPriority() {
+        return priority;
+    }
+
+    public void setPriority(String priority) {
+        this.priority = priority;
+    }
+
+    public String getCategory() {
+        return category;
+    }
+
+    public void setCategory(String category) {
+        this.category = category;
+    }
+
+    public LocalDateTime getMetadataUpdatedAt() {
+        return metadataUpdatedAt;
+    }
+
+    public void setMetadataUpdatedAt(LocalDateTime metadataUpdatedAt) {
+        this.metadataUpdatedAt = metadataUpdatedAt;
+    }
+
     public String getArchiveStatus() {
         return archiveStatus;
     }
@@ -112,6 +148,9 @@ public class ChatSession {
                 ", userId='" + userId + '\'' +
                 ", agentId='" + agentId + '\'' +
                 ", status='" + status + '\'' +
+                ", title='" + title + '\'' +
+                ", priority='" + priority + '\'' +
+                ", category='" + category + '\'' +
                 ", archiveStatus='" + archiveStatus + '\'' +
                 ", createTime=" + createTime +
                 ", endTime=" + endTime +

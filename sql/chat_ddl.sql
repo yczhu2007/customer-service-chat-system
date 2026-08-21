@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS chat_session
     status         VARCHAR(16) NOT NULL COMMENT '会话状态：ACTIVE、CLOSED',
     create_time    DATETIME(6) NOT NULL COMMENT '会话创建时间',
     end_time       DATETIME(6) NULL COMMENT '会话结束时间',
+    title          VARCHAR(100) NOT NULL DEFAULT '新咨询' COMMENT '会话标题',
+    priority       VARCHAR(16) NOT NULL DEFAULT 'NORMAL' COMMENT '优先级：LOW、NORMAL、HIGH、URGENT',
+    category       VARCHAR(32) NULL COMMENT '会话分类：ACCOUNT、PAYMENT、TECHNICAL、AFTER_SALES、OTHER',
+    metadata_updated_at DATETIME(6) NULL COMMENT '会话元数据更新时间',
     archive_status VARCHAR(16) NULL COMMENT '归档状态：COMPLETED、PENDING、ON_HOLD、OTHER',
     archive_remark VARCHAR(255) NULL COMMENT '归档备注',
     archived_by    VARCHAR(64) NULL COMMENT '归档操作客服ID',
@@ -65,6 +69,11 @@ CREATE TABLE IF NOT EXISTS chat_session
 
     CONSTRAINT chk_chat_session_status
         CHECK (status IN ('ACTIVE', 'CLOSED')),
+    CONSTRAINT chk_chat_session_priority
+        CHECK (priority IN ('LOW', 'NORMAL', 'HIGH', 'URGENT')),
+    CONSTRAINT chk_chat_session_category
+        CHECK (category IS NULL
+            OR category IN ('ACCOUNT', 'PAYMENT', 'TECHNICAL', 'AFTER_SALES', 'OTHER')),
     CONSTRAINT chk_chat_session_archive
         CHECK (archive_status IS NULL
             OR archive_status IN ('COMPLETED', 'PENDING', 'ON_HOLD', 'OTHER'))
@@ -73,6 +82,32 @@ CREATE TABLE IF NOT EXISTS chat_session
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci
     COMMENT = '客服聊天会话表';
+
+
+-- ============================================================
+-- 1.0 会话标签表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS chat_session_tag
+(
+    session_id   VARCHAR(64) NOT NULL COMMENT '会话ID',
+    tag          VARCHAR(32) NOT NULL COMMENT '会话标签',
+    create_time  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6)
+        COMMENT '创建时间',
+
+    PRIMARY KEY (session_id, tag),
+    KEY idx_chat_session_tag_tag (tag),
+
+    CONSTRAINT fk_chat_session_tag_session
+        FOREIGN KEY (session_id)
+            REFERENCES chat_session (id)
+            ON UPDATE CASCADE
+            ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+    COMMENT = '会话标签表';
 
 
 -- ============================================================

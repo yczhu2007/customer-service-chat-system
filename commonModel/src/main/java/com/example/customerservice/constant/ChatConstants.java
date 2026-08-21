@@ -20,6 +20,19 @@ public final class ChatConstants {
     public static final String REASON_AGENT_DISCONNECTED = "AGENT_DISCONNECTED";
     public static final String REASON_SESSION_INACTIVITY_TIMEOUT = "SESSION_INACTIVITY_TIMEOUT";
     public static final String AGENT_SKILL_VIP_CODE = "VIP";
+    public static final String DEFAULT_SESSION_TITLE = "新咨询";
+    public static final String PRIORITY_LOW = "LOW";
+    public static final String PRIORITY_NORMAL = "NORMAL";
+    public static final String PRIORITY_HIGH = "HIGH";
+    public static final String PRIORITY_URGENT = "URGENT";
+    public static final String CATEGORY_ACCOUNT = "ACCOUNT";
+    public static final String CATEGORY_PAYMENT = "PAYMENT";
+    public static final String CATEGORY_TECHNICAL = "TECHNICAL";
+    public static final String CATEGORY_AFTER_SALES = "AFTER_SALES";
+    public static final String CATEGORY_OTHER = "OTHER";
+    public static final int SESSION_TITLE_MAX_LENGTH = 100;
+    public static final int SESSION_TAG_MAX_LENGTH = 32;
+    public static final int SESSION_TAG_MAX_COUNT = 10;
 
     // ── 会话归档状态（参考 Zendesk Ticket Status） ──────────────────────────
     /** 已完成（Solved），允许 reopen 回到 PENDING/ON_HOLD。 */
@@ -35,10 +48,25 @@ public final class ChatConstants {
     private static final Set<String> VALID_ARCHIVE_STATUSES = Set.of(
             ARCHIVE_COMPLETED, ARCHIVE_PENDING, ARCHIVE_ON_HOLD, ARCHIVE_OTHER
     );
+    private static final Set<String> VALID_SESSION_PRIORITIES = Set.of(
+            PRIORITY_LOW, PRIORITY_NORMAL, PRIORITY_HIGH, PRIORITY_URGENT
+    );
+    private static final Set<String> VALID_SESSION_CATEGORIES = Set.of(
+            CATEGORY_ACCOUNT, CATEGORY_PAYMENT, CATEGORY_TECHNICAL,
+            CATEGORY_AFTER_SALES, CATEGORY_OTHER
+    );
 
     /** 判断给定值是否为合法的归档状态。 */
     public static boolean isValidArchiveStatus(String status) {
         return status != null && VALID_ARCHIVE_STATUSES.contains(status);
+    }
+
+    public static boolean isValidSessionPriority(String priority) {
+        return priority != null && VALID_SESSION_PRIORITIES.contains(priority);
+    }
+
+    public static boolean isValidSessionCategory(String category) {
+        return category != null && VALID_SESSION_CATEGORIES.contains(category);
     }
 
     /**
