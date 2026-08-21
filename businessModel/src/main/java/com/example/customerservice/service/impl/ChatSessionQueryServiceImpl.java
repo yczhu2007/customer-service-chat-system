@@ -7,6 +7,7 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatSessionRating;
+import com.example.customerservice.domain.ChatSessionTag;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.exception.BusinessStateException;
@@ -14,10 +15,12 @@ import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.ChatSessionRatingMapper;
+import com.example.customerservice.mapper.ChatSessionTagMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatSessionQueryService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
@@ -26,8 +29,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 
 @Slf4j
 @Service
@@ -38,6 +44,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
     private final SysUserMapper userMapper;
     private final ChatMessageReadMapper messageReadMapper;
     private final ChatRedisRepository chatRedisRepository;
+    private final ChatSessionTagMapper tagMapper;
     private final long averageHandleSeconds;
 
     public ChatSessionQueryServiceImpl(ChatSessionMapper sessionMapper,
@@ -45,12 +52,25 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                                        SysUserMapper userMapper,
                                        ChatMessageReadMapper messageReadMapper,
                                        ChatRedisRepository chatRedisRepository,
+                                       long averageHandleSeconds) {
+        this(sessionMapper, ratingMapper, userMapper, messageReadMapper,
+                chatRedisRepository, null, averageHandleSeconds);
+    }
+
+    @Autowired
+    public ChatSessionQueryServiceImpl(ChatSessionMapper sessionMapper,
+                                       ChatSessionRatingMapper ratingMapper,
+                                       SysUserMapper userMapper,
+                                       ChatMessageReadMapper messageReadMapper,
+                                       ChatRedisRepository chatRedisRepository,
+                                       ChatSessionTagMapper tagMapper,
                                        @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds) {
         this.sessionMapper = sessionMapper;
         this.ratingMapper = ratingMapper;
         this.userMapper = userMapper;
         this.messageReadMapper = messageReadMapper;
         this.chatRedisRepository = chatRedisRepository;
+        this.tagMapper = tagMapper;
         this.averageHandleSeconds = Math.max(30L, averageHandleSeconds);
     }
 
@@ -147,6 +167,127 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         vo.setVipLevel(user.getVipLevel() == null ? 0 : user.getVipLevel());
         vo.setTotalSessionCount(totalSessions == null ? 0 : totalSessions.intValue());
         vo.setLastSessionTime(lastSession == null ? null : lastSession.getCreateTime());
+        return vo;
+    }
+
+    @Override
+    public ChatSessionMetadataVO getSessionMetadata(
+            String actorId,
+            boolean administrator,
+            String sessionId
+    ) {
+        ChatSession session = requireSession(sessionId);
+        if (!administrator
+                && (actorId == null
+                || actorId.isBlank()
+                || (!Objects.equals(actorId, session.getUserId())
+                && !Objects.equals(actorId, session.getAgentId())))) {
+            throw new IllegalArgumentException("无权查看该会话元数据");
+        }
+
+        List<String> tags = tagMapper.selectBySessionId(sessionId).stream()
+                .map(ChatSessionTag::getTag)
+                .toList();
+        return toMetadataVO(session, tags);
+    }
+
+    @Override
+    @Transactional
+    public ChatSessionMetadataVO updateSessionMetadata(
+            String agentId,
+            String sessionId,
+            ChatSessionMetadataUpdateDTO request
+    ) {
+        ChatSession session = requireSession(sessionId);
+        if (agentId == null
+                || agentId.isBlank()
+                || !Objects.equals(agentId, session.getAgentId())) {
+            throw new IllegalArgumentException("只有会话分配的客服可以更新元数据");
+        }
+        validateMetadataRequest(request);
+        List<String> normalizedTags = normalizeTags(request.getTags());
+
+        session.setTitle(request.getTitle());
+        session.setPriority(request.getPriority());
+        session.setCategory(request.getCategory());
+        session.setMetadataUpdatedAt(LocalDateTime.now());
+        if (sessionMapper.updateById(session) != 1) {
+            throw new BusinessStateException("会话元数据更新失败");
+        }
+
+        tagMapper.deleteBySessionId(sessionId);
+        for (String value : normalizedTags) {
+            ChatSessionTag tag = new ChatSessionTag();
+            tag.setSessionId(sessionId);
+            tag.setTag(value);
+            if (tagMapper.insert(tag) != 1) {
+                throw new BusinessStateException("会话标签更新失败");
+            }
+        }
+        return toMetadataVO(session, normalizedTags);
+    }
+
+    private ChatSession requireSession(String sessionId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new NotFoundException("会话不存在");
+        }
+        return session;
+    }
+
+    private void validateMetadataRequest(ChatSessionMetadataUpdateDTO request) {
+        if (request == null) {
+            throw new IllegalArgumentException("会话元数据不能为空");
+        }
+        if (request.getTitle() == null || request.getTitle().isBlank()) {
+            throw new IllegalArgumentException("标题不能为空");
+        }
+        if (request.getTitle().length() > ChatConstants.SESSION_TITLE_MAX_LENGTH) {
+            throw new IllegalArgumentException("标题长度不能超过100个字符");
+        }
+        if (!ChatConstants.isValidSessionPriority(request.getPriority())) {
+            throw new IllegalArgumentException("优先级不合法");
+        }
+        if (!ChatConstants.isValidSessionCategory(request.getCategory())) {
+            throw new IllegalArgumentException("分类不合法");
+        }
+    }
+
+    private List<String> normalizeTags(List<String> tags) {
+        if (tags == null || tags.isEmpty()) {
+            return List.of();
+        }
+        LinkedHashSet<String> normalized = new LinkedHashSet<>();
+        for (String value : tags) {
+            if (value == null) {
+                throw new IllegalArgumentException("标签不能为空");
+            }
+            String tag = value.trim().toLowerCase(Locale.ROOT);
+            if (tag.isBlank()) {
+                throw new IllegalArgumentException("标签不能为空");
+            }
+            if (tag.length() > ChatConstants.SESSION_TAG_MAX_LENGTH) {
+                throw new IllegalArgumentException("单个标签长度不能超过32个字符");
+            }
+            normalized.add(tag);
+        }
+        if (normalized.size() > ChatConstants.SESSION_TAG_MAX_COUNT) {
+            throw new IllegalArgumentException("标签数量不能超过10个");
+        }
+        return List.copyOf(normalized);
+    }
+
+    private ChatSessionMetadataVO toMetadataVO(ChatSession session, List<String> tags) {
+        ChatSessionMetadataVO vo = new ChatSessionMetadataVO();
+        vo.setSessionId(session.getId());
+        vo.setTitle(session.getTitle());
+        vo.setPriority(session.getPriority());
+        vo.setCategory(session.getCategory());
+        vo.setTags(tags);
+        vo.setMetadataUpdatedAt(session.getMetadataUpdatedAt());
         return vo;
     }
 

@@ -21,6 +21,12 @@ public interface ChatSessionQueryService {
     /** 客服查看当前会话中用户的基本信息侧栏。 */
     UserProfileSidebarVO getUserProfileSidebar(String agentId, String sessionId);
 
+    /** 查看会话元数据。 */
+    ChatSessionMetadataVO getSessionMetadata(String actorId, boolean administrator, String sessionId);
+
+    /** 更新会话元数据。 */
+    ChatSessionMetadataVO updateSessionMetadata(String agentId, String sessionId, ChatSessionMetadataUpdateDTO request);
+
     /** 查询当前排队状态（在线客服数、队列大小、我的位置、预估等待时间）。 */
     QueueStatusVO getQueueStatus(String userId);
 
