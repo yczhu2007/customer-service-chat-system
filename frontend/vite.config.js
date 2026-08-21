@@ -5,7 +5,8 @@ import vue from "@vitejs/plugin-vue";
 
 export default defineConfig({
   plugins: [vue()],
-  base: '/',
+  // Spring Boot serves the app below /frontend; Vercel serves it at the domain root.
+  base: process.env.VERCEL === '1' || process.env.VERCEL_ENV ? '/' : '/frontend/',
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))
