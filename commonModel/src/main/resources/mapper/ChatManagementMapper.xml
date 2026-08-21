@@ -143,12 +143,15 @@
                    COUNT(*) AS unread_count
             FROM chat_message message
             JOIN scoped_sessions session ON session.id = message.session_id
-            LEFT JOIN chat_message_read read_state
-                   ON read_state.message_id = message.id
-                  AND read_state.user_id = #{agentId}
-            WHERE message.sender_role = 'USER'
+            WHERE message.sender_id IS NOT NULL
+              AND message.sender_id &lt;&gt; #{agentId}
               AND message.recalled = 0
-              AND read_state.message_id IS NULL
+              AND NOT EXISTS (
+                    SELECT 1
+                    FROM chat_message_read read_state
+                    WHERE read_state.message_id = message.id
+                      AND read_state.user_id = #{agentId}
+              )
             GROUP BY message.session_id
         )
     </sql>

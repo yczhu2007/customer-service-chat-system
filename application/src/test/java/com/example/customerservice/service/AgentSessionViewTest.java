@@ -47,6 +47,13 @@ import static org.mockito.Mockito.when;
 @ExtendWith(MockitoExtension.class)
 class AgentSessionViewTest {
 
+    private static final String UNREAD_SENDER_CONTRACT =
+            "MESSAGE.SENDER_ID IS NOT NULL AND MESSAGE.SENDER_ID <> ?";
+    private static final String UNREAD_READ_STATE_CONTRACT =
+            "NOT EXISTS ( SELECT 1 FROM CHAT_MESSAGE_READ READ_STATE "
+                    + "WHERE READ_STATE.MESSAGE_ID = MESSAGE.ID "
+                    + "AND READ_STATE.USER_ID = ? )";
+
     @Mock private ChatManagementMapper managementMapper;
     @Mock private ChatSessionMapper sessionMapper;
     @Mock private ChatRedisRepository redisRepository;
@@ -300,12 +307,54 @@ class AgentSessionViewTest {
         String sql = normalizeSql(boundSql.getSql());
 
         assertTrue(sql.contains("SESSION.AGENT_ID = ?"));
+        assertUnreadContract(sql);
         assertTrue(sql.contains(expectedPredicate), sql);
-        assertEquals(
-                List.of("agentId", "agentId"),
-                boundSql.getParameterMappings().stream()
-                        .map(mapping -> mapping.getProperty())
-                        .toList()
+        assertParameterProperties(boundSql, "agentId", "agentId", "agentId");
+    }
+
+    @Test
+    void unreadCountAndListQueriesShareSenderIdBasedUnreadContract()
+            throws IOException {
+        BoundSql fixedViewCounts = mappedSql(
+                "countAgentSessionViews",
+                Map.of("agentId", "A001")
+        );
+        BoundSql unreadCount = mappedSql(
+                "countAgentViewSessions",
+                new HashMap<>(Map.of(
+                        "agentId", "A001",
+                        "viewCode", "MY_UNREAD"
+                ))
+        );
+        BoundSql unreadList = mappedSql(
+                "findAgentViewSessions",
+                new HashMap<>(Map.of(
+                        "agentId", "A001",
+                        "viewCode", "MY_UNREAD",
+                        "offset", 0L,
+                        "pageSize", 20L
+                ))
+        );
+
+        String fixedViewCountSql = normalizeSql(fixedViewCounts.getSql());
+        String unreadCountSql = normalizeSql(unreadCount.getSql());
+        String unreadListSql = normalizeSql(unreadList.getSql());
+
+        assertUnreadContract(fixedViewCountSql);
+        assertUnreadContract(unreadCountSql);
+        assertUnreadContract(unreadListSql);
+        assertTrue(fixedViewCountSql.contains("SELECT 'MY_UNREAD' AS CODE"));
+        assertTrue(unreadCountSql.contains("COALESCE(UNREAD.UNREAD_COUNT, 0) > 0"));
+        assertTrue(unreadListSql.contains("COALESCE(UNREAD.UNREAD_COUNT, 0) > 0"));
+        assertParameterProperties(fixedViewCounts, "agentId", "agentId", "agentId");
+        assertParameterProperties(unreadCount, "agentId", "agentId", "agentId");
+        assertParameterProperties(
+                unreadList,
+                "agentId",
+                "agentId",
+                "agentId",
+                "offset",
+                "pageSize"
         );
     }
 
@@ -323,6 +372,7 @@ class AgentSessionViewTest {
 
         assertTrue(sql.contains("ROW_NUMBER() OVER (PARTITION BY MESSAGE.SESSION_ID"));
         assertTrue(sql.contains("LEFT JOIN UNREAD_BY_SESSION UNREAD"));
+        assertUnreadContract(sql);
         assertTrue(sql.contains("SESSION.TITLE"));
         assertTrue(sql.contains("SESSION.PRIORITY"));
         assertTrue(sql.contains("SESSION.CATEGORY"));
@@ -332,6 +382,14 @@ class AgentSessionViewTest {
         assertTrue(sql.contains("SESSION.ARCHIVED_AT"));
         assertTrue(sql.contains("LATEST.SENDER_ID AS LAST_MESSAGE_SENDER_ID"));
         assertTrue(sql.contains("COALESCE(UNREAD.UNREAD_COUNT, 0) AS UNREAD_COUNT"));
+        assertParameterProperties(
+                boundSql,
+                "agentId",
+                "agentId",
+                "agentId",
+                "offset",
+                "pageSize"
+        );
     }
 
     private static Stream<Arguments> viewPredicates() {
@@ -394,5 +452,22 @@ class AgentSessionViewTest {
         return sql.replaceAll("\\s+", " ")
                 .trim()
                 .toUpperCase(Locale.ROOT);
+    }
+
+    private static void assertUnreadContract(String sql) {
+        assertTrue(sql.contains(UNREAD_SENDER_CONTRACT), sql);
+        assertTrue(sql.contains(UNREAD_READ_STATE_CONTRACT), sql);
+    }
+
+    private static void assertParameterProperties(
+            BoundSql boundSql,
+            String... expectedProperties
+    ) {
+        assertEquals(
+                List.of(expectedProperties),
+                boundSql.getParameterMappings().stream()
+                        .map(mapping -> mapping.getProperty())
+                        .toList()
+        );
     }
 }
