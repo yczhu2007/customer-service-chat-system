@@ -77,7 +77,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   <section class="dead-letter-panel">
     <div class="panel-header">
       <h2>死信管理</h2>
-      <button class="btn" @click="loadDeadLetters" :disabled="loading">🔄 刷新</button>
+      <button class="btn" @click="loadDeadLetters" :disabled="loading">刷新</button>
     </div>
 
     <div class="info-box">

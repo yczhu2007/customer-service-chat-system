@@ -22,11 +22,11 @@ async function loadStats() {
 onMounted(loadStats)
 
 const statusCards = [
-  { key: 'completed', label: '已完成 (COMPLETED)', color: '#16a34a', icon: '✅' },
-  { key: 'pending', label: '待处理 (PENDING)', color: '#f59e0b', icon: '⏳' },
-  { key: 'onHold', label: '搁置 (ON_HOLD)', color: '#6366f1', icon: '⏸️' },
-  { key: 'other', label: '其他 (OTHER)', color: '#8b5cf6', icon: '📋' },
-  { key: 'unarchived', label: '未归档', color: '#94a3b8', icon: '📭' },
+  { key: 'completed', label: '已完成 (COMPLETED)', color: '#238636' },
+  { key: 'pending', label: '待处理 (PENDING)', color: '#b7791f' },
+  { key: 'onHold', label: '搁置 (ON_HOLD)', color: '#4f6f9f' },
+  { key: 'other', label: '其他 (OTHER)', color: '#6b7280' },
+  { key: 'unarchived', label: '未归档', color: '#94a3b8' },
 ]
 
 const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.key] ?? 0), 0)
@@ -37,7 +37,7 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
     <div class="panel-header">
       <h2>归档统计</h2>
       <button class="btn" @click="loadStats" :disabled="loading">
-        {{ loading ? '刷新中...' : '🔄 刷新' }}
+        {{ loading ? '刷新中...' : '刷新' }}
       </button>
     </div>
 
@@ -56,7 +56,6 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
           class="stat-card"
           :style="{ borderLeftColor: card.color }"
         >
-          <div class="card-icon">{{ card.icon }}</div>
           <div class="card-body">
             <div class="card-count">{{ stats[card.key] ?? 0 }}</div>
             <div class="card-label">{{ card.label }}</div>
@@ -79,10 +78,11 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
 }
 .total-card {
   text-align: center;
-  background: linear-gradient(135deg, #2563eb, #1d4ed8);
-  color: #fff;
-  border-radius: 12px;
-  padding: 2rem;
+  background: #fff;
+  color: #1f2937;
+  border: 1px solid #d7dde5;
+  border-radius: 4px;
+  padding: 1.5rem;
   margin-bottom: 1.5rem;
 }
 .total-value {
@@ -108,9 +108,6 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
   border-left: 4px solid;
   border-radius: 8px;
   padding: 1rem 1.25rem;
-}
-.card-icon {
-  font-size: 2rem;
 }
 .card-count {
   font-size: 1.75rem;

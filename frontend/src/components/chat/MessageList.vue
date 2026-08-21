@@ -114,7 +114,7 @@ onMounted(() => scrollToBottom())
               :download="msg.content"
               class="file-link"
             >
-              📎 {{ msg.content }}
+              附件：{{ msg.content }}
             </a>
             <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
             <button v-else class="load-btn" @click="loadBlob(msg)">下载文件</button>

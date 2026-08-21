@@ -4,13 +4,13 @@ import { useChatStore } from '../../stores/chat'
 
 const chat = useChatStore()
 
-/** View definitions with Chinese labels and icons */
+/** Fixed agent views. */
 const VIEW_DEFS = [
-  { code: 'MY_ACTIVE', label: '处理中', icon: '🟢' },
-  { code: 'MY_UNREAD', label: '未读', icon: '🔴' },
-  { code: 'MY_HIGH_PRIORITY', label: '高优先级', icon: '⚡' },
-  { code: 'MY_UNARCHIVED', label: '未归档', icon: '📂' },
-  { code: 'MY_RECENT_CLOSED', label: '最近关闭', icon: '✅' },
+  { code: 'MY_ACTIVE', label: '处理中' },
+  { code: 'MY_UNREAD', label: '未读' },
+  { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
+  { code: 'MY_UNARCHIVED', label: '未归档' },
+  { code: 'MY_RECENT_CLOSED', label: '最近关闭' },
 ]
 
 /** Build a map of code -> count for quick lookup */
@@ -42,7 +42,6 @@ onMounted(() => {
         :class="{ active: chat.activeAgentView === v.code }"
         @click="selectView(v.code)"
       >
-        <span class="view-icon">{{ v.icon }}</span>
         <span class="view-label">{{ v.label }}</span>
         <span v-if="countMap[v.code] != null" class="view-count" :class="{ highlight: countMap[v.code] > 0 }">
           {{ countMap[v.code] }}
@@ -86,11 +85,6 @@ onMounted(() => {
   background: #eff6ff;
   color: #1d4ed8;
   font-weight: 600;
-}
-.view-icon {
-  font-size: 1rem;
-  width: 1.25rem;
-  text-align: center;
 }
 .view-label {
   flex: 1;

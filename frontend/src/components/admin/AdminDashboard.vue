@@ -24,11 +24,11 @@ async function loadDashboard() {
 onMounted(loadDashboard)
 
 const quickLinks = [
-  { label: '用户管理', panel: 'users', icon: '👥' },
-  { label: '角色管理', panel: 'roles', icon: '🔑' },
-  { label: '归档统计', panel: 'archive', icon: '📊' },
-  { label: '死信管理', panel: 'deadletters', icon: '💀' },
-  { label: 'VIP 技能组', panel: 'vip', icon: '⭐' },
+  { label: '用户管理', panel: 'users' },
+  { label: '角色管理', panel: 'roles' },
+  { label: '归档统计', panel: 'archive' },
+  { label: '死信管理', panel: 'deadletters' },
+  { label: 'VIP 技能组', panel: 'vip' },
 ]
 </script>
 
@@ -66,7 +66,6 @@ const quickLinks = [
           class="quick-link"
           @click="emit('navigate', link.panel)"
         >
-          <span class="ql-icon">{{ link.icon }}</span>
           <span>{{ link.label }}</span>
         </button>
       </div>
@@ -84,16 +83,17 @@ const quickLinks = [
   margin-bottom: 1.5rem;
 }
 .card {
-  background: #f0f4ff;
-  border-radius: 8px;
-  padding: 1.25rem 2rem;
-  text-align: center;
+  background: #fff;
+  border: 1px solid #d7dde5;
+  border-radius: 4px;
+  padding: 1rem 1.5rem;
+  text-align: left;
   min-width: 120px;
 }
 .card-value {
   font-size: 2rem;
   font-weight: 700;
-  color: #2563eb;
+  color: #1f5f99;
 }
 .card-label {
   margin-top: 0.25rem;
@@ -110,7 +110,7 @@ const quickLinks = [
   gap: 0.5rem;
   padding: 0.75rem 1.25rem;
   border: 1px solid #d1d5db;
-  border-radius: 8px;
+  border-radius: 4px;
   background: #fff;
   cursor: pointer;
   font-size: 1rem;
@@ -119,9 +119,6 @@ const quickLinks = [
 .quick-link:hover {
   border-color: #2563eb;
   box-shadow: 0 2px 8px rgba(37,99,235,0.15);
-}
-.ql-icon {
-  font-size: 1.25rem;
 }
 .loading, .error {
   padding: 1rem;

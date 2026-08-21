@@ -63,7 +63,7 @@ async function handleRemove(agentId) {
   <section class="vip-panel">
     <div class="panel-header">
       <h2>VIP 技能组</h2>
-      <button class="btn" @click="loadAgents" :disabled="loading">🔄 刷新</button>
+      <button class="btn" @click="loadAgents" :disabled="loading">刷新</button>
     </div>
 
     <div class="add-form">
