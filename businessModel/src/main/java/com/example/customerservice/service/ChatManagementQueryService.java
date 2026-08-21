@@ -18,18 +18,14 @@ public interface ChatManagementQueryService {
 
     AgentDashboardVO findAgentDashboard(String agentId);
 
-    default List<AgentSessionViewCountVO> findAgentSessionViews(String agentId) {
-        throw new UnsupportedOperationException("Task 3A only defines the contract");
-    }
+    List<AgentSessionViewCountVO> findAgentSessionViews(String agentId);
 
-    default PageResult<ChatSessionListItemVO> findAgentViewSessions(
+    PageResult<ChatSessionListItemVO> findAgentViewSessions(
             String agentId,
             AgentSessionView view,
             long pageNo,
             long pageSize
-    ) {
-        throw new UnsupportedOperationException("Task 3A only defines the contract");
-    }
+    );
 
     AdminDashboardVO findAdminDashboard();
 

@@ -1,11 +1,15 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.ChatSessionTag;
 import com.example.customerservice.dto.AdminDashboardVO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentLoadVO;
+import com.example.customerservice.dto.AgentSessionViewCountVO;
+import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -13,13 +17,18 @@ import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatManagementMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.ChatSessionTagMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatManagementQueryService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -30,15 +39,32 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
     private final ChatManagementMapper managementMapper;
     private final ChatSessionMapper sessionMapper;
     private final ChatRedisRepository redisRepository;
+    private final ChatSessionTagMapper sessionTagMapper;
 
     public ChatManagementQueryServiceImpl(
             ChatManagementMapper managementMapper,
             ChatSessionMapper sessionMapper,
             ChatRedisRepository redisRepository
     ) {
+        this(
+                managementMapper,
+                sessionMapper,
+                redisRepository,
+                null
+        );
+    }
+
+    @Autowired
+    public ChatManagementQueryServiceImpl(
+            ChatManagementMapper managementMapper,
+            ChatSessionMapper sessionMapper,
+            ChatRedisRepository redisRepository,
+            ChatSessionTagMapper sessionTagMapper
+    ) {
         this.managementMapper = managementMapper;
         this.sessionMapper = sessionMapper;
         this.redisRepository = redisRepository;
+        this.sessionTagMapper = sessionTagMapper;
     }
 
     @Override
@@ -62,6 +88,81 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 valueOrZero(redisRepository.sortedSetCardinality(RedisConstants.QUEUE_PENDING)),
                 activeSessions == null ? List.of() : List.copyOf(activeSessions),
                 managementMapper.countTodayClosedSessionsByAgent(agentId, dayStart, dayEnd)
+        );
+    }
+
+    @Override
+    public List<AgentSessionViewCountVO> findAgentSessionViews(String agentId) {
+        requireText(agentId, "客服ID不能为空");
+        String normalizedAgentId = agentId.trim();
+        List<AgentSessionViewCountVO> counts = managementMapper.countAgentSessionViews(
+                normalizedAgentId
+        );
+        Map<String, Long> countByCode = new LinkedHashMap<>();
+        if (counts != null) {
+            for (AgentSessionViewCountVO count : counts) {
+                if (count != null && count.code() != null) {
+                    countByCode.put(count.code(), count.count());
+                }
+            }
+        }
+        List<AgentSessionViewCountVO> result = new ArrayList<>(AgentSessionView.values().length);
+        for (AgentSessionView view : AgentSessionView.values()) {
+            result.add(new AgentSessionViewCountVO(
+                    view.getCode(),
+                    view.getLabel(),
+                    countByCode.getOrDefault(view.getCode(), 0L)
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    @Override
+    public PageResult<ChatSessionListItemVO> findAgentViewSessions(
+            String agentId,
+            AgentSessionView view,
+            long pageNo,
+            long pageSize
+    ) {
+        requireText(agentId, "客服ID不能为空");
+        if (view == null) {
+            throw new IllegalArgumentException("坐席会话视图不能为空");
+        }
+
+        String normalizedAgentId = agentId.trim();
+        long normalizedPageNo = Math.max(1L, pageNo);
+        long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
+        long total = managementMapper.countAgentViewSessions(
+                normalizedAgentId,
+                view.getCode()
+        );
+        long pages = total == 0 ? 0 : (total + normalizedPageSize - 1) / normalizedPageSize;
+        if (total == 0) {
+            return new PageResult<>(
+                    normalizedPageNo,
+                    normalizedPageSize,
+                    0L,
+                    0L,
+                    List.of()
+            );
+        }
+
+        List<ChatSessionListItemVO> records = managementMapper.findAgentViewSessions(
+                normalizedAgentId,
+                view.getCode(),
+                (normalizedPageNo - 1) * normalizedPageSize,
+                normalizedPageSize
+        );
+        List<ChatSessionListItemVO> safeRecords = records == null
+                ? List.of()
+                : List.copyOf(records);
+        attachSessionTags(safeRecords);
+        return new PageResult<>(
+                normalizedPageNo,
+                normalizedPageSize,
+                total,
+                pages,
+                safeRecords
         );
     }
 
@@ -179,6 +280,47 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
             throw new IllegalArgumentException("无权查看该会话的转接记录");
         }
         return safeRecords;
+    }
+
+    private void attachSessionTags(List<ChatSessionListItemVO> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        if (sessionTagMapper == null) {
+            throw new IllegalStateException(
+                    "Agent session views require the ChatSessionTagMapper dependency"
+            );
+        }
+
+        List<String> sessionIds = new ArrayList<>(records.size());
+        for (ChatSessionListItemVO record : records) {
+            if (record != null && record.getSessionId() != null) {
+                sessionIds.add(record.getSessionId());
+            }
+        }
+        Map<String, List<String>> tagsBySessionId = new LinkedHashMap<>();
+        if (!sessionIds.isEmpty()) {
+            List<ChatSessionTag> sessionTags = sessionTagMapper.selectBySessionIds(sessionIds);
+            if (sessionTags != null) {
+                for (ChatSessionTag sessionTag : sessionTags) {
+                    if (sessionTag == null
+                            || sessionTag.getSessionId() == null
+                            || sessionTag.getTag() == null) {
+                        continue;
+                    }
+                    tagsBySessionId.computeIfAbsent(
+                            sessionTag.getSessionId(),
+                            ignored -> new ArrayList<>()
+                    ).add(sessionTag.getTag());
+                }
+            }
+        }
+        for (ChatSessionListItemVO record : records) {
+            if (record == null || record.getSessionId() == null) {
+                continue;
+            }
+            record.setTags(tagsBySessionId.getOrDefault(record.getSessionId(), List.of()));
+        }
     }
 
     private void validateStatus(String status) {
