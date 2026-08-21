@@ -68,66 +68,73 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
 
 <style scoped>
 .archive-stats {
-  padding: 1rem;
+  max-width: 980px;
+  margin: 0 auto;
 }
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 18px;
 }
 .total-card {
   text-align: center;
-  background: #fff;
-  color: #1f2937;
-  border: 1px solid #d7dde5;
-  border-radius: 4px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+  background: var(--color-paper);
+  color: var(--color-ink);
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 12px;
+  text-align: left;
 }
 .total-value {
-  font-size: 3rem;
-  font-weight: 800;
+  font-size: 24px;
+  font-weight: 700;
 }
 .total-label {
-  font-size: 1.1rem;
-  opacity: 0.9;
-  margin-top: 0.25rem;
+  color: var(--color-muted);
+  font-size: 12px;
+  margin-top: 2px;
 }
 .cards-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: 1fr;
+  gap: 0;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
 }
 .stat-card {
   display: flex;
   align-items: center;
-  gap: 1rem;
-  background: #fff;
-  border: 1px solid #e5e7eb;
+  gap: 10px;
+  min-height: 44px;
+  background: var(--color-paper);
+  border: 0;
   border-left: 4px solid;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-line);
+  border-radius: 0;
+  padding: 9px 12px;
 }
 .card-count {
-  font-size: 1.75rem;
+  font-size: 16px;
   font-weight: 700;
-  color: #1e293b;
+  color: var(--color-ink);
 }
 .card-label {
-  font-size: 0.9rem;
-  color: #64748b;
+  font-size: 12px;
+  color: var(--color-muted);
 }
 .btn {
   padding: 0.4rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-paper);
   cursor: pointer;
   font-size: 0.9rem;
 }
 .btn:hover:not(:disabled) {
-  background: #f3f4f6;
+  background: rgba(77, 107, 254, .04);
 }
 .btn:disabled {
   opacity: 0.6;
@@ -137,6 +144,6 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
   padding: 1rem;
 }
 .error {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 </style>

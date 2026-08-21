@@ -107,27 +107,27 @@ onUnmounted(() => {
 <style scoped>
 .user-workspace {
   display: flex;
-  height: 100vh;
-  background: #f3f4f6;
+  min-height: calc(100vh - 54px);
+  background: var(--color-bg);
 }
 .left-panel {
   width: 320px;
   min-width: 280px;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid #e5e7eb;
-  background: white;
+  border-right: 1px solid var(--color-line);
+  background: var(--color-paper);
 }
 .queue-panel {
   padding: 1rem;
-  border-bottom: 1px solid #e5e7eb;
-  background: #fafbfc;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-paper);
 }
 .queue-panel h3 {
   margin: 0 0 0.75rem 0;
   font-size: 0.95rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-ink);
 }
 .queue-info {
   display: flex;
@@ -141,14 +141,14 @@ onUnmounted(() => {
   font-size: 0.85rem;
 }
 .queue-row .label {
-  color: #6b7280;
+  color: var(--color-muted);
 }
 .queue-row .value {
   font-weight: 500;
-  color: #111827;
+  color: var(--color-ink);
 }
 .queue-row.highlight {
-  background: #eff6ff;
+  background: rgba(77, 107, 254, .06);
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
 }
@@ -159,28 +159,28 @@ onUnmounted(() => {
 .consult-btn {
   flex: 1;
   padding: 0.5rem;
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
   border: none;
-  border-radius: 0.375rem;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
   font-weight: 500;
 }
 .consult-btn:hover {
-  background: #2563eb;
+  background: var(--color-primary-hover);
 }
 .refresh-queue-btn {
   padding: 0.5rem 0.75rem;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
   cursor: pointer;
   font-size: 0.85rem;
-  color: #374151;
+  color: var(--color-ink);
 }
 .refresh-queue-btn:hover {
-  background: #f9fafb;
+  background: rgba(77, 107, 254, .04);
 }
 .session-list-container {
   flex: 1;

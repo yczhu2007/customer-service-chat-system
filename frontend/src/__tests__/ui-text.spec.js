@@ -21,4 +21,10 @@ describe('workspace visual text', () => {
 
     expect(contents.join('\n')).not.toMatch(/\p{Extended_Pictographic}/u)
   })
+
+  it('defines the stomp-test primary color as a global design token', async () => {
+    const app = await readFile(join(sourceRoot, 'App.vue'), 'utf8')
+
+    expect(app).toContain('--color-primary: #4d6bfe')
+  })
 })

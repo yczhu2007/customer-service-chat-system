@@ -66,14 +66,15 @@ const priorityClass = computed(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f9fafb;
-  border-radius: 0.5rem;
+  background: var(--color-bg);
+  border: 1px solid var(--color-line);
+  border-radius: 10px;
   overflow: hidden;
 }
 .session-header {
   padding: 0.75rem 1rem;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-line);
 }
 .header-main {
   display: flex;
@@ -84,26 +85,26 @@ const priorityClass = computed(() => {
 .session-title {
   font-weight: 600;
   font-size: 1rem;
-  color: #111827;
+  color: var(--color-ink);
 }
 .status-badge {
   font-size: 0.75rem;
   padding: 0.125rem 0.5rem;
   border-radius: 9999px;
-  background: #e5e7eb;
-  color: #374151;
+  background: #f2f3f5;
+  color: var(--color-muted);
 }
 .status-badge.active {
-  background: #d1fae5;
-  color: #065f46;
+  background: #e7f4ee;
+  color: var(--color-success);
 }
 .status-badge.queued {
   background: #fef3c7;
   color: #92400e;
 }
 .status-badge.closed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fdecec;
+  color: var(--color-danger);
 }
 .priority-badge {
   font-size: 0.7rem;
@@ -124,7 +125,7 @@ const priorityClass = computed(() => {
 }
 .priority-low {
   background: #f3f4f6;
-  color: #6b7280;
+  color: var(--color-muted);
 }
 .category-badge {
   font-size: 0.7rem;
@@ -148,7 +149,7 @@ const priorityClass = computed(() => {
   flex-wrap: wrap;
 }
 .tag {
-  background: #f3f4f6;
+  background: #f2f3f5;
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
   font-size: 0.7rem;
@@ -158,6 +159,6 @@ const priorityClass = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #9ca3af;
+  color: var(--color-faint);
 }
 </style>

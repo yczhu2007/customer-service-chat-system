@@ -129,9 +129,9 @@ onUnmounted(() => {
 .agent-workspace {
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  background: #f3f4f6;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: calc(100vh - 54px);
+  background: var(--color-bg);
+  font-family: var(--font-sans);
 }
 
 /* ─── Header ─── */
@@ -140,14 +140,14 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 0.5rem 1rem;
-  background: white;
-  border-bottom: 1px solid #e5e7eb;
+  background: var(--color-paper);
+  border-bottom: 1px solid var(--color-line);
   flex-shrink: 0;
 }
 .workspace-title {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-ink);
   margin: 0;
 }
 .header-right {
@@ -157,49 +157,49 @@ onUnmounted(() => {
 }
 .agent-id {
   font-size: 0.8rem;
-  color: #6b7280;
+  color: var(--color-muted);
 }
 .online-status {
   font-size: 0.75rem;
   padding: 0.1rem 0.5rem;
   border-radius: 9999px;
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fdecec;
+  color: var(--color-danger);
 }
 .online-status.online {
-  background: #d1fae5;
-  color: #065f46;
+  background: #e7f4ee;
+  color: var(--color-success);
 }
 .online-btn,
 .offline-btn {
   font-size: 0.8rem;
   padding: 0.25rem 0.75rem;
-  border-radius: 0.375rem;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid;
 }
 .online-btn {
-  background: #3b82f6;
+  background: var(--color-primary);
   color: white;
-  border-color: #3b82f6;
+  border-color: var(--color-primary);
 }
 .online-btn:hover {
-  background: #2563eb;
+  background: var(--color-primary-hover);
 }
 .offline-btn {
   background: white;
-  color: #ef4444;
-  border-color: #ef4444;
+  color: var(--color-danger);
+  border-color: var(--color-danger);
 }
 .offline-btn:hover {
   background: #fef2f2;
 }
 .ws-status {
   font-size: 0.7rem;
-  color: #9ca3af;
+  color: var(--color-faint);
 }
 .ws-status.connected {
-  color: #059669;
+  color: var(--color-success);
 }
 
 /* ─── Body layout ─── */
@@ -213,15 +213,15 @@ onUnmounted(() => {
 .left-sidebar {
   width: 280px;
   min-width: 240px;
-  background: white;
-  border-right: 1px solid #e5e7eb;
+  background: var(--color-paper);
+  border-right: 1px solid var(--color-line);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 .sidebar-divider {
   height: 1px;
-  background: #e5e7eb;
+  background: var(--color-line);
 }
 .session-list-header {
   display: flex;
@@ -232,19 +232,19 @@ onUnmounted(() => {
 .list-title {
   font-size: 0.8rem;
   font-weight: 600;
-  color: #374151;
+  color: var(--color-ink);
 }
 .refresh-btn {
   font-size: 0.7rem;
   padding: 0.15rem 0.5rem;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
+  background: var(--color-paper);
+  border: 1px solid var(--color-line-strong);
   border-radius: 4px;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--color-muted);
 }
 .refresh-btn:hover {
-  background: #e5e7eb;
+  background: rgba(77, 107, 254, .04);
 }
 
 /* ─── Center chat area ─── */
@@ -259,8 +259,8 @@ onUnmounted(() => {
 .right-sidebar {
   width: 280px;
   min-width: 240px;
-  background: white;
-  border-left: 1px solid #e5e7eb;
+  background: var(--color-paper);
+  border-left: 1px solid var(--color-line);
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -269,8 +269,8 @@ onUnmounted(() => {
 /* ─── Footer ─── */
 .workspace-footer {
   display: flex;
-  background: white;
-  border-top: 1px solid #e5e7eb;
+  background: var(--color-paper);
+  border-top: 1px solid var(--color-line);
   flex-shrink: 0;
   max-height: 240px;
   overflow: hidden;
@@ -281,7 +281,7 @@ onUnmounted(() => {
 }
 .footer-divider {
   width: 1px;
-  background: #e5e7eb;
+  background: var(--color-line);
 }
 .quick-reply-section {
   flex: 1.5;

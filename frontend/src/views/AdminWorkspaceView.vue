@@ -54,41 +54,52 @@ function switchTab(key) {
 .admin-workspace {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
+  min-height: calc(100vh - 54px);
+  background: var(--color-bg);
 }
 .tab-bar {
   display: flex;
   gap: 0;
-  border-bottom: 2px solid #e5e7eb;
-  background: #f9fafb;
-  padding: 0 0.5rem;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-paper);
+  padding: 0 20px;
   flex-shrink: 0;
   overflow-x: auto;
 }
 .tab {
-  padding: 0.75rem 1.25rem;
+  padding: 14px 16px;
   border: none;
   background: transparent;
   cursor: pointer;
   font-size: 0.95rem;
-  color: #64748b;
+  color: var(--color-muted);
   border-bottom: 2px solid transparent;
-  margin-bottom: -2px;
+  margin-bottom: -1px;
   white-space: nowrap;
   transition: color 0.2s, border-color 0.2s;
 }
 .tab:hover {
-  color: #1e293b;
+  color: var(--color-ink);
 }
 .tab.active {
-  color: #2563eb;
-  border-bottom-color: #2563eb;
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
   font-weight: 600;
 }
 .tab-content {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
+  padding: 18px 24px;
 }
+:deep(.data-table) { background: var(--color-paper); border: 1px solid var(--color-line); border-radius: 8px; overflow: hidden; }
+:deep(.data-table thead) { background: #f8f9fb; }
+:deep(.data-table th) { color: var(--color-muted); font-size: 12px; font-weight: 600; }
+:deep(.data-table th), :deep(.data-table td) { border-bottom-color: var(--color-line); }
+:deep(.panel-header h2), :deep(.tab-content h2) { color: var(--color-ink); font-size: 19px; }
+:deep(.btn-primary) { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
+:deep(.btn-primary:hover:not(:disabled)) { border-color: var(--color-primary-hover); background: var(--color-primary-hover); color: #fff; }
+:deep(.btn-danger) { border-color: var(--color-danger); background: transparent; color: var(--color-danger); }
+:deep(.dialog) { border: 1px solid var(--color-line); border-radius: 10px; box-shadow: 0 12px 32px rgba(24, 29, 38, .14); }
+:deep(.filters input), :deep(.filters select) { border-color: var(--color-line-strong); border-radius: 8px; }
 </style>

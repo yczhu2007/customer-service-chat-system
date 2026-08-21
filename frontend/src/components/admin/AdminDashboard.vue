@@ -75,55 +75,58 @@ const quickLinks = [
 
 <style scoped>
 .admin-dashboard {
-  padding: 1rem;
+  max-width: 1180px;
+  margin: 0 auto;
 }
+.admin-dashboard h2 { margin: 0 0 18px; font-size: 19px; }
 .summary-cards {
   display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 24px;
 }
 .card {
   background: #fff;
-  border: 1px solid #d7dde5;
-  border-radius: 4px;
-  padding: 1rem 1.5rem;
+  border: 1px solid var(--color-line);
+  border-radius: 8px;
+  padding: 12px;
   text-align: left;
   min-width: 120px;
 }
 .card-value {
   font-size: 2rem;
   font-weight: 700;
-  color: #1f5f99;
+  color: var(--color-ink);
 }
 .card-label {
   margin-top: 0.25rem;
-  color: #555;
+  color: var(--color-muted);
 }
 .quick-links {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.75rem;
+  gap: 8px;
 }
 .quick-link {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.25rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  background: #fff;
+  padding: 9px 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-paper);
   cursor: pointer;
-  font-size: 1rem;
-  transition: border-color 0.2s, box-shadow 0.2s;
+  font-size: 13px;
+  transition: border-color .12s ease;
 }
 .quick-link:hover {
-  border-color: #2563eb;
-  box-shadow: 0 2px 8px rgba(37,99,235,0.15);
+  border-color: var(--color-primary);
 }
 .loading, .error {
   padding: 1rem;
 }
 .error {
-  color: #dc2626;
+  color: var(--color-danger);
 }
 </style>
