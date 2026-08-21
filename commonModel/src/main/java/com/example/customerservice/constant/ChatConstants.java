@@ -66,7 +66,7 @@ public final class ChatConstants {
     }
 
     public static boolean isValidSessionCategory(String category) {
-        return category != null && VALID_SESSION_CATEGORIES.contains(category);
+        return category == null || VALID_SESSION_CATEGORIES.contains(category);
     }
 
     /**

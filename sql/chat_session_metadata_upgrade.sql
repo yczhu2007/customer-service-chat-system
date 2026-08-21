@@ -18,6 +18,40 @@ UPDATE chat_session
 SET priority = 'NORMAL'
 WHERE priority IS NULL OR priority = '';
 
+SET @chat_session_priority_check_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'chat_session'
+      AND CONSTRAINT_NAME = 'chk_chat_session_priority'
+      AND CONSTRAINT_TYPE = 'CHECK'
+);
+SET @chat_session_priority_check_sql = IF(
+    @chat_session_priority_check_exists = 0,
+    'ALTER TABLE chat_session ADD CONSTRAINT chk_chat_session_priority CHECK (priority IN (''LOW'', ''NORMAL'', ''HIGH'', ''URGENT''))',
+    'SELECT 1'
+);
+PREPARE chat_session_priority_check_statement FROM @chat_session_priority_check_sql;
+EXECUTE chat_session_priority_check_statement;
+DEALLOCATE PREPARE chat_session_priority_check_statement;
+
+SET @chat_session_category_check_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.TABLE_CONSTRAINTS
+    WHERE CONSTRAINT_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'chat_session'
+      AND CONSTRAINT_NAME = 'chk_chat_session_category'
+      AND CONSTRAINT_TYPE = 'CHECK'
+);
+SET @chat_session_category_check_sql = IF(
+    @chat_session_category_check_exists = 0,
+    'ALTER TABLE chat_session ADD CONSTRAINT chk_chat_session_category CHECK (category IS NULL OR category IN (''ACCOUNT'', ''PAYMENT'', ''TECHNICAL'', ''AFTER_SALES'', ''OTHER''))',
+    'SELECT 1'
+);
+PREPARE chat_session_category_check_statement FROM @chat_session_category_check_sql;
+EXECUTE chat_session_category_check_statement;
+DEALLOCATE PREPARE chat_session_category_check_statement;
+
 CREATE TABLE IF NOT EXISTS chat_session_tag
 (
     session_id   VARCHAR(64) NOT NULL COMMENT '会话ID',
