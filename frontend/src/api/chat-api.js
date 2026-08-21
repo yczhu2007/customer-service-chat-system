@@ -80,3 +80,85 @@ export const fetchAttachmentBlob = async (attachmentId) => {
   const blob = await res.blob()
   return URL.createObjectURL(blob)
 }
+
+// ─── Agent workspace APIs ────────────────────────────────────────
+
+/**
+ * Set the current agent online.
+ */
+export const agentOnline = () =>
+  request('/chat/agent/online', { method: 'POST' })
+
+/**
+ * Set the current agent offline.
+ */
+export const agentOffline = () =>
+  request('/chat/agent/offline', { method: 'POST' })
+
+/**
+ * Get session metadata (title, priority, category, tags).
+ */
+export const getSessionMetadata = (sessionId) =>
+  request(`/chat/sessions/${sessionId}/metadata`)
+
+/**
+ * Update session metadata (AGENT only, assigned agent).
+ * data: { title, priority, category?, tags? }
+ */
+export const updateSessionMetadata = (sessionId, data) =>
+  request(`/chat/sessions/${sessionId}/metadata`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
+/**
+ * Update session archive status (AGENT only).
+ * data: { archiveStatus, remark? }
+ */
+export const setArchiveStatus = (sessionId, data) =>
+  request(`/chat/sessions/${sessionId}/archive-status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
+/**
+ * Get user profile sidebar for a session (AGENT only).
+ */
+export const getUserProfile = (sessionId) =>
+  request(`/chat/sessions/${sessionId}/user-profile`)
+
+/**
+ * List current agent's quick replies.
+ */
+export const listQuickReplies = () =>
+  request('/chat/quick-replies')
+
+/**
+ * Create a new quick reply.
+ * data: { title, content, sortOrder? }
+ */
+export const createQuickReply = (data) =>
+  request('/chat/quick-replies', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
+/**
+ * Update an existing quick reply.
+ * data: { title, content, sortOrder? }
+ */
+export const updateQuickReply = (id, data) =>
+  request(`/chat/quick-replies/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
+/**
+ * Delete a quick reply.
+ */
+export const deleteQuickReply = (id) =>
+  request(`/chat/quick-replies/${id}`, { method: 'DELETE' })

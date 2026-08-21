@@ -1,16 +1,31 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
 
 const props = defineProps({
   sessionId: { type: String, required: true },
   disabled: { type: Boolean, default: false },
+  /** Optional text to insert into the composer (e.g. from quick reply) */
+  insertText: { type: String, default: '' },
 })
+
+const emit = defineEmits(['inserted'])
 
 const chat = useChatStore()
 const text = ref('')
 const fileInput = ref(null)
 const uploading = ref(false)
+
+/** Watch for external insert text (quick reply) */
+watch(
+  () => props.insertText,
+  (val) => {
+    if (val) {
+      text.value = val
+      emit('inserted')
+    }
+  }
+)
 
 /** Send text message on Enter or button click */
 function sendText() {

@@ -2,10 +2,16 @@ import { defineStore } from 'pinia'
 import { useAuthStore } from './auth'
 import {
   listSessions,
+  listAgentViews,
+  listAgentViewSessions,
   getQueueStatus,
   getSessionRating,
   submitRating,
   uploadAttachment,
+  getSessionMetadata,
+  updateSessionMetadata,
+  setArchiveStatus,
+  getUserProfile,
 } from '../api/chat-api'
 import { createStompClient } from '../services/stomp-client'
 
@@ -33,6 +39,17 @@ export const useChatStore = defineStore('chat', {
     messagesLoading: false,
     /** Error message */
     error: null,
+    // ─── Agent workspace state ───
+    /** Agent view counts: [{ code, label, count }] */
+    agentViewCounts: [],
+    /** Active agent view code */
+    activeAgentView: 'MY_ACTIVE',
+    /** Metadata for the active session */
+    activeMetadata: null,
+    /** User profile for the active session */
+    activeUserProfile: null,
+    /** Agent online status */
+    agentOnline: false,
   }),
 
   getters: {
@@ -282,6 +299,116 @@ export const useChatStore = defineStore('chat', {
         this._deactivateStomp()
         this._deactivateStomp = null
       }
+    },
+
+    // ─── Agent workspace actions ──────────────────────────────
+
+    /**
+     * Load agent view counts from REST.
+     */
+    async loadAgentViewCounts() {
+      try {
+        const result = await listAgentViews()
+        const data = result?.data || result
+        this.agentViewCounts = Array.isArray(data) ? data : []
+      } catch (e) {
+        this.error = e.message
+      }
+    },
+
+    /**
+     * Load sessions for a specific agent view.
+     */
+    async loadAgentViewSessions(viewCode, params = {}) {
+      this.sessionsLoading = true
+      this.error = null
+      try {
+        const result = await listAgentViewSessions(viewCode, params)
+        const page = result?.data || result
+        this.sessions = page?.records || []
+      } catch (e) {
+        this.error = e.message
+      } finally {
+        this.sessionsLoading = false
+      }
+    },
+
+    /**
+     * Switch active agent view and refresh sessions.
+     */
+    async switchAgentView(viewCode) {
+      this.activeAgentView = viewCode
+      await this.loadAgentViewSessions(viewCode)
+    },
+
+    /**
+     * Load session metadata (title, priority, category, tags).
+     */
+    async loadSessionMetadata(sessionId) {
+      try {
+        const result = await getSessionMetadata(sessionId)
+        this.activeMetadata = result?.data || result
+      } catch (e) {
+        this.activeMetadata = null
+        this.error = e.message
+      }
+    },
+
+    /**
+     * Update session metadata.
+     */
+    async updateSessionMetadata(sessionId, data) {
+      try {
+        const result = await updateSessionMetadata(sessionId, data)
+        this.activeMetadata = result?.data || result
+        // Refresh the session list entry if present
+        const idx = this.sessions.findIndex((s) => s.sessionId === sessionId)
+        if (idx !== -1) {
+          this.sessions[idx] = { ...this.sessions[idx], ...data }
+        }
+        return this.activeMetadata
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
+    /**
+     * Update archive status for a session.
+     */
+    async updateArchiveStatus(sessionId, data) {
+      try {
+        await setArchiveStatus(sessionId, data)
+        // Refresh sessions for current view
+        await this.loadAgentViewSessions(this.activeAgentView)
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
+    /**
+     * Load user profile for a session (agent sidebar).
+     */
+    async loadUserProfile(sessionId) {
+      try {
+        const result = await getUserProfile(sessionId)
+        this.activeUserProfile = result?.data || result
+      } catch (e) {
+        this.activeUserProfile = null
+        this.error = e.message
+      }
+    },
+
+    /**
+     * Select session for agent workspace: loads messages, metadata, and user profile.
+     */
+    async selectAgentSession(sessionId) {
+      await this.selectSession(sessionId)
+      await Promise.all([
+        this.loadSessionMetadata(sessionId),
+        this.loadUserProfile(sessionId),
+      ])
     },
 
     /**
