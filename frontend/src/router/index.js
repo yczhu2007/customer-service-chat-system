@@ -6,6 +6,7 @@ import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
 import AdminWorkspaceView from '../views/AdminWorkspaceView.vue'
 
 const routes = [
+  { path: '/index.html', redirect: '/login' },
   { path: '/login', component: LoginView },
   { path: '/user', component: UserWorkspaceView, meta: { role: 'USER' } },
   { path: '/agent', component: AgentWorkspaceView, meta: { role: 'AGENT' } },
