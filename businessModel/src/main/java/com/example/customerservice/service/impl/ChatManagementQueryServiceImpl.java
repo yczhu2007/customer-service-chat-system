@@ -41,19 +41,6 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
     private final ChatRedisRepository redisRepository;
     private final ChatSessionTagMapper sessionTagMapper;
 
-    public ChatManagementQueryServiceImpl(
-            ChatManagementMapper managementMapper,
-            ChatSessionMapper sessionMapper,
-            ChatRedisRepository redisRepository
-    ) {
-        this(
-                managementMapper,
-                sessionMapper,
-                redisRepository,
-                null
-        );
-    }
-
     @Autowired
     public ChatManagementQueryServiceImpl(
             ChatManagementMapper managementMapper,

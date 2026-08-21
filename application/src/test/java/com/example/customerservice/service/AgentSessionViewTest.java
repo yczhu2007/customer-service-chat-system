@@ -264,35 +264,6 @@ class AgentSessionViewTest {
         verifyNoInteractions(managementMapper, tagMapper);
     }
 
-    @Test
-    void legacyConstructorFailsExplicitlyWhenViewTagsAreNeeded() {
-        ChatManagementQueryServiceImpl legacyService =
-                new ChatManagementQueryServiceImpl(
-                        managementMapper,
-                        sessionMapper,
-                        redisRepository
-                );
-        ChatSessionListItemVO record = new ChatSessionListItemVO();
-        record.setSessionId("S001");
-        when(managementMapper.countAgentViewSessions("A001", "MY_ACTIVE"))
-                .thenReturn(1L);
-        when(managementMapper.findAgentViewSessions(
-                "A001", "MY_ACTIVE", 0L, 20L
-        )).thenReturn(List.of(record));
-
-        IllegalStateException error = assertThrows(
-                IllegalStateException.class,
-                () -> legacyService.findAgentViewSessions(
-                        "A001", AgentSessionView.MY_ACTIVE, 1L, 20L
-                )
-        );
-
-        assertEquals(
-                "Agent session views require the ChatSessionTagMapper dependency",
-                error.getMessage()
-        );
-    }
-
     @ParameterizedTest
     @MethodSource("viewPredicates")
     void mapperSqlAppliesExactFixedPredicate(

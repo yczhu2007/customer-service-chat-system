@@ -9,6 +9,7 @@ import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.mapper.ChatManagementMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.ChatSessionTagMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.impl.ChatManagementQueryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
@@ -33,6 +34,7 @@ class ChatManagementQueryServiceImplTest {
 
     @Mock private ChatManagementMapper managementMapper;
     @Mock private ChatSessionMapper sessionMapper;
+    @Mock private ChatSessionTagMapper sessionTagMapper;
     @Mock private ChatRedisRepository redisRepository;
 
     private ChatManagementQueryServiceImpl service;
@@ -42,7 +44,8 @@ class ChatManagementQueryServiceImplTest {
         service = new ChatManagementQueryServiceImpl(
                 managementMapper,
                 sessionMapper,
-                redisRepository
+                redisRepository,
+                sessionTagMapper
         );
     }
 
