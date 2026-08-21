@@ -259,6 +259,16 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_SESSION_VIEW_OWN',
+        'chat:session:view-own',
+        '查看自己的会话列表',
+        'API',
+        'GET',
+        '/chat/sessions',
+        '允许普通用户和客服查看各自参与的会话列表',
+        'ENABLED'
+    ),
+    (
         'P_CHAT_SESSION_RATE',
         'chat:session:rate',
         '会话满意度评价',
@@ -396,6 +406,7 @@ INSERT INTO sys_role_permission
     (role_id, permission_id)
 VALUES
     ('R_USER', 'P_CHAT_USER_ACCESS'),
+    ('R_USER', 'P_CHAT_SESSION_VIEW_OWN'),
     ('R_USER', 'P_CHAT_SESSION_RATE')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
@@ -407,6 +418,7 @@ INSERT INTO sys_role_permission
 VALUES
     ('R_AGENT', 'P_CHAT_AGENT_ONLINE'),
     ('R_AGENT', 'P_CHAT_AGENT_OFFLINE'),
+    ('R_AGENT', 'P_CHAT_SESSION_VIEW_OWN'),
     ('R_AGENT', 'P_CHAT_SESSION_END'),
     ('R_AGENT', 'P_CHAT_SESSION_TRANSFER'),
     ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE'),

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatSessionRating;
 import com.example.customerservice.domain.SysUser;
@@ -191,8 +192,13 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
     @Override
     public PageResult<ChatSessionListItemVO> findMySessions(
-            String participantId, String statusFilter,
+            String participantId,
+            SessionParticipantType participantType,
+            String statusFilter,
             String archiveStatusFilter, long pageNo, long pageSize) {
+        if (participantType == null) {
+            throw new IllegalArgumentException("participantType不能为空");
+        }
         long normalizedPageNo = Math.max(1L, pageNo);
         long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
 
@@ -201,18 +207,14 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
         Page<ChatSession> page = sessionMapper.selectPage(
                 new Page<>(normalizedPageNo, normalizedPageSize),
-                Wrappers.<ChatSession>lambdaQuery()
-                        .and(w -> w
-                                .eq(ChatSession::getUserId, participantId)
-                                .or()
-                                .eq(ChatSession::getAgentId, participantId)
-                        )
-                        .eq(statusFilter != null && !statusFilter.isBlank(),
-                                ChatSession::getStatus, statusFilter)
-                        .and(filterArchive && !filterUnarchived, w ->
-                                w.eq(ChatSession::getArchiveStatus, archiveStatusFilter))
-                        .and(filterUnarchived, w ->
-                                w.isNull(ChatSession::getArchiveStatus))
+                buildSessionScopeQuery(
+                        participantId,
+                        participantType,
+                        statusFilter,
+                        archiveStatusFilter,
+                        filterArchive,
+                        filterUnarchived
+                )
                         .orderByDesc(ChatSession::getCreateTime)
                         .orderByDesc(ChatSession::getId)
         );
@@ -242,6 +244,29 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
         return new PageResult<>(
                 page.getCurrent(), page.getSize(), page.getTotal(), page.getPages(), records);
+    }
+
+    private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession> buildSessionScopeQuery(
+            String participantId,
+            SessionParticipantType participantType,
+            String statusFilter,
+            String archiveStatusFilter,
+            boolean filterArchive,
+            boolean filterUnarchived
+    ) {
+        var query = Wrappers.<ChatSession>lambdaQuery();
+        switch (participantType) {
+            case USER -> query.eq(ChatSession::getUserId, participantId);
+            case AGENT -> query.eq(ChatSession::getAgentId, participantId);
+            default -> throw new IllegalArgumentException("不支持的participantType：" + participantType);
+        }
+        return query
+                .eq(statusFilter != null && !statusFilter.isBlank(),
+                        ChatSession::getStatus, statusFilter)
+                .and(filterArchive && !filterUnarchived, w ->
+                        w.eq(ChatSession::getArchiveStatus, archiveStatusFilter))
+                .and(filterUnarchived, w ->
+                        w.isNull(ChatSession::getArchiveStatus));
     }
 
     // ── 归档状态（Zendesk 风格） ────────────────────────────────────────────

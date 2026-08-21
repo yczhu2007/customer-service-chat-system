@@ -1,6 +1,11 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.SessionParticipantType;
+import com.example.customerservice.common.Result;
+import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.service.ChatSessionQueryService;
 import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.ChatAgentOperations;
 import com.example.customerservice.service.ChatMessageOperations;
@@ -14,10 +19,13 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
+import java.util.List;
 import java.util.Set;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -31,6 +39,7 @@ class ChatControllerTest {
     @Mock private ChatPresenceOperations chatPresenceOperations;
     @Mock private IAuthenticationService authenticationService;
     @Mock private CurrentUser currentUser;
+    @Mock private ChatSessionQueryService chatSessionQueryService;
     @InjectMocks private ChatController controller;
 
     @Test
@@ -60,5 +69,103 @@ class ChatControllerTest {
         );
 
         verify(chatRoutingOperations, never()).onUserConnected("A001");
+    }
+
+    @Test
+    void userSessionEndpointUsesUserScope() {
+        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("USER"));
+        when(currentUser.getUserId()).thenReturn("U001");
+        when(chatSessionQueryService.findMySessions(
+                "U001",
+                SessionParticipantType.USER,
+                "OPEN",
+                "NONE",
+                1,
+                20
+        )).thenReturn(page);
+
+        Result<PageResult<ChatSessionListItemVO>> result =
+                controller.findMySessions("OPEN", "NONE", 1, 20);
+
+        assertEquals(page, result.getData());
+        verify(currentUser).requirePermission("chat:session:view-own");
+        verify(chatSessionQueryService).findMySessions(
+                "U001",
+                SessionParticipantType.USER,
+                "OPEN",
+                "NONE",
+                1,
+                20
+        );
+    }
+
+    @Test
+    void agentSessionEndpointUsesAgentScope() {
+        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
+        when(currentUser.getUserId()).thenReturn("A001");
+        when(chatSessionQueryService.findMySessions(
+                "A001",
+                SessionParticipantType.AGENT,
+                null,
+                null,
+                1,
+                20
+        )).thenReturn(page);
+
+        Result<PageResult<ChatSessionListItemVO>> result =
+                controller.findMySessions(null, null, 1, 20);
+
+        assertEquals(page, result.getData());
+        verify(currentUser).requirePermission("chat:session:view-own");
+        verify(chatSessionQueryService).findMySessions(
+                "A001",
+                SessionParticipantType.AGENT,
+                null,
+                null,
+                1,
+                20
+        );
+    }
+
+    @Test
+    void dualRoleSessionEndpointPrefersAgentScope() {
+        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("USER", "AGENT"));
+        when(currentUser.getUserId()).thenReturn("UA001");
+        when(chatSessionQueryService.findMySessions(
+                "UA001",
+                SessionParticipantType.AGENT,
+                null,
+                null,
+                1,
+                20
+        )).thenReturn(page);
+
+        controller.findMySessions(null, null, 1, 20);
+
+        verify(chatSessionQueryService).findMySessions(
+                "UA001",
+                SessionParticipantType.AGENT,
+                null,
+                null,
+                1,
+                20
+        );
+    }
+
+    @Test
+    void adminCannotUseParticipantSessionEndpoint() {
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
+        when(currentUser.getUserId()).thenReturn("ADMIN001");
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> controller.findMySessions(null, null, 1, 20)
+        );
+
+        verify(currentUser).requirePermission("chat:session:view-own");
+        verifyNoInteractions(chatSessionQueryService);
     }
 }

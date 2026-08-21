@@ -1,5 +1,6 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
@@ -300,10 +301,17 @@ public class ChatController {
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize
     ) {
-        currentUser.requireRole("USER");
+        currentUser.requirePermission("chat:session:view-own");
         return Result.success(
                 chatSessionQueryService.findMySessions(
-                        currentUser.getUserId(), status, archiveStatus, pageNo, pageSize));
+                        currentUser.getUserId(),
+                        resolveSessionParticipantType(),
+                        status,
+                        archiveStatus,
+                        pageNo,
+                        pageSize
+                )
+        );
     }
 
     /** 查询指定会话的满意度评价。 */
@@ -775,5 +783,16 @@ public class ChatController {
                 userId,
                 permissionCode
         );
+    }
+
+    private SessionParticipantType resolveSessionParticipantType() {
+        Set<String> roleCodes = currentUser.getRoleCodes();
+        if (roleCodes.contains("AGENT")) {
+            return SessionParticipantType.AGENT;
+        }
+        if (roleCodes.contains("USER")) {
+            return SessionParticipantType.USER;
+        }
+        throw new IllegalArgumentException("只有普通用户或客服可以查看自己的会话列表");
     }
 }

@@ -1,12 +1,15 @@
 package com.example.customerservice.service;
 
+import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.dto.*;
 
 /** 会话查询、评价和用户侧栏的只读/评价服务。 */
 public interface ChatSessionQueryService {
     /** 参与者查看自己的会话历史列表（用户或客服视角），支持归档状态筛选。 */
     PageResult<ChatSessionListItemVO> findMySessions(
-            String participantId, String statusFilter,
+            String participantId,
+            SessionParticipantType participantType,
+            String statusFilter,
             String archiveStatusFilter, long pageNo, long pageSize);
 
     /** 用户对已结束的会话提交满意度评价，每会话仅一次。 */
