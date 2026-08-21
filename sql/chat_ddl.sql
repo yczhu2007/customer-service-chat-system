@@ -13,20 +13,6 @@ SET NAMES utf8mb4;
 
 
 -- ============================================================
--- 0. 已有数据库升级：chat_session 新增归档字段（仅在列不存在时执行）
--- ============================================================
-
-ALTER TABLE chat_session
-    ADD COLUMN IF NOT EXISTS archive_status VARCHAR(16) NULL COMMENT '归档状态：COMPLETED、PENDING、ON_HOLD、OTHER',
-    ADD COLUMN IF NOT EXISTS archive_remark VARCHAR(255) NULL COMMENT '归档备注',
-    ADD COLUMN IF NOT EXISTS archived_by    VARCHAR(64)  NULL COMMENT '归档操作客服ID',
-    ADD COLUMN IF NOT EXISTS archived_at    DATETIME(6)  NULL COMMENT '归档时间';
-
-CREATE INDEX IF NOT EXISTS idx_chat_session_agent_archive
-    ON chat_session (agent_id, archive_status, archived_at);
-
-
--- ============================================================
 -- 0. 客服技能表
 -- ============================================================
 
@@ -87,6 +73,34 @@ CREATE TABLE IF NOT EXISTS chat_session
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci
     COMMENT = '客服聊天会话表';
+
+
+-- ============================================================
+-- 1.1 客服会话转接记录表
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS chat_session_transfer_log
+(
+    id              VARCHAR(64)  NOT NULL COMMENT '转接记录ID',
+    session_id      VARCHAR(64)  NOT NULL COMMENT '会话ID',
+    source_agent_id VARCHAR(64)  NOT NULL COMMENT '原客服ID',
+    target_agent_id VARCHAR(64)  NOT NULL COMMENT '目标客服ID',
+    reason          VARCHAR(64)  NOT NULL DEFAULT 'MANUAL_TRANSFER' COMMENT '转接原因',
+    create_time     DATETIME(6)  NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '转接时间',
+
+    PRIMARY KEY (id),
+    KEY idx_chat_transfer_session_time (session_id, create_time, id),
+    KEY idx_chat_transfer_source_time (source_agent_id, create_time),
+    KEY idx_chat_transfer_target_time (target_agent_id, create_time),
+
+    CONSTRAINT fk_chat_transfer_session
+        FOREIGN KEY (session_id) REFERENCES chat_session (id)
+            ON UPDATE CASCADE ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+    COMMENT = '客服会话转接记录表';
 
 
 -- ============================================================

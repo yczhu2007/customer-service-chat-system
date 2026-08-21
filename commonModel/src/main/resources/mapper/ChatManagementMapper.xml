@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.ChatManagementMapper">
+
+    <resultMap id="agentLoadResult" type="com.example.customerservice.dto.AgentLoadVO">
+        <constructor>
+            <arg column="agent_id" javaType="java.lang.String"/>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="active_session_count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="sessionSummaryResult" type="com.example.customerservice.dto.SessionSummaryVO">
+        <constructor>
+            <arg column="session_id" javaType="java.lang.String"/>
+            <arg column="user_id" javaType="java.lang.String"/>
+            <arg column="username" javaType="java.lang.String"/>
+            <arg column="agent_id" javaType="java.lang.String"/>
+            <arg column="agent_username" javaType="java.lang.String"/>
+            <arg column="status" javaType="java.lang.String"/>
+            <arg column="create_time" javaType="java.time.LocalDateTime"/>
+            <arg column="end_time" javaType="java.time.LocalDateTime"/>
+            <arg column="last_message" javaType="java.lang.String"/>
+            <arg column="last_message_time" javaType="java.time.LocalDateTime"/>
+            <arg column="unread_count" javaType="_long"/>
+            <arg column="rating" javaType="java.lang.Integer"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="ratingSummaryResult" type="com.example.customerservice.dto.RatingSummaryVO">
+        <constructor>
+            <arg column="agent_id" javaType="java.lang.String"/>
+            <arg column="rating_count" javaType="_long"/>
+            <arg column="average_rating" javaType="_double"/>
+            <arg column="one_star_count" javaType="_long"/>
+            <arg column="two_star_count" javaType="_long"/>
+            <arg column="three_star_count" javaType="_long"/>
+            <arg column="four_star_count" javaType="_long"/>
+            <arg column="five_star_count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="transferLogResult" type="com.example.customerservice.dto.SessionTransferLogVO">
+        <constructor>
+            <arg column="id" javaType="java.lang.String"/>
+            <arg column="session_id" javaType="java.lang.String"/>
+            <arg column="source_agent_id" javaType="java.lang.String"/>
+            <arg column="source_agent_username" javaType="java.lang.String"/>
+            <arg column="target_agent_id" javaType="java.lang.String"/>
+            <arg column="target_agent_username" javaType="java.lang.String"/>
+            <arg column="reason" javaType="java.lang.String"/>
+            <arg column="create_time" javaType="java.time.LocalDateTime"/>
+        </constructor>
+    </resultMap>
+
+    <sql id="sessionFilters">
+        <where>
+            <if test="userId != null and userId != ''">
+                AND session.user_id = #{userId}
+            </if>
+            <if test="agentId != null and agentId != ''">
+                AND session.agent_id = #{agentId}
+            </if>
+            <if test="status != null and status != ''">
+                AND session.status = #{status}
+            </if>
+            <if test="archiveStatus != null and archiveStatus != ''">
+                <choose>
+                    <when test="archiveStatus == 'NONE'">
+                        AND session.archive_status IS NULL
+                    </when>
+                    <otherwise>
+                        AND session.archive_status = #{archiveStatus}
+                    </otherwise>
+                </choose>
+            </if>
+            <if test="rating != null">
+                AND rating.rating = #{rating}
+            </if>
+            <if test="fromTime != null">
+                AND session.create_time &gt;= #{fromTime}
+            </if>
+            <if test="toTime != null">
+                AND session.create_time &lt; #{toTime}
+            </if>
+        </where>
+    </sql>
+
+    <select id="countTodaySessions" resultType="long">
+        SELECT COUNT(*)
+        FROM chat_session
+        WHERE create_time &gt;= #{startTime}
+          AND create_time &lt; #{endTime}
+    </select>
+
+    <select id="countTodayMessages" resultType="long">
+        SELECT COUNT(*)
+        FROM chat_message
+        WHERE create_time &gt;= #{startTime}
+          AND create_time &lt; #{endTime}
+    </select>
+
+    <select id="countTodayClosedSessionsByAgent" resultType="long">
+        SELECT COUNT(*)
+        FROM chat_session
+        WHERE agent_id = #{agentId}
+          AND status = 'CLOSED'
+          AND end_time &gt;= #{startTime}
+          AND end_time &lt; #{endTime}
+    </select>
+
+    <select id="findAgentLoads" resultMap="agentLoadResult">
+        SELECT user.id AS agent_id,
+               user.username,
+               COUNT(session.id) AS active_session_count
+        FROM sys_user user
+        LEFT JOIN chat_session session
+               ON session.agent_id = user.id
+              AND session.status = 'ACTIVE'
+        WHERE user.id IN
+        <foreach collection="agentIds" item="agentId" open="(" separator="," close=")">
+            #{agentId}
+        </foreach>
+        GROUP BY user.id, user.username
+        ORDER BY active_session_count ASC, user.id ASC
+    </select>
+
+    <select id="countSessionSummaries" resultType="long">
+        SELECT COUNT(*)
+        FROM chat_session session
+        LEFT JOIN chat_session_rating rating ON rating.session_id = session.id
+        <include refid="sessionFilters"/>
+    </select>
+
+    <select id="findSessionSummaries" resultMap="sessionSummaryResult">
+        SELECT session.id AS session_id,
+               session.user_id,
+               customer.username,
+               session.agent_id,
+               agent.username AS agent_username,
+               session.status,
+               session.create_time,
+               session.end_time,
+               (
+                   SELECT CASE
+                              WHEN message.recalled = 1 THEN '[消息已撤回]'
+                              WHEN message.type = 'IMAGE' THEN '[图片]'
+                              WHEN message.type = 'FILE' THEN '[文件]'
+                              ELSE LEFT(message.content, 120)
+                          END
+                   FROM chat_message message
+                   WHERE message.session_id = session.id
+                   ORDER BY message.create_time DESC, message.id DESC
+                   LIMIT 1
+               ) AS last_message,
+               (
+                   SELECT message.create_time
+                   FROM chat_message message
+                   WHERE message.session_id = session.id
+                   ORDER BY message.create_time DESC, message.id DESC
+                   LIMIT 1
+               ) AS last_message_time,
+               0 AS unread_count,
+               rating.rating
+        FROM chat_session session
+        JOIN sys_user customer ON customer.id = session.user_id
+        LEFT JOIN sys_user agent ON agent.id = session.agent_id
+        LEFT JOIN chat_session_rating rating ON rating.session_id = session.id
+        <include refid="sessionFilters"/>
+        ORDER BY session.create_time DESC, session.id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="findRatingSummary" resultMap="ratingSummaryResult">
+        SELECT #{agentId} AS agent_id,
+               COUNT(rating.session_id) AS rating_count,
+               COALESCE(ROUND(AVG(rating.rating), 2), 0) AS average_rating,
+               COALESCE(SUM(CASE WHEN rating.rating = 1 THEN 1 ELSE 0 END), 0) AS one_star_count,
+               COALESCE(SUM(CASE WHEN rating.rating = 2 THEN 1 ELSE 0 END), 0) AS two_star_count,
+               COALESCE(SUM(CASE WHEN rating.rating = 3 THEN 1 ELSE 0 END), 0) AS three_star_count,
+               COALESCE(SUM(CASE WHEN rating.rating = 4 THEN 1 ELSE 0 END), 0) AS four_star_count,
+               COALESCE(SUM(CASE WHEN rating.rating = 5 THEN 1 ELSE 0 END), 0) AS five_star_count
+        FROM chat_session_rating rating
+        JOIN chat_session session ON session.id = rating.session_id
+        <where>
+            <if test="agentId != null and agentId != ''">
+                AND session.agent_id = #{agentId}
+            </if>
+            <if test="fromTime != null">
+                AND rating.create_time &gt;= #{fromTime}
+            </if>
+            <if test="toTime != null">
+                AND rating.create_time &lt; #{toTime}
+            </if>
+        </where>
+    </select>
+
+    <select id="findTransferLogs" resultMap="transferLogResult">
+        SELECT transfer_log.id,
+               transfer_log.session_id,
+               transfer_log.source_agent_id,
+               source_agent.username AS source_agent_username,
+               transfer_log.target_agent_id,
+               target_agent.username AS target_agent_username,
+               transfer_log.reason,
+               transfer_log.create_time
+        FROM chat_session_transfer_log transfer_log
+        LEFT JOIN sys_user source_agent ON source_agent.id = transfer_log.source_agent_id
+        LEFT JOIN sys_user target_agent ON target_agent.id = transfer_log.target_agent_id
+        WHERE transfer_log.session_id = #{sessionId}
+        ORDER BY transfer_log.create_time ASC, transfer_log.id ASC
+    </select>
+
+</mapper>

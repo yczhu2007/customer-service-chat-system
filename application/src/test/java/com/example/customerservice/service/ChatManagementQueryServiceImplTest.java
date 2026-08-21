@@ -1,0 +1,145 @@
+package com.example.customerservice.service;
+
+import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.dto.AgentLoadVO;
+import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.RatingSummaryVO;
+import com.example.customerservice.dto.SessionSummaryVO;
+import com.example.customerservice.dto.SessionTransferLogVO;
+import com.example.customerservice.mapper.ChatManagementMapper;
+import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.repository.ChatRedisRepository;
+import com.example.customerservice.service.impl.ChatManagementQueryServiceImpl;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Set;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class ChatManagementQueryServiceImplTest {
+
+    @Mock private ChatManagementMapper managementMapper;
+    @Mock private ChatSessionMapper sessionMapper;
+    @Mock private ChatRedisRepository redisRepository;
+
+    private ChatManagementQueryServiceImpl service;
+
+    @BeforeEach
+    void setUp() {
+        service = new ChatManagementQueryServiceImpl(
+                managementMapper,
+                sessionMapper,
+                redisRepository
+        );
+    }
+
+    @Test
+    void adminDashboardCombinesRedisPresenceWithDatabaseMetrics() {
+        when(redisRepository.sortedSetRange(RedisConstants.AGENT_LOAD, 0, -1))
+                .thenReturn(Set.of("A001", "A002"));
+        when(redisRepository.sortedSetCardinality(RedisConstants.QUEUE_PENDING))
+                .thenReturn(3L);
+        when(managementMapper.findAgentLoads(any()))
+                .thenReturn(List.of(
+                        new AgentLoadVO("A001", "agent001", 1),
+                        new AgentLoadVO("A002", "agent002", 2)
+                ));
+        when(managementMapper.countTodaySessions(any(), any())).thenReturn(8L);
+        when(managementMapper.countTodayMessages(any(), any())).thenReturn(42L);
+
+        var dashboard = service.findAdminDashboard();
+
+        assertEquals(2L, dashboard.onlineAgentCount());
+        assertEquals(3L, dashboard.totalQueueSize());
+        assertEquals(8L, dashboard.todaySessionCount());
+        assertEquals(42L, dashboard.todayMessageCount());
+        assertEquals(2, dashboard.agentLoads().size());
+    }
+
+    @Test
+    void adminSessionSearchUsesBoundedPagination() {
+        when(managementMapper.countSessionSummaries(
+                eq("U001"), eq("A001"), eq("CLOSED"),
+                eq("COMPLETED"), eq(5), eq(null), eq(null)))
+                .thenReturn(1L);
+        SessionSummaryVO summary = new SessionSummaryVO(
+                "S001", "U001", "user001", "A001", "agent001",
+                "CLOSED", LocalDateTime.now(), LocalDateTime.now(),
+                "已处理完成", LocalDateTime.now(), 0L, 5
+        );
+        when(managementMapper.findSessionSummaries(
+                eq("U001"), eq("A001"), eq("CLOSED"),
+                eq("COMPLETED"), eq(5), eq(null), eq(null),
+                eq(0L), eq(100L)))
+                .thenReturn(List.of(summary));
+
+        PageResult<SessionSummaryVO> result = service.searchSessions(
+                "U001", "A001", "CLOSED", "COMPLETED", 5,
+                null, null, 0, 500
+        );
+
+        assertEquals(1L, result.getPageNo());
+        assertEquals(100L, result.getPageSize());
+        assertEquals(1L, result.getTotal());
+        assertEquals("S001", result.getRecords().get(0).sessionId());
+    }
+
+    @Test
+    void transferSourceAgentCanReadTransferHistoryAfterOwnershipChanged() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setAgentId("A002");
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+        when(managementMapper.findTransferLogs("S001"))
+                .thenReturn(List.of(new SessionTransferLogVO(
+                        "T001", "S001", "A001", "agent001",
+                        "A002", "agent002", "MANUAL_TRANSFER", LocalDateTime.now()
+                )));
+
+        List<SessionTransferLogVO> result = service.findTransferLogs(
+                "A001", false, "S001"
+        );
+
+        assertEquals(1, result.size());
+        assertEquals("A002", result.get(0).targetAgentId());
+    }
+
+    @Test
+    void invalidRatingAndTimeRangeAreRejectedBeforeQueryingDatabase() {
+        assertThrows(IllegalArgumentException.class, () ->
+                service.searchSessions(
+                        null, null, null, null, 6,
+                        null, null, 1, 20
+                ));
+        LocalDateTime now = LocalDateTime.now();
+        assertThrows(IllegalArgumentException.class, () ->
+                service.findRatingSummary(null, now, now.minusSeconds(1)));
+    }
+
+    @Test
+    void ratingSummarySupportsOverallStatistics() {
+        RatingSummaryVO summary = new RatingSummaryVO(
+                null, 10L, 4.2, 0L, 1L, 2L, 3L, 4L
+        );
+        when(managementMapper.findRatingSummary(null, null, null))
+                .thenReturn(summary);
+
+        RatingSummaryVO result = service.findRatingSummary(null, null, null);
+
+        assertEquals(10L, result.ratingCount());
+        verify(managementMapper).findRatingSummary(null, null, null);
+    }
+}

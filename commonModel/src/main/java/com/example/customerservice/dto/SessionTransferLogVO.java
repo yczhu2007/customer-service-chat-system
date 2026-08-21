@@ -7,7 +7,10 @@ public record SessionTransferLogVO(
         String id,
         String sessionId,
         String sourceAgentId,
+        String sourceAgentUsername,
         String targetAgentId,
+        String targetAgentUsername,
+        String reason,
         LocalDateTime createTime
 ) implements Serializable {
     private static final long serialVersionUID = 1L;

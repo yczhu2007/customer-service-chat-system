@@ -4,6 +4,7 @@ import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.ChatSessionTransferLogMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.mapper.ChatAgentSkillMapper;
@@ -150,6 +151,7 @@ public class ChatServiceConfiguration {
     public ChatSessionTransferOperations chatSessionTransferOperations(
             ChatRedisRepository chatRedisRepository,
             ChatSessionMapper chatSessionMapper,
+            ChatSessionTransferLogMapper transferLogMapper,
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SimpMessagingTemplate messagingTemplate,
@@ -158,6 +160,7 @@ public class ChatServiceConfiguration {
         return new ChatSessionTransferService(
                 chatRedisRepository,
                 chatSessionMapper,
+                transferLogMapper,
                 sysUserMapper,
                 sysUserRoleMapper,
                 messagingTemplate,

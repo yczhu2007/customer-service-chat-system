@@ -299,6 +299,56 @@ VALUES
         'ENABLED'
     ),
     (
+        'P_CHAT_AGENT_DASHBOARD_VIEW',
+        'chat:agent:dashboard:view',
+        '客服工作台查看',
+        'API',
+        'GET',
+        '/chat/agent/dashboard',
+        '允许客服查看自己的接待工作台数据',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_ADMIN_DASHBOARD_VIEW',
+        'chat:admin:dashboard:view',
+        '管理员工作台查看',
+        'API',
+        'GET',
+        '/chat/admin/dashboard',
+        '允许管理员查看客服在线、排队和当日业务数据',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_RATING_STATS_VIEW',
+        'chat:rating:stats:view',
+        '满意度统计查看',
+        'API',
+        'GET',
+        '/chat/*/ratings/summary',
+        '允许客服查看个人满意度统计，允许管理员查看整体或指定客服统计',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_SESSION_AUDIT_VIEW',
+        'chat:session:audit:view',
+        '会话质检查询',
+        'API',
+        'GET',
+        '/chat/admin/sessions',
+        '允许管理员按条件分页查询会话记录',
+        'ENABLED'
+    ),
+    (
+        'P_CHAT_SESSION_TRANSFER_LOG_VIEW',
+        'chat:session:transfer-log:view',
+        '会话转接记录查看',
+        'API',
+        'GET',
+        '/chat/sessions/*/transfers',
+        '允许客服查看自己参与会话的转接记录',
+        'ENABLED'
+    ),
+    (
         'P_USER_MANAGE',
         'user:manage',
         '用户管理',
@@ -361,7 +411,10 @@ VALUES
     ('R_AGENT', 'P_CHAT_SESSION_TRANSFER'),
     ('R_AGENT', 'P_CHAT_QUICK_REPLY_MANAGE'),
     ('R_AGENT', 'P_CHAT_SESSION_ARCHIVE'),
-    ('R_AGENT', 'P_CHAT_USER_PROFILE_VIEW')
+    ('R_AGENT', 'P_CHAT_USER_PROFILE_VIEW'),
+    ('R_AGENT', 'P_CHAT_AGENT_DASHBOARD_VIEW'),
+    ('R_AGENT', 'P_CHAT_RATING_STATS_VIEW'),
+    ('R_AGENT', 'P_CHAT_SESSION_TRANSFER_LOG_VIEW')
 ON DUPLICATE KEY UPDATE
     role_id = VALUES(role_id);
 

@@ -89,7 +89,7 @@ mysql -u root -p springboot < sql/chat_ddl.sql
 
 ### 已有数据库升级
 
-`chat_ddl.sql` 顶部包含 `ALTER TABLE` 语句，可安全重复执行（`CREATE TABLE IF NOT EXISTS` + `ADD COLUMN IF NOT EXISTS`）。
+如数据库已经由本项目脚本建立，可重新执行 `rbac_ddl.sql` 和 `chat_ddl.sql`，以幂等方式补充缺失的权限和新表。`CREATE TABLE IF NOT EXISTS` 不会修改已有字段，旧结构仍需先人工核对。
 
 当前版本新增的表和字段：
 
@@ -99,6 +99,7 @@ mysql -u root -p springboot < sql/chat_ddl.sql
 | `chat_attachment` | 聊天附件 |
 | `chat_quick_reply` | 快捷回复 |
 | `chat_session_rating` | 满意度评价 |
+| `chat_session_transfer_log` | 客服会话转接记录 |
 | `chat_session` 归档字段 | `archive_status`、`archive_remark`、`archived_by`、`archived_at` |
 
 新增权限（`rbac_ddl.sql` 幂等写入，可重复执行）：
@@ -108,6 +109,11 @@ mysql -u root -p springboot < sql/chat_ddl.sql
 | `chat:session:archive` | AGENT |
 | `chat:archive:stats` | ADMIN（通过全量 SELECT 自动获得） |
 | `chat:session:rate` | USER |
+| `chat:agent:dashboard:view` | AGENT |
+| `chat:admin:dashboard:view` | ADMIN |
+| `chat:rating:stats:view` | AGENT、ADMIN |
+| `chat:session:audit:view` | ADMIN |
+| `chat:session:transfer-log:view` | AGENT、ADMIN |
 | `chat:quick-reply:manage` | AGENT |
 
 ## 配置
@@ -163,6 +169,12 @@ mysql -u root -p springboot < sql/chat_ddl.sql
 | PUT | `/chat/sessions/{id}/archive-status` | 设置归档状态 | AGENT + chat:session:archive |
 | GET | `/chat/sessions/{id}/user-profile` | 用户信息侧栏 | AGENT |
 | GET | `/chat/admin/archive-stats` | 归档统计 | ADMIN + chat:archive:stats |
+| GET | `/chat/sessions/{id}/transfers` | 会话转接记录 | 参与转接的 AGENT 或 ADMIN |
+| GET | `/chat/agent/dashboard` | 客服工作台概览 | AGENT + chat:agent:dashboard:view |
+| GET | `/chat/admin/dashboard` | 管理员运营概览 | ADMIN + chat:admin:dashboard:view |
+| GET | `/chat/agent/ratings/summary` | 当前客服满意度统计 | AGENT + chat:rating:stats:view |
+| GET | `/chat/admin/ratings/summary` | 整体或指定客服满意度统计 | ADMIN + chat:rating:stats:view |
+| GET | `/chat/admin/sessions` | 会话质检分页查询 | ADMIN + chat:session:audit:view |
 
 ### 附件
 
@@ -233,4 +245,6 @@ $env:RUN_REAL_INTEGRATION_TESTS='true'
 - 会话列表（未读计数、归档筛选、归档状态徽标）
 - 排队状态展示
 - 满意度评价（星级展示 + 提交）
-- 管理员功能（VIP 设置、归档统计、死信管理）
+- 客服工作台（在线人数、排队人数、活跃会话、今日完成量、满意度统计）
+- 会话转接记录时间线
+- 管理员功能（运营仪表盘、满意度统计、会话质检、VIP 设置、归档统计、死信管理）

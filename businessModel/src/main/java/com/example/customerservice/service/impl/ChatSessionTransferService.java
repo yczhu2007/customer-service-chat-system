@@ -3,10 +3,12 @@ package com.example.customerservice.service.impl;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.ChatSessionTransferLog;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.ChatSessionDTO;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.ChatSessionTransferLogMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
@@ -16,8 +18,10 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 public class ChatSessionTransferService implements ChatSessionTransferOperations {
@@ -54,6 +58,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
 
     private final ChatRedisRepository chatRedisRepository;
     private final ChatSessionMapper chatSessionMapper;
+    private final ChatSessionTransferLogMapper transferLogMapper;
     private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SimpMessagingTemplate messagingTemplate;
@@ -63,6 +68,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
     public ChatSessionTransferService(
             ChatRedisRepository chatRedisRepository,
             ChatSessionMapper chatSessionMapper,
+            ChatSessionTransferLogMapper transferLogMapper,
             SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SimpMessagingTemplate messagingTemplate,
@@ -71,12 +77,14 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.chatSessionMapper = chatSessionMapper;
+        this.transferLogMapper = transferLogMapper;
         this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.messagingTemplate = messagingTemplate;
         this.transactionTemplate = transactionTemplate;
         this.agentMaxConcurrency = agentMaxConcurrency;
     }
+
     @Override
     public void transferSession(
             String sessionId,
@@ -103,69 +111,88 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
 
         boolean redisTransferred = false;
         try {
+            ChatSession session = chatSessionMapper.selectById(sessionId);
+            if (session == null
+                    || !ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
+                throw new IllegalArgumentException("活动聊天会话不存在");
+            }
+            if (!sourceAgentId.equals(session.getAgentId())) {
+                throw new IllegalArgumentException("当前客服不是该会话分配的客服");
+            }
 
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null || !ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
-            throw new IllegalArgumentException("活动聊天会话不存在");
-        }
-        if (!sourceAgentId.equals(session.getAgentId())) {
-            throw new IllegalArgumentException("当前客服不是该会话分配的客服");
-        }
+            SysUser targetAgent = sysUserMapper.selectById(targetAgentId);
+            Set<String> targetRoleCodes = targetAgent == null
+                    ? Set.of()
+                    : sysUserRoleMapper.findRoleCodesByUserId(targetAgentId);
+            if (targetRoleCodes == null || !targetRoleCodes.contains("AGENT")) {
+                throw new IllegalArgumentException("目标用户不是客服");
+            }
 
-        SysUser targetAgent = sysUserMapper.selectById(targetAgentId);
-        Set<String> targetRoleCodes = targetAgent == null
-                ? Set.of()
-                : sysUserRoleMapper.findRoleCodesByUserId(targetAgentId);
-        if (targetRoleCodes == null || !targetRoleCodes.contains("AGENT")) {
-            throw new IllegalArgumentException("目标用户不是客服");
-        }
+            Long transferred = chatRedisRepository.execute(
+                    TRANSFER_SESSION_REDIS_SCRIPT,
+                    List.of(
+                            RedisConstants.agentSessionsKey(sourceAgentId),
+                            RedisConstants.agentSessionsKey(targetAgentId),
+                            RedisConstants.AGENT_LOAD,
+                            RedisConstants.SESSION_AGENT + sessionId,
+                            RedisConstants.SESSION_META + sessionId,
+                            RedisConstants.AGENT_LAST_ASSIGNED
+                    ),
+                    sessionId,
+                    sourceAgentId,
+                    targetAgentId,
+                    String.valueOf(agentMaxConcurrency),
+                    String.valueOf(System.currentTimeMillis())
+            );
+            if (!Long.valueOf(1L).equals(transferred)) {
+                throw new IllegalArgumentException("目标客服不在线或已达到最大接待数量");
+            }
+            redisTransferred = true;
 
-        Long transferred = chatRedisRepository.execute(
-                TRANSFER_SESSION_REDIS_SCRIPT,
-                List.of(
-                        RedisConstants.agentSessionsKey(sourceAgentId),
-                        RedisConstants.agentSessionsKey(targetAgentId),
-                        RedisConstants.AGENT_LOAD,
-                        RedisConstants.SESSION_AGENT + sessionId,
-                        RedisConstants.SESSION_META + sessionId,
-                        RedisConstants.AGENT_LAST_ASSIGNED
-                ),
-                sessionId,
-                sourceAgentId,
-                targetAgentId,
-                String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY),
-                String.valueOf(System.currentTimeMillis())
-        );
-        if (!Long.valueOf(1L).equals(transferred)) {
-            throw new IllegalArgumentException("目标客服不在线或已达到最大接待数量");
-        }
-        redisTransferred = true;
-
-        Integer updatedRows = transactionTemplate.execute(status ->
-                chatSessionMapper.transferSession(
+            Integer updatedRows = transactionTemplate.execute(status -> {
+                int updated = chatSessionMapper.transferSession(
                         sessionId,
                         sourceAgentId,
                         targetAgentId
-                )
-        );
-        if (updatedRows == null || updatedRows != 1) {
-            throw new BusinessStateException("会话归属已变化，转接失败");
-        }
-        // 数据库事务已经提交，之后即使通知失败也不能再回滚 Redis 归属。
-        redisTransferred = false;
+                );
+                if (updated != 1) {
+                    return updated;
+                }
+                ChatSessionTransferLog transferLog = new ChatSessionTransferLog();
+                transferLog.setId(UUID.randomUUID().toString().replace("-", ""));
+                transferLog.setSessionId(sessionId);
+                transferLog.setSourceAgentId(sourceAgentId);
+                transferLog.setTargetAgentId(targetAgentId);
+                transferLog.setReason("MANUAL_TRANSFER");
+                transferLog.setCreateTime(LocalDateTime.now());
+                if (transferLogMapper.insert(transferLog) != 1) {
+                    status.setRollbackOnly();
+                    throw new IllegalStateException("会话转接记录保存失败");
+                }
+                return updated;
+            });
+            if (updatedRows == null || updatedRows != 1) {
+                throw new BusinessStateException("会话归属已变化，转接失败");
+            }
+            // 数据库事务已经提交，之后即使通知失败也不能再回滚 Redis 归属。
+            redisTransferred = false;
 
-        session.setAgentId(targetAgentId);
-        try {
-            notifySessionTransferred(session, sourceAgentId, targetAgentId);
-        } catch (RuntimeException exception) {
-            log.error("会话已完成转接，但发送转接通知失败，sessionId={}", sessionId, exception);
-        }
-        log.info(
-                "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
-                sessionId,
-                sourceAgentId,
-                targetAgentId
-        );
+            session.setAgentId(targetAgentId);
+            try {
+                notifySessionTransferred(session, sourceAgentId, targetAgentId);
+            } catch (RuntimeException exception) {
+                log.error(
+                        "会话已完成转接，但发送转接通知失败，sessionId={}",
+                        sessionId,
+                        exception
+                );
+            }
+            log.info(
+                    "会话转接成功，sessionId={}，sourceAgentId={}，targetAgentId={}",
+                    sessionId,
+                    sourceAgentId,
+                    targetAgentId
+            );
         } catch (RuntimeException exception) {
             if (redisTransferred) {
                 try {

@@ -13,6 +13,7 @@ public class ChatSessionTransferLog {
     private String sessionId;
     private String sourceAgentId;
     private String targetAgentId;
+    private String reason;
     private LocalDateTime createTime;
 
     public String getId() { return id; }
@@ -23,6 +24,8 @@ public class ChatSessionTransferLog {
     public void setSourceAgentId(String sourceAgentId) { this.sourceAgentId = sourceAgentId; }
     public String getTargetAgentId() { return targetAgentId; }
     public void setTargetAgentId(String targetAgentId) { this.targetAgentId = targetAgentId; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
     public LocalDateTime getCreateTime() { return createTime; }
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
 }

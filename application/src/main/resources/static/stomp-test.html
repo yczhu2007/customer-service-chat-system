@@ -209,6 +209,34 @@
         .archive-stat-item.total { background: #f8f9fb; }
         .archive-stat-item.total .stat-label { color: var(--ink); font-weight: 600; }
         .archive-stat-item.total .stat-value { color: var(--navy); font-size: 17px; }
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+        .metric-card {
+            padding: 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: #f8f9fb;
+        }
+        .metric-card .metric-label { font-size: 11px; color: var(--muted); }
+        .metric-card .metric-value { margin-top: 4px; font-size: 19px; font-weight: 700; color: var(--ink); }
+        .management-list { display: grid; gap: 6px; margin-top: 8px; }
+        .management-row {
+            padding: 8px 10px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--paper);
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-wrap: anywhere;
+        }
+        .management-row strong { color: var(--ink); }
+        .management-row .row-meta { color: var(--muted); }
+        .audit-filter { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .audit-filter .field { margin: 0; }
         .status-badge::before {
             content: "";
             width: 7px;
@@ -479,6 +507,19 @@
                 <div id="agentOperationResult" class="operation-result" hidden></div>
             </section>
 
+            <section id="agentDashboardPanel" class="panel" hidden>
+                <h2>接待概况</h2>
+                <div class="metric-grid">
+                    <div class="metric-card"><div class="metric-label">在线客服</div><div id="agentDashboardOnline" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">排队人数</div><div id="agentDashboardQueue" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">我的活跃会话</div><div id="agentDashboardActive" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">今日已结束</div><div id="agentDashboardClosed" class="metric-value">0</div></div>
+                </div>
+                <div id="agentRatingSummary" class="hint">暂无满意度统计</div>
+                <div id="agentActiveSessionList" class="management-list"></div>
+                <button class="secondary" style="margin-top:10px" onclick="loadAgentDashboard()">刷新概况</button>
+            </section>
+
             <details id="sessionListPanel" class="panel">
                 <summary><strong>我的会话</strong> <span id="sessionListUnreadBadge" class="unread-badge" hidden>0</span></summary>
                 <div class="archive-filter">
@@ -569,6 +610,8 @@
                 </label>
                 <button id="transferSessionButton" class="primary" onclick="transferCurrentSession()" disabled>转接当前会话</button>
                 <div id="transferResult" class="operation-result" hidden></div>
+                <button class="secondary" style="margin-top:8px" onclick="loadTransferLogs()">查看转接记录</button>
+                <div id="transferLogList" class="management-list"></div>
             </section>
 
             <section id="quickReplyPanel" class="panel" hidden>
@@ -591,6 +634,18 @@
         </aside>
 
         <aside id="adminSidebar" class="sidebar" hidden>
+            <section id="adminDashboardPanel" class="panel">
+                <h2>运营概况</h2>
+                <div class="metric-grid">
+                    <div class="metric-card"><div class="metric-label">在线客服</div><div id="adminDashboardOnline" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">当前排队</div><div id="adminDashboardQueue" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">今日会话</div><div id="adminDashboardSessions" class="metric-value">0</div></div>
+                    <div class="metric-card"><div class="metric-label">今日消息</div><div id="adminDashboardMessages" class="metric-value">0</div></div>
+                </div>
+                <div id="adminRatingSummary" class="hint">暂无满意度统计</div>
+                <div id="adminAgentLoadList" class="management-list"></div>
+                <button class="secondary" style="margin-top:10px" onclick="loadAdminDashboard()">刷新概况</button>
+            </section>
             <section id="adminPanel" class="panel">
                 <h2>管理员功能</h2>
                 <label class="field">用户 ID<input id="vipUserId" placeholder="例如 U001"></label>
@@ -603,6 +658,21 @@
                     <button class="secondary" onclick="queryVipAgentSkills()">查询 VIP 客服</button>
                 </div>
                 <div id="adminOperationResult" class="operation-result" hidden></div>
+            </section>
+            <section id="adminSessionAuditPanel" class="panel">
+                <h2>会话质检查询</h2>
+                <div class="audit-filter">
+                    <label class="field">用户 ID<input id="auditUserId" maxlength="64"></label>
+                    <label class="field">客服 ID<input id="auditAgentId" maxlength="64"></label>
+                    <label class="field">会话状态
+                        <select id="auditStatus"><option value="">全部</option><option value="ACTIVE">进行中</option><option value="CLOSED">已结束</option></select>
+                    </label>
+                    <label class="field">满意度
+                        <select id="auditRating"><option value="">全部</option><option value="5">5 分</option><option value="4">4 分</option><option value="3">3 分</option><option value="2">2 分</option><option value="1">1 分</option></select>
+                    </label>
+                </div>
+                <button class="secondary" style="margin-top:10px" onclick="loadAdminSessionAudit()">查询会话</button>
+                <div id="adminSessionAuditList" class="management-list"></div>
             </section>
             <section id="archiveStatsPanel" class="panel">
                 <h2>归档统计</h2>
@@ -760,6 +830,7 @@
         document.getElementById("queueMyPositionRow").hidden = isAgent;
         document.getElementById("queueEstimatedWaitRow").hidden = isAgent;
         document.getElementById("agentPanel").hidden = !isAgent;
+        document.getElementById("agentDashboardPanel").hidden = !isAgent;
         document.getElementById("quickReplyPanel").hidden = !isAgent;
         document.getElementById("transferPanel").hidden = !isAgent;
         document.getElementById("endSessionButton").hidden = !isAgent;
@@ -767,9 +838,12 @@
         if (isAdmin) {
             setConnectionStatus("管理模式", false);
             loadArchiveStats();
+            loadAdminDashboard();
+            loadAdminSessionAudit();
         }
         if (isAgent) {
             loadQuickReplies();
+            loadAgentDashboard();
         }
         updateActionAvailability();
     }
@@ -1301,6 +1375,9 @@
             }
             loadSessionList();
             loadQueueStatus();
+            if (loggedInRoles.includes("AGENT")) {
+                loadAgentDashboard();
+            }
             return;
         }
         if (body.event && body.message) {
@@ -2753,6 +2830,173 @@
         document.getElementById("statsOther").textContent = other;
         document.getElementById("statsUnarchived").textContent = unarchived;
         document.getElementById("statsTotal").textContent = completed + pending + onHold + other + unarchived;
+    }
+
+    function renderRatingSummary(elementId, summary) {
+        const element = document.getElementById(elementId);
+        if (!element) return;
+        if (!summary || !summary.ratingCount) {
+            element.textContent = "满意度：暂无评价";
+            return;
+        }
+        element.textContent = "满意度：平均 " + summary.averageRating
+            + " 分，共 " + summary.ratingCount + " 条"
+            + "（1分 " + summary.oneStarCount
+            + "，2分 " + summary.twoStarCount
+            + "，3分 " + summary.threeStarCount
+            + "，4分 " + summary.fourStarCount
+            + "，5分 " + summary.fiveStarCount + "）";
+    }
+
+    async function loadAgentDashboard() {
+        if (!loggedInRoles.includes("AGENT")) return;
+        const dashboardResult = await callRest("GET", "/chat/agent/dashboard", null, null);
+        if (dashboardResult && dashboardResult.data) {
+            const data = dashboardResult.data;
+            const activeSessions = Array.isArray(data.myActiveSessions) ? data.myActiveSessions : [];
+            document.getElementById("agentDashboardOnline").textContent = data.onlineAgentCount ?? 0;
+            document.getElementById("agentDashboardQueue").textContent = data.queueSize ?? 0;
+            document.getElementById("agentDashboardActive").textContent = activeSessions.length;
+            document.getElementById("agentDashboardClosed").textContent = data.todayClosedCount ?? 0;
+            renderSessionSummaryList("agentActiveSessionList", activeSessions, false);
+        }
+        const ratingResult = await callRest("GET", "/chat/agent/ratings/summary", null, null);
+        renderRatingSummary("agentRatingSummary", ratingResult ? ratingResult.data : null);
+    }
+
+    async function loadAdminDashboard() {
+        if (!loggedInRoles.includes("ADMIN")) return;
+        const dashboardResult = await callRest("GET", "/chat/admin/dashboard", null, null);
+        if (dashboardResult && dashboardResult.data) {
+            const data = dashboardResult.data;
+            document.getElementById("adminDashboardOnline").textContent = data.onlineAgentCount ?? 0;
+            document.getElementById("adminDashboardQueue").textContent = data.totalQueueSize ?? 0;
+            document.getElementById("adminDashboardSessions").textContent = data.todaySessionCount ?? 0;
+            document.getElementById("adminDashboardMessages").textContent = data.todayMessageCount ?? 0;
+            const loadContainer = document.getElementById("adminAgentLoadList");
+            loadContainer.innerHTML = "";
+            const loads = Array.isArray(data.agentLoads) ? data.agentLoads : [];
+            if (loads.length === 0) {
+                loadContainer.textContent = "当前没有在线客服";
+            } else {
+                loads.forEach(function (load) {
+                    const row = document.createElement("div");
+                    row.className = "management-row";
+                    row.textContent = (load.username || load.agentId)
+                        + "：当前接待 " + (load.activeSessionCount ?? 0) + " 个会话";
+                    loadContainer.appendChild(row);
+                });
+            }
+        }
+        const ratingResult = await callRest("GET", "/chat/admin/ratings/summary", null, null);
+        renderRatingSummary("adminRatingSummary", ratingResult ? ratingResult.data : null);
+    }
+
+    function renderSessionSummaryList(elementId, sessions, showTransferHistory) {
+        const container = document.getElementById(elementId);
+        if (!container) return;
+        container.innerHTML = "";
+        if (!Array.isArray(sessions) || sessions.length === 0) {
+            container.textContent = "暂无符合条件的会话";
+            return;
+        }
+        sessions.forEach(function (session) {
+            const row = document.createElement("div");
+            row.className = "management-row";
+            const title = document.createElement("strong");
+            title.textContent = (session.username || session.userId || "未知用户")
+                + " / " + (session.agentUsername || session.agentId || "未分配客服");
+            const meta = document.createElement("div");
+            meta.className = "row-meta";
+            meta.textContent = "状态 " + (session.status || "-")
+                + "，创建 " + formatDisplayTime(session.createTime)
+                + (session.rating ? "，评价 " + session.rating + " 分" : "");
+            const preview = document.createElement("div");
+            preview.textContent = session.lastMessage || "暂无消息";
+            row.appendChild(title);
+            row.appendChild(meta);
+            row.appendChild(preview);
+            if (showTransferHistory) {
+                const button = document.createElement("button");
+                button.className = "secondary";
+                button.style.marginTop = "6px";
+                button.textContent = "查看转接记录";
+                button.onclick = function () { loadAdminTransferLogs(session.sessionId, row); };
+                row.appendChild(button);
+            }
+            container.appendChild(row);
+        });
+    }
+
+    async function loadAdminSessionAudit() {
+        if (!loggedInRoles.includes("ADMIN")) return;
+        const parameters = new URLSearchParams({pageNo: "1", pageSize: "50"});
+        const userId = document.getElementById("auditUserId").value.trim();
+        const agentId = document.getElementById("auditAgentId").value.trim();
+        const status = document.getElementById("auditStatus").value;
+        const rating = document.getElementById("auditRating").value;
+        if (userId) parameters.set("userId", userId);
+        if (agentId) parameters.set("agentId", agentId);
+        if (status) parameters.set("status", status);
+        if (rating) parameters.set("rating", rating);
+        const result = await callRest("GET", "/chat/admin/sessions?" + parameters.toString(), null, null);
+        const sessions = result && result.data && Array.isArray(result.data.records)
+            ? result.data.records : [];
+        renderSessionSummaryList("adminSessionAuditList", sessions, true);
+    }
+
+    async function loadTransferLogs() {
+        const currentSessionId = document.getElementById("sessionId").value.trim();
+        const container = document.getElementById("transferLogList");
+        if (!currentSessionId) {
+            container.textContent = "请先选择会话";
+            return;
+        }
+        const result = await callRest(
+            "GET",
+            "/chat/sessions/" + encodeURIComponent(currentSessionId) + "/transfers",
+            null,
+            null
+        );
+        renderTransferLogs(container, result && Array.isArray(result.data) ? result.data : []);
+    }
+
+    async function loadAdminTransferLogs(sessionId, parentRow) {
+        const result = await callRest(
+            "GET",
+            "/chat/sessions/" + encodeURIComponent(sessionId) + "/transfers",
+            null,
+            null
+        );
+        let container = parentRow.querySelector(".transfer-log-inline");
+        if (!container) {
+            container = document.createElement("div");
+            container.className = "management-list transfer-log-inline";
+            parentRow.appendChild(container);
+        }
+        renderTransferLogs(container, result && Array.isArray(result.data) ? result.data : []);
+    }
+
+    function renderTransferLogs(container, logs) {
+        container.innerHTML = "";
+        if (!Array.isArray(logs) || logs.length === 0) {
+            container.textContent = "该会话没有转接记录";
+            return;
+        }
+        logs.forEach(function (log) {
+            const row = document.createElement("div");
+            row.className = "management-row";
+            row.textContent = formatDisplayTime(log.createTime)
+                + "：" + (log.sourceAgentUsername || log.sourceAgentId)
+                + " 转接给 " + (log.targetAgentUsername || log.targetAgentId);
+            container.appendChild(row);
+        });
+    }
+
+    function formatDisplayTime(value) {
+        if (!value) return "-";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
     }
 
     async function updateMyProfile() {

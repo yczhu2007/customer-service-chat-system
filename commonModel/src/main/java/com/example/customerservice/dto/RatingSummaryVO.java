@@ -6,6 +6,10 @@ public record RatingSummaryVO(
         String agentId,
         long ratingCount,
         double averageRating,
+        long oneStarCount,
+        long twoStarCount,
+        long threeStarCount,
+        long fourStarCount,
         long fiveStarCount
 ) implements Serializable {
     private static final long serialVersionUID = 1L;
