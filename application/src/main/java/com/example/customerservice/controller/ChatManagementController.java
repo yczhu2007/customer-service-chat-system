@@ -1,8 +1,11 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AdminDashboardVO;
 import com.example.customerservice.dto.AgentDashboardVO;
+import com.example.customerservice.dto.AgentSessionViewCountVO;
+import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -45,6 +48,36 @@ public class ChatManagementController {
         currentUser.requirePermission("chat:agent:dashboard:view");
         return Result.success(
                 managementQueryService.findAgentDashboard(currentUser.getUserId())
+        );
+    }
+
+    @GetMapping("/agent/views")
+    public Result<List<AgentSessionViewCountVO>> findAgentSessionViews() {
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:view-own");
+        return Result.success(
+                managementQueryService.findAgentSessionViews(currentUser.getUserId())
+        );
+    }
+
+    @GetMapping("/agent/views/{viewCode}/sessions")
+    public Result<PageResult<ChatSessionListItemVO>> findAgentViewSessions(
+            @PathVariable String viewCode,
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize
+    ) {
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:view-own");
+
+        AgentSessionView view = AgentSessionView.fromCode(viewCode);
+
+        return Result.success(
+                managementQueryService.findAgentViewSessions(
+                        currentUser.getUserId(),
+                        view,
+                        pageNo,
+                        pageSize
+                )
         );
     }
 
