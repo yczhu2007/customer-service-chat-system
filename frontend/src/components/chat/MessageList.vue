@@ -101,17 +101,10 @@ onMounted(() => scrollToBottom())
           <span v-else-if="msg.ackStatus === 'DELIVERED'" class="message-state">已送达</span>
         </div>
 
-        <div v-if="chat.editingMessageId === msg.id" class="edit-area">
-          <input v-model="chat.editingContent" class="edit-input" @keyup.enter="chat.editMessage(msg.id)" />
-          <button class="message-action" @click="chat.editMessage(msg.id)">保存</button>
-          <button class="message-action" @click="chat.cancelEditing">取消</button>
-        </div>
-
         <!-- TEXT message -->
-        <div v-else-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
+        <div v-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
           <span>{{ msg.content }}</span>
           <div v-if="isMine(msg)" class="message-actions">
-            <button class="message-action" @click="chat.startEditing(msg)">编辑</button>
             <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
           </div>
         </div>
@@ -169,6 +162,8 @@ onMounted(() => scrollToBottom())
 <style scoped>
 .message-list {
   flex: 1;
+  min-height: 0;
+  min-width: 0;
   overflow-y: auto;
   padding: 1rem;
   display: flex;
@@ -180,6 +175,7 @@ onMounted(() => scrollToBottom())
   display: flex;
   flex-direction: column;
   max-width: 75%;
+  min-width: 0;
 }
 .message-row.mine {
   align-self: flex-end;
@@ -202,6 +198,7 @@ onMounted(() => scrollToBottom())
   align-items: center;
 }
 .message-bubble {
+  max-width: 100%;
   padding: 0.5rem 0.75rem;
   border-radius: 0.5rem;
   word-break: break-word;
@@ -248,8 +245,6 @@ onMounted(() => scrollToBottom())
 .message-actions { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
 .message-action { border: 0; padding: 0; background: transparent; color: inherit; font-size: 0.7rem; cursor: pointer; opacity: 0.7; }
 .message-action:hover { opacity: 1; text-decoration: underline; }
-.edit-area { display: flex; gap: 0.35rem; align-items: center; }
-.edit-input { min-width: 180px; padding: 0.35rem; border: 1px solid #cbd5e1; border-radius: 4px; }
 .message-state { font-size: 0.7rem; color: #6b7280; }
 .file-info { font-size: 0.75rem; opacity: 0.75; }
 .mine .file-link {

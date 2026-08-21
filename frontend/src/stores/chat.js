@@ -336,6 +336,16 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    /** Mark the newest persisted message from the other participant as read. */
+    markActiveSessionRead() {
+      if (!this.activeSessionId) return
+      const auth = useAuthStore()
+      const latestReceived = [...this.messages]
+        .reverse()
+        .find((message) => message?.id && message.senderId !== auth.userId)
+      if (latestReceived) this.markRead(this.activeSessionId, latestReceived.id)
+    },
+
     async loadTransferLogs(sessionId) {
       if (!sessionId) { this.transferLogs = []; return }
       try {
@@ -582,11 +592,7 @@ export const useChatStore = defineStore('chat', {
           this.messages = [...incoming, ...this.messages]
           // Deduplicate by clientMsgId
           this._deduplicateMessages()
-          const auth = useAuthStore()
-          const latestReceived = [...incoming]
-            .reverse()
-            .find((message) => message?.id && message.senderId !== auth.userId)
-          if (latestReceived) this.markRead(body.sessionId, latestReceived.id)
+          this.markActiveSessionRead()
           this.historyCursor = body.nextCursor || null
           this.historyHasMore = Boolean(body.hasMore && body.nextCursor)
         }

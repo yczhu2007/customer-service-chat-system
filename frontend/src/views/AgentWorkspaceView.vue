@@ -282,7 +282,7 @@ onUnmounted(() => {
   background: var(--color-paper);
   border-top: 1px solid var(--color-line);
   flex-shrink: 0;
-  max-height: 240px;
+  max-height: 190px;
   overflow: hidden;
 }
 .footer-section {

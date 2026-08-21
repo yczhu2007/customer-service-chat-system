@@ -96,6 +96,8 @@ async function onFileChange(e) {
 
 <style scoped>
 .composer {
+  flex: 0 0 auto;
+  min-width: 0;
   border-top: 1px solid #e5e7eb;
   padding: 0.75rem;
   background: white;
