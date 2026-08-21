@@ -13,6 +13,34 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="agentSessionViewCountResult" type="com.example.customerservice.dto.AgentSessionViewCountVO">
+        <constructor>
+            <arg column="code" javaType="java.lang.String"/>
+            <arg column="label" javaType="java.lang.String"/>
+            <arg column="count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="chatSessionListItemResult" type="com.example.customerservice.dto.ChatSessionListItemVO">
+        <id property="sessionId" column="session_id"/>
+        <result property="userId" column="user_id"/>
+        <result property="agentId" column="agent_id"/>
+        <result property="status" column="status"/>
+        <result property="createTime" column="create_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="lastMessageContent" column="last_message_content"/>
+        <result property="lastMessageSenderId" column="last_message_sender_id"/>
+        <result property="lastMessageTime" column="last_message_time"/>
+        <result property="title" column="title"/>
+        <result property="priority" column="priority"/>
+        <result property="category" column="category"/>
+        <result property="metadataUpdatedAt" column="metadata_updated_at"/>
+        <result property="unreadCount" column="unread_count"/>
+        <result property="archiveStatus" column="archive_status"/>
+        <result property="archiveRemark" column="archive_remark"/>
+        <result property="archivedAt" column="archived_at"/>
+    </resultMap>
+
     <resultMap id="sessionSummaryResult" type="com.example.customerservice.dto.SessionSummaryVO">
         <constructor>
             <arg column="session_id" javaType="java.lang.String"/>
@@ -89,6 +117,96 @@
         </where>
     </sql>
 
+    <sql id="agentViewScopedSessionsCte">
+        scoped_sessions AS (
+            SELECT session.id,
+                   session.user_id,
+                   session.agent_id,
+                   session.status,
+                   session.create_time,
+                   session.end_time,
+                   session.title,
+                   session.priority,
+                   session.category,
+                   session.metadata_updated_at,
+                   session.archive_status,
+                   session.archive_remark,
+                   session.archived_at
+            FROM chat_session session
+            WHERE session.agent_id = #{agentId}
+        )
+    </sql>
+
+    <sql id="agentViewUnreadBySessionCte">
+        unread_by_session AS (
+            SELECT message.session_id,
+                   COUNT(*) AS unread_count
+            FROM chat_message message
+            JOIN scoped_sessions session ON session.id = message.session_id
+            LEFT JOIN chat_message_read read_state
+                   ON read_state.message_id = message.id
+                  AND read_state.user_id = #{agentId}
+            WHERE message.sender_role = 'USER'
+              AND message.recalled = 0
+              AND read_state.message_id IS NULL
+            GROUP BY message.session_id
+        )
+    </sql>
+
+    <sql id="agentViewLatestMessageCtes">
+        latest_message_ranked AS (
+            SELECT message.session_id,
+                   message.sender_id,
+                   CASE
+                       WHEN message.recalled = 1 THEN '[消息已撤回]'
+                       WHEN message.type = 'IMAGE' THEN '[图片]'
+                       WHEN message.type = 'FILE' THEN '[文件]'
+                       ELSE LEFT(message.content, 120)
+                   END AS last_message_content,
+                   message.create_time AS last_message_time,
+                   ROW_NUMBER() OVER (
+                       PARTITION BY message.session_id
+                       ORDER BY message.create_time DESC, message.id DESC
+                   ) AS row_num
+            FROM chat_message message
+            JOIN scoped_sessions session ON session.id = message.session_id
+        ),
+        latest_message AS (
+            SELECT ranked.session_id,
+                   ranked.sender_id,
+                   ranked.last_message_content,
+                   ranked.last_message_time
+            FROM latest_message_ranked ranked
+            WHERE ranked.row_num = 1
+        )
+    </sql>
+
+    <sql id="agentViewPredicate">
+        <choose>
+            <when test="viewCode == 'MY_ACTIVE'">
+                session.status = 'ACTIVE'
+            </when>
+            <when test="viewCode == 'MY_UNREAD'">
+                COALESCE(unread.unread_count, 0) &gt; 0
+            </when>
+            <when test="viewCode == 'MY_HIGH_PRIORITY'">
+                session.status = 'ACTIVE'
+                AND session.priority IN ('HIGH', 'URGENT')
+            </when>
+            <when test="viewCode == 'MY_UNARCHIVED'">
+                session.status = 'CLOSED'
+                AND session.archive_status IS NULL
+            </when>
+            <when test="viewCode == 'MY_RECENT_CLOSED'">
+                session.status = 'CLOSED'
+                AND session.end_time &gt;= NOW() - INTERVAL 7 DAY
+            </when>
+            <otherwise>
+                1 = 0
+            </otherwise>
+        </choose>
+    </sql>
+
     <select id="countTodaySessions" resultType="long">
         SELECT COUNT(*)
         FROM chat_session
@@ -110,6 +228,89 @@
           AND status = 'CLOSED'
           AND end_time &gt;= #{startTime}
           AND end_time &lt; #{endTime}
+    </select>
+
+    <select id="countAgentSessionViews" resultMap="agentSessionViewCountResult">
+        WITH
+        <include refid="agentViewScopedSessionsCte"/>,
+        <include refid="agentViewUnreadBySessionCte"/>
+        SELECT 'MY_ACTIVE' AS code,
+               '我的处理中' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'ACTIVE'
+        UNION ALL
+        SELECT 'MY_UNREAD' AS code,
+               '我的未读' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE COALESCE(unread.unread_count, 0) &gt; 0
+        UNION ALL
+        SELECT 'MY_HIGH_PRIORITY' AS code,
+               '我的高优先级' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'ACTIVE'
+          AND session.priority IN ('HIGH', 'URGENT')
+        UNION ALL
+        SELECT 'MY_UNARCHIVED' AS code,
+               '我的未归档' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.archive_status IS NULL
+        UNION ALL
+        SELECT 'MY_RECENT_CLOSED' AS code,
+               '我最近关闭' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.end_time &gt;= NOW() - INTERVAL 7 DAY
+    </select>
+
+    <select id="countAgentViewSessions" resultType="long">
+        WITH
+        <include refid="agentViewScopedSessionsCte"/>,
+        <include refid="agentViewUnreadBySessionCte"/>
+        SELECT COUNT(*)
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE <include refid="agentViewPredicate"/>
+    </select>
+
+    <select id="findAgentViewSessions" resultMap="chatSessionListItemResult">
+        WITH
+        <include refid="agentViewScopedSessionsCte"/>,
+        <include refid="agentViewUnreadBySessionCte"/>,
+        <include refid="agentViewLatestMessageCtes"/>
+        SELECT session.id AS session_id,
+               session.user_id,
+               session.agent_id,
+               session.status,
+               session.create_time,
+               session.end_time,
+               latest.last_message_content AS last_message_content,
+               latest.sender_id AS last_message_sender_id,
+               latest.last_message_time,
+               session.title,
+               session.priority,
+               session.category,
+               session.metadata_updated_at,
+               COALESCE(unread.unread_count, 0) AS unread_count,
+               session.archive_status,
+               session.archive_remark,
+               session.archived_at
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        LEFT JOIN latest_message latest ON latest.session_id = session.id
+        WHERE <include refid="agentViewPredicate"/>
+        ORDER BY session.create_time DESC, session.id DESC
+        LIMIT #{offset}, #{pageSize}
     </select>
 
     <select id="findAgentLoads" resultMap="agentLoadResult">

@@ -1,6 +1,8 @@
 package com.example.customerservice.mapper;
 
 import com.example.customerservice.dto.AgentLoadVO;
+import com.example.customerservice.dto.AgentSessionViewCountVO;
+import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
@@ -26,6 +28,20 @@ public interface ChatManagementMapper {
             @Param("agentId") String agentId,
             @Param("startTime") LocalDateTime startTime,
             @Param("endTime") LocalDateTime endTime
+    );
+
+    List<AgentSessionViewCountVO> countAgentSessionViews(@Param("agentId") String agentId);
+
+    long countAgentViewSessions(
+            @Param("agentId") String agentId,
+            @Param("viewCode") String viewCode
+    );
+
+    List<ChatSessionListItemVO> findAgentViewSessions(
+            @Param("agentId") String agentId,
+            @Param("viewCode") String viewCode,
+            @Param("offset") long offset,
+            @Param("pageSize") long pageSize
     );
 
     List<AgentLoadVO> findAgentLoads(@Param("agentIds") List<String> agentIds);
