@@ -175,6 +175,28 @@ describe('SessionAuditPanel', () => {
     expect(statusOptions.map((option) => option.attributes('value'))).toEqual(['', 'ACTIVE', 'CLOSED'])
   })
 
+  it('uses one explicit date-time format and normalizes it for the API', async () => {
+    const { request } = await import('../services/http-client')
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await nextTick()
+    request.mockClear()
+
+    const dateInputs = wrapper.findAll('.date-field input')
+    expect(dateInputs[1].attributes('type')).toBe('text')
+    expect(dateInputs[1].attributes('placeholder')).toBe('YYYY-MM-DD HH:mm')
+    expect(dateInputs[2].attributes('type')).toBe('text')
+    expect(dateInputs[2].attributes('placeholder')).toBe('YYYY-MM-DD HH:mm')
+
+    await dateInputs[1].setValue('2026-08-22 09:30')
+    await dateInputs[2].setValue('2026-08-22 18:45')
+    await wrapper.find('.btn-primary').trigger('click')
+
+    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+    expect(requestUrl.searchParams.get('from')).toBe('2026-08-22T09:30')
+    expect(requestUrl.searchParams.get('to')).toBe('2026-08-22T18:45')
+  })
+
   it('renders returned audit records and their transfer row safely', async () => {
     const { request } = await import('../services/http-client')
     request.mockResolvedValueOnce({

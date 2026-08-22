@@ -44,4 +44,13 @@ describe('workspace visual text', () => {
     expect(contents).toContain('开始时间')
     expect(contents).toContain('结束时间')
   })
+
+  it('keeps the category selector visually neutral', async () => {
+    const metadataEditor = await readFile(
+      join(sourceRoot, 'components/session/SessionMetadataEditor.vue'),
+      'utf8'
+    )
+
+    expect(metadataEditor).not.toContain(':style="category ? categoryStyle(category) : undefined"')
+  })
 })

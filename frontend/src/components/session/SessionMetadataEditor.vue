@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
-import { categoryLabel, categoryStyle } from '../../constants/session-ui'
+import { categoryLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -113,7 +113,7 @@ async function save() {
 
       <div class="field">
         <label class="field-label">分类</label>
-        <select v-model="category" :disabled="!isAssignedAgent" class="field-select" :style="category ? categoryStyle(category) : undefined">
+        <select v-model="category" :disabled="!isAssignedAgent" class="field-select">
           <option value="">未分类</option>
           <option v-for="c in CATEGORIES" :key="c" :value="c">{{ categoryLabel(c) }}</option>
         </select>
