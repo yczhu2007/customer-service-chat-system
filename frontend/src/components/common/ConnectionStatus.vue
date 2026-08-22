@@ -14,10 +14,6 @@ function reconnect() { chat.reconnectAttempts = 0; chat.reconnectStomp() }
     <span>{{ stateLabel }}</span>
     <span v-if="chat.lastActivityAt" class="activity">最近活动 {{ new Date(chat.lastActivityAt).toLocaleTimeString('zh-CN') }}</span>
     <button v-if="chat.connectionState !== 'connected'" type="button" @click="reconnect">重连</button>
-    <details v-if="chat.connectionLogs.length">
-      <summary>日志</summary>
-      <div v-for="item in chat.connectionLogs" :key="item.time + item.message">{{ item.message }}</div>
-    </details>
   </div>
 </template>
 <style scoped>

@@ -5,6 +5,8 @@ import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
 import com.example.customerservice.dto.ChatSessionMetadataVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.ChatHistoryPage;
+import com.example.customerservice.dto.HistoryRequest;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatSessionQueryService;
@@ -23,6 +25,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import java.security.Principal;
 import java.util.List;
 import java.util.Set;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -57,6 +60,20 @@ class ChatControllerTest {
                 "chat:user:access"
         );
         verify(chatRoutingOperations).onUserConnected("U001");
+    }
+
+    @Test
+    void historyResponseEchoesTheClientRequestId() {
+        HistoryRequest request = new HistoryRequest();
+        request.setSessionId("S001");
+        request.setRequestId("history-1");
+        request.setPageSize(20);
+        when(chatMessageOperations.getHistory("S001", "U001", null, 20))
+                .thenReturn(new ChatHistoryPage(List.of(), 0, 20, null, false, 0));
+
+        Map<String, Object> response = controller.getHistory(request, () -> "U001");
+
+        assertEquals("history-1", response.get("requestId"));
     }
 
     @Test

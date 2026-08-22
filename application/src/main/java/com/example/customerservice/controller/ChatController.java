@@ -624,6 +624,8 @@ public class ChatController {
                 request.getSessionId()
         );
 
+        response.put("requestId", request.getRequestId());
+
 
         response.put(
                 "count",

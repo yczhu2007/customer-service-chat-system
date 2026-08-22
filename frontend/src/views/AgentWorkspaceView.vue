@@ -17,18 +17,19 @@ import TransferLogPanel from '../components/session/TransferLogPanel.vue'
 const chat = useChatStore()
 const auth = useAuthStore()
 const pendingQuickReply = ref('')
-let presenceTimer = null
+const presenceError = ref('')
 
 const QUICK_REPLY_LABELS = {
-  MY_ACTIVE: '处理中',
-  MY_UNREAD: '未读',
-  MY_HIGH_PRIORITY: '高优先级',
-  MY_UNARCHIVED: '未归档',
-  MY_RECENT_CLOSED: '最近关闭',
+  MY_ACTIVE: 'Open',
+  MY_UNREAD: 'Unread',
+  MY_HIGH_PRIORITY: 'High priority',
+  MY_UNARCHIVED: 'Unarchived',
+  MY_RECENT_CLOSED: 'Recently closed',
 }
 
 /** Set agent online and connect STOMP */
 async function goOnline() {
+  presenceError.value = ''
   try {
     await agentOnline()
     chat.agentOnline = true
@@ -36,19 +37,22 @@ async function goOnline() {
     // Load initial view
     await chat.loadAgentViewCounts()
     await chat.loadAgentViewSessions(chat.activeAgentView)
-  } catch {
-    // Error handled by store
+  } catch (e) {
+    chat.agentOnline = false
+    presenceError.value = e.message || '上线失败，请稍后重试'
   }
 }
 
 /** Set agent offline */
 async function goOffline() {
+  presenceError.value = ''
   try {
     await agentOffline()
+  } catch (e) {
+    presenceError.value = e.message || '下线失败，请稍后重试'
+  } finally {
     chat.agentOnline = false
     chat.disconnectStomp()
-  } catch {
-    // Error handled by store
   }
 }
 
@@ -62,13 +66,10 @@ onMounted(async () => {
   if (!chat.agentOnline) {
     await goOnline()
   }
-  presenceTimer = setInterval(() => agentOnline().catch(() => {}), 30000)
 })
 
 onUnmounted(() => {
-  if (presenceTimer) clearInterval(presenceTimer)
-  // Optionally go offline on leave (commented out to persist across navigation)
-  // goOffline()
+  goOffline()
 })
 </script>
 
@@ -87,6 +88,7 @@ onUnmounted(() => {
         <button v-else class="offline-btn" @click="goOffline">下线</button>
         <ConnectionStatus />
       </div>
+      <p v-if="presenceError" class="presence-error">{{ presenceError }}</p>
     </header>
 
     <div class="workspace-body">
@@ -130,6 +132,10 @@ onUnmounted(() => {
     </footer>
   </div>
 </template>
+
+<style scoped>
+.presence-error { margin: 0; color: var(--color-danger); font-size: .8rem; }
+</style>
 
 <style scoped>
 .agent-workspace {

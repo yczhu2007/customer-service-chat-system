@@ -3,21 +3,14 @@ import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
+import { categoryLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const session = computed(() => chat.activeSession)
 const isClosed = computed(() => session.value?.status === 'CLOSED')
 const canSend = computed(() => session.value && !isClosed.value && chat.connected)
 
-/** Status display text */
-const statusText = computed(() => {
-  if (!session.value) return ''
-  const s = session.value.status
-  if (s === 'ACTIVE') return '进行中'
-  if (s === 'QUEUED') return '排队中'
-  if (s === 'CLOSED') return '已结束'
-  return s
-})
+const statusText = computed(() => statusLabel(session.value?.status))
 
 /** Priority badge color */
 const priorityClass = computed(() => {
@@ -37,7 +30,7 @@ const priorityClass = computed(() => {
         <span class="session-title">{{ session.title || '会话' }}</span>
         <span class="status-badge" :class="session.status?.toLowerCase()">{{ statusText }}</span>
         <span v-if="session.priority" class="priority-badge" :class="priorityClass">{{ session.priority }}</span>
-        <span v-if="session.category" class="category-badge">{{ session.category }}</span>
+        <span v-if="session.category" class="category-badge">{{ categoryLabel(session.category) }}</span>
       </div>
       <div class="header-meta">
         <span v-if="session.agentId" class="agent-info">客服: {{ session.agentId }}</span>
@@ -97,15 +90,15 @@ const priorityClass = computed(() => {
 }
 .status-badge.active {
   background: #e7f4ee;
-  color: var(--color-success);
+  color: #1f8a5f;
 }
 .status-badge.queued {
   background: #fef3c7;
-  color: #92400e;
+  color: #b7791f;
 }
 .status-badge.closed {
   background: #fdecec;
-  color: var(--color-danger);
+  color: #dc2626;
 }
 .priority-badge {
   font-size: 0.7rem;
@@ -150,7 +143,8 @@ const priorityClass = computed(() => {
   flex-wrap: wrap;
 }
 .tag {
-  background: #f2f3f5;
+  background: #eef0ff;
+  color: #635bce;
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
   font-size: 0.7rem;

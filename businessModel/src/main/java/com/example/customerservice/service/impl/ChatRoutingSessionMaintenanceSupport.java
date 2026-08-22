@@ -137,29 +137,15 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
         }
 
 
-        notifySessionClosed(
-
-                session.getUserId(),
-
-                sessionId,
-
-                "MANUAL_END"
-        );
-
-
-        notifySessionClosed(
-
-                session.getAgentId(),
-
-                sessionId,
-
-                "MANUAL_END"
-        );
-
-
-        dequeueAndReassign(
-                session.getAgentId()
-        );
+        afterCommit(() -> {
+            notifySessionClosedSafely(session.getUserId(), sessionId, "MANUAL_END");
+            notifySessionClosedSafely(session.getAgentId(), sessionId, "MANUAL_END");
+            try {
+                dequeueAndReassign(session.getAgentId());
+            } catch (RuntimeException exception) {
+                log.error("会话结束后的等待队列处理失败，sessionId={}", sessionId, exception);
+            }
+        });
     }
 
     @Override
@@ -174,6 +160,14 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
     }
     protected void notifySessionClosed(String userId, String sessionId, String reason) {
         chatSessionNotificationOperations.notifySessionClosed(userId, sessionId, reason);
+    }
+
+    private void notifySessionClosedSafely(String userId, String sessionId, String reason) {
+        try {
+            notifySessionClosed(userId, sessionId, reason);
+        } catch (RuntimeException exception) {
+            log.error("会话关闭通知发送失败，userId={}，sessionId={}", userId, sessionId, exception);
+        }
     }
     protected void dequeueAndReassign(
             String agentId

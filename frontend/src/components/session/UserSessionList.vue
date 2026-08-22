@@ -1,17 +1,10 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const archiveFilter = ref('')
-
-/** Status label */
-function statusLabel(status) {
-  if (status === 'ACTIVE') return '进行中'
-  if (status === 'QUEUED') return '排队中'
-  if (status === 'CLOSED') return '已结束'
-  return status || ''
-}
 
 /** Status CSS class */
 function statusClass(status) {
@@ -55,11 +48,9 @@ function refresh() {
 
 /** Archive filter options */
 const archiveOptions = [
-  { label: '全部', value: '' },
-  { label: '未归档', value: 'NONE' },
-  { label: '已完成', value: 'COMPLETED' },
-  { label: '待处理', value: 'PENDING' },
-  { label: '搁置', value: 'ON_HOLD' },
+  { label: 'All', value: '' },
+  { label: 'Unarchived', value: 'NONE' },
+  ...ARCHIVE_STATUS_OPTIONS,
 ]
 
 onMounted(() => {
@@ -70,9 +61,9 @@ onMounted(() => {
 <template>
   <div class="session-list-panel">
     <div class="panel-header">
-      <h3>我的会话</h3>
+      <h3>My tickets</h3>
       <button class="refresh-btn" @click="refresh" :disabled="chat.sessionsLoading">
-        {{ chat.sessionsLoading ? '加载中…' : '刷新' }}
+        {{ chat.sessionsLoading ? 'Loading…' : 'Refresh' }}
       </button>
     </div>
 
@@ -108,7 +99,7 @@ onMounted(() => {
           <span class="time">{{ formatTime(session.lastMessageTime || session.createTime) }}</span>
         </div>
         <div class="item-body">
-          <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || '暂无消息' }}</span>
+          <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || 'No messages' }}</span>
           <span class="status-badge" :class="statusClass(session.status)">
             {{ statusLabel(session.status) }}
           </span>
@@ -120,7 +111,7 @@ onMounted(() => {
           <span v-if="chat.unreadCounts[session.sessionId]" class="unread-badge">
             {{ chat.unreadCounts[session.sessionId] }}
           </span>
-          <span v-if="session.archiveStatus" class="archive-tag">{{ session.archiveStatus }}</span>
+          <span v-if="session.archiveStatus" class="archive-tag">{{ archiveStatusLabel(session.archiveStatus) }}</span>
         </div>
       </li>
     </ul>
@@ -228,16 +219,16 @@ onMounted(() => {
   white-space: nowrap;
 }
 .status-badge.active {
-  background: #d1fae5;
-  color: #065f46;
+  background: #e7f4ee;
+  color: #1f8a5f;
 }
 .status-badge.queued {
   background: #fef3c7;
-  color: #92400e;
+  color: #b7791f;
 }
 .status-badge.closed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fdecec;
+  color: #dc2626;
 }
 .item-footer {
   display: flex;
@@ -280,8 +271,8 @@ onMounted(() => {
 }
 .archive-tag {
   font-size: 0.65rem;
-  color: #9ca3af;
-  background: #f3f4f6;
+  color: #635bce;
+  background: #eef0ff;
   padding: 0.05rem 0.3rem;
   border-radius: 3px;
 }

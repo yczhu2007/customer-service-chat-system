@@ -1,5 +1,5 @@
 <script setup>
-import { ref, watch, nextTick, onMounted } from 'vue'
+import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { fetchAttachmentBlob } from '../../api/chat-api'
@@ -37,12 +37,32 @@ function formatFileSize(size) {
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
 }
 
+function releaseBlob(messageId) {
+  const cached = blobCache.value[messageId]
+  if (cached?.url && typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(cached.url)
+  }
+  delete blobCache.value[messageId]
+}
+
+function releaseAllBlobs() {
+  Object.keys(blobCache.value).forEach((messageId) => releaseBlob(messageId))
+}
+
 /** Fetch blob URL for IMAGE/FILE messages */
 async function loadBlob(msg) {
   if (!msg.id) return
   if (blobCache.value[msg.id]) return
+  const sessionId = props.sessionId
   try {
-    blobCache.value[msg.id] = await fetchAttachmentBlob(msg.content)
+    const attachment = await fetchAttachmentBlob(msg.content)
+    if (sessionId !== props.sessionId || !chat.messages.some((item) => item.id === msg.id)) {
+      if (attachment?.url && typeof URL.revokeObjectURL === 'function') {
+        URL.revokeObjectURL(attachment.url)
+      }
+      return
+    }
+    blobCache.value[msg.id] = attachment
   } catch {
     blobCache.value[msg.id] = null
   }
@@ -58,8 +78,12 @@ function scrollToBottom() {
 }
 
 watch(
-  () => chat.messages.length,
+  () => [props.sessionId, ...chat.messages.map((msg) => msg.id || msg.clientMsgId)],
   () => {
+    const messageIds = new Set(chat.messages.map((msg) => msg.id).filter(Boolean))
+    Object.keys(blobCache.value)
+      .filter((messageId) => !messageIds.has(messageId))
+      .forEach((messageId) => releaseBlob(messageId))
     scrollToBottom()
     chat.messages
       .filter((msg) => (msg.type === 'IMAGE' || msg.type === 'FILE') && !msg.recalled)
@@ -69,6 +93,7 @@ watch(
 )
 
 onMounted(() => scrollToBottom())
+onUnmounted(releaseAllBlobs)
 </script>
 
 <template>
@@ -99,14 +124,25 @@ onMounted(() => scrollToBottom())
           <span v-if="msg.recalled" class="recalled-tag">(已撤回)</span>
           <span v-if="msg.ackStatus === 'STORED'" class="message-state">已保存</span>
           <span v-else-if="msg.ackStatus === 'DELIVERED'" class="message-state">已送达</span>
+          <span v-if="isMine(msg) && msg.readByPeer" class="message-state">已读</span>
         </div>
 
         <!-- TEXT message -->
         <div v-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
-          <span>{{ msg.content }}</span>
-          <div v-if="isMine(msg)" class="message-actions">
-            <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
-          </div>
+          <template v-if="chat.editingMessageId === msg.id">
+            <textarea v-model="chat.editingContent" class="edit-input" rows="2" />
+            <div class="message-actions">
+              <button class="message-action" @click="chat.editMessage(msg.id)">保存</button>
+              <button class="message-action" @click="chat.cancelEditing()">取消</button>
+            </div>
+          </template>
+          <template v-else>
+            <span>{{ msg.content }}</span>
+            <div v-if="isMine(msg)" class="message-actions">
+              <button class="message-action" @click="chat.startEditing(msg)">编辑</button>
+              <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
+            </div>
+          </template>
         </div>
 
         <!-- IMAGE message -->
@@ -139,7 +175,7 @@ onMounted(() => scrollToBottom())
               class="file-link"
             >
               <strong>{{ blobCache[msg.id].name }}</strong>
-              <span class="file-info">{{ blobCache[msg.id].type || '文件' }} · {{ formatFileSize(blobCache[msg.id].size) }}</span>
+              <span class="file-info">Download file<span v-if="blobCache[msg.id].size"> · {{ formatFileSize(blobCache[msg.id].size) }}</span></span>
             </a>
             <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
             <span v-else class="load-error">文件加载中…</span>
@@ -245,6 +281,7 @@ onMounted(() => scrollToBottom())
 .message-actions { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
 .message-action { border: 0; padding: 0; background: transparent; color: inherit; font-size: 0.7rem; cursor: pointer; opacity: 0.7; }
 .message-action:hover { opacity: 1; text-decoration: underline; }
+.edit-input { width: 100%; box-sizing: border-box; border: 1px solid currentColor; border-radius: 4px; padding: .35rem; color: #111827; }
 .message-state { font-size: 0.7rem; color: #6b7280; }
 .file-info { font-size: 0.75rem; opacity: 0.75; }
 .mine .file-link {

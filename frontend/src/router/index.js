@@ -28,6 +28,8 @@ router.beforeEach((to) => {
   }
   if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
   if (!to.meta.role) return true
-  return to.meta.role === auth.homeRole ? true : `/${auth.homeRole.toLowerCase()}`
+  if (!auth.hasRole(to.meta.role)) return `/${auth.homeRole.toLowerCase()}`
+  auth.setActiveRole(to.meta.role)
+  return true
 })
 export default router

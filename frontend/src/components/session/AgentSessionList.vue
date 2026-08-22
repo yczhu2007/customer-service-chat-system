@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { archiveStatusLabel, categoryLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
@@ -13,18 +14,6 @@ function priorityClass(priority) {
   if (priority === 'HIGH') return 'priority-high'
   if (priority === 'NORMAL') return 'priority-normal'
   return 'priority-low'
-}
-
-/** Short category label */
-function categoryLabel(cat) {
-  const map = {
-    ACCOUNT: '账户',
-    PAYMENT: '支付',
-    TECHNICAL: '技术',
-    AFTER_SALES: '售后',
-    OTHER: '其他',
-  }
-  return map[cat] || cat
 }
 
 /** Format relative or short time */
@@ -42,17 +31,6 @@ function formatTime(ts) {
 
 function preview(content) {
   return content?.startsWith('/chat/attachments/') ? '附件消息' : content
-}
-
-/** Archive status label */
-function archiveLabel(status) {
-  const map = {
-    COMPLETED: '已完成',
-    PENDING: '待处理',
-    ON_HOLD: '搁置',
-    OTHER: '其他',
-  }
-  return map[status] || null
 }
 
 function selectSession(sessionId) {
@@ -82,7 +60,7 @@ function selectSession(sessionId) {
             {{ s.priority }}
           </span>
           <span v-if="s.category" class="category-tag">{{ categoryLabel(s.category) }}</span>
-          <span v-if="s.archiveStatus" class="archive-tag">{{ archiveLabel(s.archiveStatus) }}</span>
+          <span v-if="s.archiveStatus" class="archive-tag">{{ archiveStatusLabel(s.archiveStatus) }}</span>
           <span v-if="s.unreadCount > 0" class="unread-badge">{{ s.unreadCount }}</span>
         </div>
         <div v-if="s.lastMessageContent" class="session-preview">
@@ -178,8 +156,8 @@ function selectSession(sessionId) {
   color: #6d28d9;
 }
 .archive-tag {
-  background: #fef3c7;
-  color: #92400e;
+  background: #eef0ff;
+  color: #635bce;
 }
 .unread-badge {
   font-size: 0.65rem;

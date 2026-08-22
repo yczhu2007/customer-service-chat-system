@@ -20,19 +20,15 @@ class ChatMessageContentValidatorTest {
     }
 
     @Test
-    void imageAndFileMessagesAcceptHttpResources() {
-        assertEquals(
-                ChatMessageType.IMAGE,
+    void imageAndFileMessagesRejectExternalHttpResources() {
+        assertThrows(IllegalArgumentException.class, () ->
                 ChatMessageContentValidator.validate(
-                        "IMAGE",
-                        "https://cdn.example.com/images/example.png"
+                        "IMAGE", "https://cdn.example.com/images/example.png"
                 )
         );
-        assertEquals(
-                ChatMessageType.FILE,
+        assertThrows(IllegalArgumentException.class, () ->
                 ChatMessageContentValidator.validate(
-                        "FILE",
-                        "http://files.example.com/download?id=100"
+                        "FILE", "http://files.example.com/download?id=100"
                 )
         );
     }

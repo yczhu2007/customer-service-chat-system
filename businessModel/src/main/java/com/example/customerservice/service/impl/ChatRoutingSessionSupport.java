@@ -37,6 +37,7 @@ import org.springframework.data.redis.connection.DataType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.databind.ObjectMapper;
 
 import java.time.Duration;
@@ -403,7 +404,7 @@ abstract class ChatRoutingSessionSupport
          * 会话元数据不立即删除，
          * 标记为CLOSED并保留24小时。
          */
-        applySessionFinalizationRedis(session, endTime, false);
+        applySessionFinalizationRedisAfterCommit(session, endTime, false);
 
 
         return true;
@@ -472,6 +473,33 @@ abstract class ChatRoutingSessionSupport
                 session.getAgentId(),
                 agentDisconnected ? "1" : "0"
         );
+    }
+
+    protected void applySessionFinalizationRedisAfterCommit(
+            ChatSession session,
+            LocalDateTime endTime,
+            boolean agentDisconnected
+    ) {
+        afterCommit(() -> applySessionFinalizationRedis(session, endTime, agentDisconnected));
+    }
+
+    protected void afterCommit(Runnable action) {
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(
+                    new TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            try {
+                                action.run();
+                            } catch (RuntimeException exception) {
+                                log.error("事务提交后的会话状态处理失败", exception);
+                            }
+                        }
+                    }
+            );
+            return;
+        }
+        action.run();
     }
     /**
      * 重连时只通知当前用户。

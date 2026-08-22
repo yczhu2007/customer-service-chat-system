@@ -13,6 +13,7 @@ const auth = useAuthStore()
 const activeSession = computed(() => chat.activeSession)
 const isClosed = computed(() => activeSession.value?.status === 'CLOSED')
 const showRating = computed(() => isClosed.value && activeSession.value)
+const hasActiveConsultation = computed(() => chat.consultationStarting || chat.sessions.some((session) => session.status === 'ACTIVE' || session.status === 'QUEUED'))
 
 /** Queue status display */
 const inQueue = computed(() => chat.queueStatus?.myPosition != null)
@@ -40,10 +41,6 @@ onMounted(() => {
   chat.loadQueueStatus()
   // Load sessions
   chat.loadSessions()
-  // Assignment can happen after the initial page load when an agent comes online.
-  chat._sessionTimer = setInterval(() => {
-    chat.loadSessions()
-  }, 5000)
   // Refresh queue status periodically
   chat._queueTimer = setInterval(() => {
     chat.loadQueueStatus()
@@ -51,14 +48,9 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  chat.disconnectStomp()
   if (chat._queueTimer) {
     clearInterval(chat._queueTimer)
     chat._queueTimer = null
-  }
-  if (chat._sessionTimer) {
-    clearInterval(chat._sessionTimer)
-    chat._sessionTimer = null
   }
 })
 </script>
@@ -89,11 +81,12 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="queue-actions">
-          <button class="consult-btn" @click="startConsultation">
-            重新咨询
+          <button class="consult-btn" :disabled="hasActiveConsultation" @click="startConsultation">
+            {{ chat.consultationStarting ? '正在咨询…' : '重新咨询' }}
           </button>
           <button class="refresh-queue-btn" @click="refreshQueue">刷新</button>
         </div>
+        <p v-if="chat.queueNotice" class="queue-notice">{{ chat.queueNotice }}</p>
       </div>
       <ConnectionStatus class="connection-panel" />
 
@@ -206,4 +199,5 @@ onUnmounted(() => {
   min-width: 0;
   min-height: 0;
 }
+.queue-notice { margin: .5rem 0 0; color: var(--color-muted); font-size: .8rem; line-height: 1.4; }
 </style>

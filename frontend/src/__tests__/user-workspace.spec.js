@@ -4,6 +4,7 @@ import { mount } from '@vue/test-utils'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import MessageComposer from '../components/chat/MessageComposer.vue'
+import MessageList from '../components/chat/MessageList.vue'
 import { fetchAttachmentBlob } from '../api/chat-api'
 
 // Mock fetch globally
@@ -107,6 +108,22 @@ describe('User Workspace', () => {
       expect(chat.messages).toEqual([])
       expect(chat.unreadCounts.s1).toBe(0)
     })
+    it('starts loading the newly selected session while the previous history request is pending', async () => {
+      const chat = useChatStore()
+      chat._stomp = { publish: vi.fn() }
+      chat.connected = true
+
+      await chat.selectSession('session-a')
+      await chat.selectSession('session-b')
+
+      expect(chat._stomp.publish).toHaveBeenNthCalledWith(1, '/app/chat.history', {
+        sessionId: 'session-a', beforeMessageId: null, pageSize: 50, requestId: expect.any(String),
+      })
+      expect(chat._stomp.publish).toHaveBeenNthCalledWith(2, '/app/chat.history', {
+        sessionId: 'session-b', beforeMessageId: null, pageSize: 50, requestId: expect.any(String),
+      })
+      expect(chat.messagesLoading).toBe(true)
+    })
   })
 
   it('loads earlier history with the server cursor', async () => {
@@ -123,7 +140,125 @@ describe('User Workspace', () => {
       sessionId: 's1',
       beforeMessageId: 'm-oldest-visible',
       pageSize: 50,
+      requestId: expect.any(String),
     })
+    expect(chat.historyLoadingMore).toBe(true)
+  })
+
+  it('ignores a late history response after the request timed out and was retried', async () => {
+    vi.useFakeTimers()
+    try {
+      const chat = useChatStore()
+      chat._stomp = { publish: vi.fn() }
+      chat.connected = true
+      chat.activeSessionId = 's1'
+
+      await chat.loadHistory('s1')
+      const firstRequestId = chat._stomp.publish.mock.calls[0][1].requestId
+      await vi.advanceTimersByTimeAsync(15000)
+      await chat.loadHistory('s1')
+
+      chat._handleChatEvent({
+        event: 'CHAT_HISTORY', sessionId: 's1', requestId: firstRequestId,
+        messages: [{ id: 'old-response' }], nextCursor: 'old-cursor', hasMore: true,
+      })
+
+      expect(chat.messages).toEqual([])
+      expect(chat.historyCursor).toBeNull()
+      expect(chat.messagesLoading).toBe(true)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not turn the current user persisted message into unread after switching sessions', () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's2'
+
+    chat._handleChatEvent({ id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '我发出的消息' })
+
+    expect(chat.unreadCounts.s1).toBeUndefined()
+  })
+
+  it('records queue events and automatically selects an assigned session', () => {
+    const chat = useChatStore()
+    chat.sessions = [{ sessionId: 's1', status: 'ACTIVE' }]
+    chat.selectSession = vi.fn()
+
+    chat._handleChatEvent({ event: 'WAITING_FOR_AGENT', queuePosition: 2 })
+    expect(chat.queueNotice).toContain('排队')
+
+    chat._handleChatEvent({ event: 'SESSION_CREATED', sessionId: 's1' })
+    expect(chat.selectSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('prevents duplicate consultation requests while a session is active or a request is pending', () => {
+    const chat = useChatStore()
+    chat._stomp = { publish: vi.fn() }
+    chat.connected = true
+    chat.sessions = [{ sessionId: 's1', status: 'ACTIVE' }]
+
+    chat.startConsultation()
+    expect(chat._stomp.publish).not.toHaveBeenCalled()
+
+    chat.sessions = []
+    chat.consultationStarting = true
+    chat.startConsultation()
+    expect(chat._stomp.publish).not.toHaveBeenCalled()
+  })
+
+  it('unlocks consultation start when publishing the request throws', () => {
+    const chat = useChatStore()
+    chat._stomp = { publish: vi.fn(() => { throw new Error('connection closed') }) }
+    chat.connected = true
+
+    expect(() => chat.startConsultation()).not.toThrow()
+    expect(chat.consultationStarting).toBe(false)
+    expect(chat.queueNotice).toBeNull()
+    expect(chat.error).toBe('connection closed')
+  })
+
+  it('renders an edit action for an own text message', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{ id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '原内容' }]
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+    expect(wrapper.text()).toContain('编辑')
+  })
+
+  it('releases attachment blob URLs when the message list is unmounted', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{ id: 'm1', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/a' }]
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['file'], { type: 'text/plain' })),
+      headers: { get: () => 'attachment; filename="a.txt"' },
+    })
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-file')
+    const hadRevokeUrl = typeof URL.revokeObjectURL === 'function'
+    const revokeUrl = hadRevokeUrl
+      ? vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+      : vi.fn()
+
+    try {
+      const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      wrapper.unmount()
+
+      expect(createUrl).toHaveBeenCalled()
+      if (hadRevokeUrl) expect(revokeUrl).toHaveBeenCalledWith('blob:test-file')
+    } finally {
+      createUrl.mockRestore()
+      if (hadRevokeUrl) revokeUrl.mockRestore()
+    }
   })
 
   describe('chat store — consultation start', () => {

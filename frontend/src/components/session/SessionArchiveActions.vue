@@ -1,15 +1,11 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 
-const ARCHIVE_STATUSES = [
-  { code: 'COMPLETED', label: '已完成', color: '#059669' },
-  { code: 'PENDING', label: '待处理', color: '#d97706' },
-  { code: 'ON_HOLD', label: '搁置', color: '#6366f1' },
-  { code: 'OTHER', label: '其他', color: '#6b7280' },
-]
+const ARCHIVE_STATUSES = ARCHIVE_STATUS_OPTIONS
 
 /**
  * Valid state transitions (mirrors backend rules).
@@ -58,7 +54,7 @@ async function setArchive(code) {
       archiveStatus: code,
       remark: remark.value.trim() || undefined,
     })
-    successMsg.value = `已归档为: ${ARCHIVE_STATUSES.find((s) => s.code === code)?.label || code}`
+    successMsg.value = `Archived as: ${archiveStatusLabel(code)}`
     remark.value = ''
     setTimeout(() => { successMsg.value = '' }, 2000)
   } catch (e) {
@@ -71,27 +67,27 @@ async function setArchive(code) {
 
 <template>
   <div class="archive-actions">
-    <h4 class="archive-title">归档操作</h4>
+    <h4 class="archive-title">Ticket status</h4>
 
-    <div v-if="!session" class="no-data">请先选择会话</div>
-    <div v-else-if="!isClosed" class="no-data">会话结束后可进行归档</div>
+    <div v-if="!session" class="no-data">Select a ticket first</div>
+    <div v-else-if="!isClosed" class="no-data">Ticket status is available after the conversation is closed</div>
 
     <template v-else>
       <div v-if="currentArchiveStatus" class="current-status">
-        当前状态:
+        Current status:
         <span class="current-badge">
           {{ ARCHIVE_STATUSES.find((s) => s.code === currentArchiveStatus)?.label || currentArchiveStatus }}
         </span>
       </div>
 
       <div class="field">
-        <label class="field-label">备注</label>
+        <label class="field-label">Internal note</label>
         <textarea
           v-model="remark"
           rows="2"
           maxlength="255"
           class="remark-input"
-          placeholder="归档备注（可选）"
+          placeholder="Add an internal note (optional)"
         />
       </div>
 
@@ -138,8 +134,8 @@ async function setArchive(code) {
 .current-badge {
   display: inline-block;
   padding: 0.1rem 0.4rem;
-  background: #e0f2fe;
-  color: #0284c7;
+  background: #eef0ff;
+  color: #635bce;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 500;

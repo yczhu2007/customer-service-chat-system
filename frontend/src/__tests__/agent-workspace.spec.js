@@ -125,10 +125,12 @@ import {
   createQuickReply,
   deleteQuickReply,
   agentOnline,
+  agentOffline,
   findAgentDashboard,
   findAgentRatingSummary,
   findTransferLogs,
 } from '../api/chat-api'
+import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -179,13 +181,15 @@ describe('Chat Store - Agent Workspace', () => {
     expect(chat.transferLogs).toEqual([])
   })
 
-  it('records readable WebSocket errors and connection activity', () => {
+  it('records transport errors without changing a still-connected state', () => {
     const chat = useChatStore()
+    chat.connected = true
+    chat.connectionState = 'connected'
     chat.handleConnectionError('连接被服务器关闭')
 
-    expect(chat.connectionState).toBe('error')
+    expect(chat.connectionState).toBe('connected')
     expect(chat.connectionError).toBe('连接被服务器关闭')
-    expect(chat.connectionLogs.at(-1).message).toBe('连接被服务器关闭')
+    expect(chat.connectionLogs).toHaveLength(0)
   })
 
   it('refreshes the fixed view immediately when the server creates a session', () => {
@@ -198,6 +202,49 @@ describe('Chat Store - Agent Workspace', () => {
 
     expect(refreshCounts).toHaveBeenCalled()
     expect(refreshSessions).toHaveBeenCalledWith('MY_ACTIVE')
+  })
+
+  it('updates read state and clears the unread badge from a read event', () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u2', role: 'AGENT' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.unreadCounts = { s1: 2 }
+    chat.messages = [
+      { id: 'm1', sessionId: 's1', senderId: 'u1' },
+      { id: 'm2', sessionId: 's1', senderId: 'u1' },
+      { id: 'm3', sessionId: 's1', senderId: 'u2' },
+    ]
+
+    chat._handleMessageEvent({
+      event: 'MESSAGES_READ',
+      sessionId: 's1',
+      readerId: 'u2',
+      lastReadMessageId: 'm2',
+    })
+
+    expect(chat.unreadCounts.s1).toBe(0)
+    expect(chat.messages[0].read).toBe(true)
+    expect(chat.messages[1].read).toBe(true)
+    expect(chat.messages[2].read).not.toBe(true)
+  })
+
+  it('does not count an agent persisted message as unread when another session is active', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 's2'
+
+    chat._handleChatEvent({ id: 'm1', sessionId: 's1', senderId: 'agent-1', type: 'TEXT', content: '回复' })
+
+    expect(chat.unreadCounts.s1).toBeUndefined()
+  })
+
+  it('rejects transfer and end actions while disconnected', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+
+    expect(chat.transferSession('s1', 'agent-2')).toBe(false)
+    expect(chat.endSession('s1')).toBe(false)
+    expect(chat.error).toBe('未连接到服务器')
   })
 
   it('refreshes the fixed view immediately when the server transfers a session', () => {
@@ -336,6 +383,28 @@ describe('Agent Online/Offline', () => {
   it('calls agentOnline API', async () => {
     await agentOnline()
     expect(agentOnline).toHaveBeenCalled()
+  })
+
+  it('does not call the full online endpoint again as a periodic heartbeat', async () => {
+    vi.useFakeTimers()
+    const wrapper = mount(AgentWorkspaceView, { global: { stubs: { AgentViewNav: true, AgentSessionList: true, AgentChatWindow: true, SessionMetadataEditor: true, SessionArchiveActions: true, UserProfileSidebar: true, QuickReplyPanel: true, ConnectionStatus: true, AgentOverviewPanel: true, TransferLogPanel: true } } })
+    await vi.runAllTicks()
+
+    expect(agentOnline).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(30000)
+    expect(agentOnline).toHaveBeenCalledTimes(1)
+
+    wrapper.unmount()
+    vi.useRealTimers()
+  })
+
+  it('takes the agent offline when the agent workspace is left', async () => {
+    const wrapper = mount(AgentWorkspaceView, { global: { stubs: { AgentViewNav: true, AgentSessionList: true, AgentChatWindow: true, SessionMetadataEditor: true, SessionArchiveActions: true, UserProfileSidebar: true, QuickReplyPanel: true, ConnectionStatus: true, AgentOverviewPanel: true, TransferLogPanel: true } } })
+    await nextTick()
+
+    wrapper.unmount()
+
+    expect(agentOffline).toHaveBeenCalled()
   })
 })
 

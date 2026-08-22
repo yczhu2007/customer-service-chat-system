@@ -35,6 +35,7 @@ vi.mock('../api/admin-api', () => ({
   findVipSkillAgents: vi.fn(() => Promise.resolve({ data: [] })),
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),
+  findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
 }))
 
 // ─── Mock http-client ────────────────────────────────────────
@@ -146,6 +147,41 @@ describe('DeadLetterPanel', () => {
     // Confirmation dialog should appear
     expect(wrapper.text()).toContain('确认重放')
     expect(wrapper.text()).toContain('msg-001')
+  })
+})
+
+describe('SessionAuditPanel', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('renders an empty audit table without a runtime scope error', async () => {
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+
+    await nextTick()
+    await new Promise((r) => setTimeout(r, 0))
+    await nextTick()
+
+    expect(wrapper.text()).toContain('暂无数据')
+  })
+
+  it('renders returned audit records and their transfer row safely', async () => {
+    const { request } = await import('../services/http-client')
+    request.mockResolvedValueOnce({
+      data: {
+        records: [{ sessionId: 's1', userId: 'u1', status: 'CLOSED', rating: 5 }],
+        total: 1,
+      },
+    })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+
+    await new Promise((r) => setTimeout(r, 0))
+    await nextTick()
+
+    expect(wrapper.text()).toContain('s1')
+    expect(wrapper.text()).toContain('u1')
   })
 })
 

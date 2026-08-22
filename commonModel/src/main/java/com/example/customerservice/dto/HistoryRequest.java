@@ -18,6 +18,9 @@ public class HistoryRequest implements Serializable {
     @Size(max = 64, message = "sessionId长度不能超过64个字符")
     private String sessionId;
 
+    @Size(max = 64, message = "历史请求标识长度不能超过64个字符")
+    private String requestId;
+
     @Size(max = 64, message = "历史消息游标长度不能超过64个字符")
     private String beforeMessageId;
 
@@ -33,6 +36,14 @@ public class HistoryRequest implements Serializable {
 
     public void setSessionId(String sessionId) {
         this.sessionId = sessionId;
+    }
+
+    public String getRequestId() {
+        return requestId;
+    }
+
+    public void setRequestId(String requestId) {
+        this.requestId = requestId;
     }
 
 

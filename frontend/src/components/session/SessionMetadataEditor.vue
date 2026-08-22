@@ -2,6 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
+import { categoryLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -52,17 +53,17 @@ async function save() {
   successMsg.value = ''
 
   if (!title.value.trim()) {
-    errorMsg.value = '标题不能为空'
+    errorMsg.value = 'Title is required'
     return
   }
   if (title.value.length > 100) {
-    errorMsg.value = '标题长度不能超过100个字符'
+    errorMsg.value = 'Title must be 100 characters or fewer'
     return
   }
 
   const tags = parseTags()
   if (tags.length > 10) {
-    errorMsg.value = '标签数量不能超过10个'
+    errorMsg.value = 'You can add up to 10 tags'
     return
   }
 
@@ -74,10 +75,10 @@ async function save() {
       category: category.value || undefined,
       tags,
     })
-    successMsg.value = '元数据已更新'
+    successMsg.value = 'Ticket fields updated'
     setTimeout(() => { successMsg.value = '' }, 2000)
   } catch (e) {
-    errorMsg.value = e.message || '更新失败'
+    errorMsg.value = e.message || 'Update failed'
   } finally {
     saving.value = false
   }
@@ -86,40 +87,40 @@ async function save() {
 
 <template>
   <div class="metadata-editor">
-    <h4 class="editor-title">会话元数据</h4>
+    <h4 class="editor-title">Ticket fields</h4>
 
-    <div v-if="!chat.activeMetadata" class="no-data">请先选择会话</div>
+    <div v-if="!chat.activeMetadata" class="no-data">Select a ticket first</div>
 
     <template v-else>
       <div class="field">
-        <label class="field-label">标题</label>
+        <label class="field-label">Title</label>
         <input
           v-model="title"
           type="text"
           maxlength="100"
           :disabled="!isAssignedAgent"
           class="field-input"
-          placeholder="会话标题"
+          placeholder="Ticket title"
         />
       </div>
 
       <div class="field">
-        <label class="field-label">优先级</label>
+        <label class="field-label">Priority</label>
         <select v-model="priority" :disabled="!isAssignedAgent" class="field-select">
           <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
         </select>
       </div>
 
       <div class="field">
-        <label class="field-label">分类</label>
+        <label class="field-label">Category</label>
         <select v-model="category" :disabled="!isAssignedAgent" class="field-select">
-          <option value="">未分类</option>
-          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ c }}</option>
+          <option value="">Uncategorized</option>
+          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ categoryLabel(c) }}</option>
         </select>
       </div>
 
       <div class="field">
-        <label class="field-label">标签 <span class="hint">(逗号分隔，最多10个)</span></label>
+        <label class="field-label">Tags <span class="hint">(comma-separated, up to 10)</span></label>
         <input
           v-model="tagsInput"
           type="text"
@@ -138,9 +139,9 @@ async function save() {
         class="save-btn"
         @click="save"
       >
-        {{ saving ? '保存中…' : '保存' }}
+        {{ saving ? 'Saving…' : 'Save' }}
       </button>
-      <p v-else class="not-allowed">仅分配的客服可编辑元数据</p>
+  <p v-else class="not-allowed">Only the assigned agent can edit ticket fields</p>
     </template>
   </div>
 </template>

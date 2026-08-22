@@ -1,4 +1,4 @@
-import { request } from '../services/http-client'
+import { request, handleUnauthorized } from '../services/http-client'
 import { useAuthStore } from '../stores/auth'
 
 /**
@@ -61,7 +61,8 @@ export const uploadAttachment = (sessionId, file) => {
     method: 'POST',
     headers,
     body: formData,
-  }).then((res) => {
+  }).then(async (res) => {
+    if (res.status === 401) await handleUnauthorized()
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     return res.json()
   })
@@ -72,10 +73,21 @@ export const uploadAttachment = (sessionId, file) => {
  * Returns a blob URL string.
  */
 export const fetchAttachmentBlob = async (contentUrl) => {
-  const auth = useAuthStore()
   const headers = {}
-  if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+  let url
+  try {
+    url = new URL(contentUrl, window.location.origin)
+  } catch {
+    throw new Error('附件地址无效')
+  }
+  const isLocalAttachment = url.origin === window.location.origin
+    && /^\/chat\/attachments\/[A-Za-z0-9]{32,64}\/content$/.test(url.pathname)
+  if (isLocalAttachment) {
+    const auth = useAuthStore()
+    if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+  }
   const res = await fetch(contentUrl, { headers })
+  if (res.status === 401) await handleUnauthorized()
   if (!res.ok) throw new Error(`HTTP ${res.status}`)
   const blob = await res.blob()
   const disposition = res.headers.get('content-disposition') || ''

@@ -3,6 +3,7 @@ import { ref, computed, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
+import { categoryLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const props = defineProps({
@@ -13,15 +14,7 @@ const session = computed(() => chat.activeSession)
 const isClosed = computed(() => session.value?.status === 'CLOSED')
 const canSend = computed(() => session.value && !isClosed.value && chat.connected)
 
-/** Status display text */
-const statusText = computed(() => {
-  if (!session.value) return ''
-  const s = session.value.status
-  if (s === 'ACTIVE') return '进行中'
-  if (s === 'QUEUED') return '排队中'
-  if (s === 'CLOSED') return '已结束'
-  return s
-})
+const statusText = computed(() => statusLabel(session.value?.status))
 
 /** Priority badge color */
 const priorityClass = computed(() => {
@@ -51,14 +44,10 @@ async function doTransfer() {
   if (!targetAgentId.value.trim()) return
   transferring.value = true
   try {
-    if (chat._stomp && chat.connected) {
-      chat._stomp.publish('/app/chat.transfer', {
-        sessionId: chat.activeSessionId,
-        targetAgentId: targetAgentId.value.trim(),
-      })
+    if (chat.transferSession(chat.activeSessionId, targetAgentId.value.trim())) {
+      showTransfer.value = false
+      targetAgentId.value = ''
     }
-    showTransfer.value = false
-    targetAgentId.value = ''
   } finally {
     transferring.value = false
   }
@@ -67,11 +56,7 @@ async function doTransfer() {
 // End session
 async function endSession() {
   if (!confirm('确定结束此会话？')) return
-  if (chat._stomp && chat.connected) {
-    chat._stomp.publish('/app/chat.end', {
-      sessionId: chat.activeSessionId,
-    })
-  }
+  chat.endSession(chat.activeSessionId)
 }
 
 // Quick reply insertion
@@ -93,7 +78,7 @@ watch(() => props.quickReplyContent, (content) => {
         <span class="session-title">{{ session.title || '会话' }}</span>
         <span class="status-badge" :class="session.status?.toLowerCase()">{{ statusText }}</span>
         <span v-if="session.priority" class="priority-badge" :class="priorityClass">{{ session.priority }}</span>
-        <span v-if="session.category" class="category-badge">{{ session.category }}</span>
+        <span v-if="session.category" class="category-badge">{{ categoryLabel(session.category) }}</span>
       </div>
       <div class="header-meta">
         <span v-if="session.userId" class="user-info">用户: {{ session.userId }}</span>
@@ -117,6 +102,7 @@ watch(() => props.quickReplyContent, (content) => {
           结束会话
         </button>
       </div>
+      <p v-if="chat.error" class="action-error">{{ chat.error }}</p>
 
       <!-- Transfer dialog -->
       <div v-if="showTransfer" class="transfer-dialog">
@@ -188,16 +174,16 @@ watch(() => props.quickReplyContent, (content) => {
   color: #374151;
 }
 .status-badge.active {
-  background: #d1fae5;
-  color: #065f46;
+  background: #e7f4ee;
+  color: #1f8a5f;
 }
 .status-badge.queued {
   background: #fef3c7;
-  color: #92400e;
+  color: #b7791f;
 }
 .status-badge.closed {
-  background: #fee2e2;
-  color: #991b1b;
+  background: #fdecec;
+  color: #dc2626;
 }
 .priority-badge {
   font-size: 0.7rem;
@@ -242,7 +228,8 @@ watch(() => props.quickReplyContent, (content) => {
   flex-wrap: wrap;
 }
 .tag {
-  background: #f3f4f6;
+  background: #eef0ff;
+  color: #635bce;
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
   font-size: 0.7rem;
@@ -319,4 +306,5 @@ watch(() => props.quickReplyContent, (content) => {
   justify-content: center;
   color: #9ca3af;
 }
+.action-error { margin: .5rem 0 0; color: #b91c1c; font-size: .8rem; }
 </style>

@@ -18,12 +18,11 @@ async function submit() {
     const result = await login({ username: username.value, password: password.value })
     const payload = result?.data
     const roles = payload?.roles || []
-    const role = roles.includes('ADMIN') ? 'ADMIN' : roles.includes('AGENT') ? 'AGENT' : 'USER'
     if (!payload?.token || !payload?.userId) {
       throw new Error('登录响应缺少认证信息')
     }
-    auth.login({ token: payload.token, userId: payload.userId, role })
-    await router.push(`/${role.toLowerCase()}`)
+    auth.login({ token: payload.token, userId: payload.userId, username: payload.username || username.value.trim(), roles })
+    await router.push(`/${auth.homeRole.toLowerCase()}`)
   } catch (e) {
     error.value = e.message || '登录失败'
   } finally {
@@ -42,16 +41,16 @@ async function submit() {
         用户名
         <input v-model="username" required autocomplete="username" placeholder="请输入用户名">
       </label>
-      <label>
+      <div class="password-field">
+        <label>
         密码
         <input v-model="password" required type="password" autocomplete="current-password" placeholder="请输入密码">
-      </label>
+        </label>
+        <RouterLink class="forgot-link" to="/forgot-password">忘记密码</RouterLink>
+      </div>
       <p v-if="error" class="login-error" role="alert">{{ error }}</p>
       <button class="login-submit" :disabled="submitting">{{ submitting ? '登录中…' : '进入工作台' }}</button>
-      <div class="login-links">
-        <RouterLink to="/register">注册普通用户</RouterLink>
-        <RouterLink to="/forgot-password">忘记密码</RouterLink>
-      </div>
+      <p class="register-prompt">还没有账号？<RouterLink to="/register">立即注册</RouterLink></p>
     </form>
   </section>
 </template>
@@ -63,8 +62,15 @@ async function submit() {
 .login-brand h1 { margin: 0; font-size: 22px; }
 .login-brand p { margin: 6px 0 0; color: var(--color-faint); font: 11px var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
 label { display: grid; gap: 6px; margin-bottom: 14px; color: var(--color-muted); font-size: 12px; }
+.password-field { position: relative; }
+.password-field label { margin-bottom: 14px; }
+.forgot-link { position: absolute; top: 0; right: 0; color: var(--color-primary); font-size: 12px; text-decoration: none; }
+.forgot-link:hover { text-decoration: underline; }
 input { width: 100%; padding: 9px 11px; }
 .login-error { margin: 0 0 12px; color: var(--color-danger); font-size: 12px; }
 .login-submit { width: 100%; padding: 9px 14px; border-color: var(--color-primary); background: var(--color-primary); color: #fff; font-weight: 600; }
 .login-submit:hover:not(:disabled) { border-color: var(--color-primary-hover); background: var(--color-primary-hover); color: #fff; }
+.register-prompt { margin: 16px 0 0; color: var(--color-muted); text-align: center; font-size: 12px; }
+.register-prompt a { color: var(--color-primary); text-decoration: none; font-weight: 600; }
+.register-prompt a:hover { text-decoration: underline; }
 </style>

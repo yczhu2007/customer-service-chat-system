@@ -21,6 +21,8 @@ import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
 import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +54,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -77,6 +80,7 @@ class ChatMessageServiceTest {
 
     private ChatMessageOperations service;
     private ChatRoutingOperations routingOperations;
+    private ChatSessionOperations sessionOperations;
 
     @BeforeEach
     void setUp() {
@@ -99,6 +103,7 @@ class ChatMessageServiceTest {
         );
         service = messageOperations;
         routingOperations = routingSessionService;
+        sessionOperations = routingSessionService;
     }
 
     @Test
@@ -396,6 +401,48 @@ class ChatMessageServiceTest {
         assertTrue(keysCaptor.getValue().contains(RedisConstants.AGENT_LAST_ASSIGNED));
         assertEquals("1", argumentsCaptor.getAllValues().get(3));
         assertEquals("1", argumentsCaptor.getAllValues().get(4));
+    }
+
+    @Test
+    void failedAttachmentValidationRemovesTheDeduplicationKey() {
+        ChatMessage message = textMessage();
+        message.setId(null);
+        message.setType("FILE");
+        message.setContent("/chat/attachments/0123456789abcdef0123456789abcdef/content");
+        message.setClientMsgId("CLIENT-FAIL");
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(valueOperations.setIfAbsent(anyString(), anyString(), eq(24L), eq(TimeUnit.HOURS)))
+                .thenReturn(true);
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
+                .thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class, () -> service.handleMessage(message));
+
+        verify(redisTemplate).delete(RedisConstants.CLIENT_MSG_DEDUP + "S001:A001:CLIENT-FAIL");
+    }
+
+    @Test
+    void sessionCloseNotificationsWaitUntilTheDatabaseTransactionCommits() {
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(valueOperations.setIfAbsent(anyString(), anyString(), anyLong(), eq(TimeUnit.SECONDS)))
+                .thenReturn(true);
+        when(chatSessionMapper.endSession(eq("S001"), any(LocalDateTime.class))).thenReturn(1);
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            sessionOperations.endSessionByAgent("S001", "A001");
+
+            verifyNoInteractions(chatSessionNotificationOperations);
+            TransactionSynchronizationUtils.triggerAfterCommit();
+
+            verify(chatSessionNotificationOperations).notifySessionClosed(
+                    "U001", "S001", "MANUAL_END"
+            );
+            verify(chatSessionNotificationOperations).notifySessionClosed(
+                    "A001", "S001", "MANUAL_END"
+            );
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     @Test

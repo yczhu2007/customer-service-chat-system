@@ -75,6 +75,10 @@ const isReadonly = ref(false)
 watch(
   () => props.sessionId,
   () => {
+    submitted.value = false
+    existingRating.value = null
+    rating.value = 0
+    comment.value = ''
     loadRating()
   }
 )

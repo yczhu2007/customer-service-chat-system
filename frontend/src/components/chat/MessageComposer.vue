@@ -53,8 +53,8 @@ async function onFileChange(e) {
     // Send as IMAGE or FILE message via STOMP
     const type = result?.messageType || (file.type.startsWith('image/') ? 'IMAGE' : 'FILE')
     chat.sendMessage(props.sessionId, type, result?.contentUrl)
-  } catch {
-    // Error handled by store
+  } catch (e) {
+    chat.error = e.message || '附件上传失败，请稍后重试'
   } finally {
     uploading.value = false
     if (fileInput.value) fileInput.value.value = ''

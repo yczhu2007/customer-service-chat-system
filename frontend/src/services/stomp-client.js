@@ -4,7 +4,6 @@ export function createStompClient({ brokerURL, connectHeaders = {}, onConnect, o
     brokerURL,
     connectHeaders,
     onConnect,
-    onDisconnect,
     onStompError: (frame) => onError?.(frame?.headers?.message || 'STOMP 服务端错误'),
     onWebSocketError: () => onError?.('WebSocket 连接错误'),
     onWebSocketClose: () => onDisconnect?.(),

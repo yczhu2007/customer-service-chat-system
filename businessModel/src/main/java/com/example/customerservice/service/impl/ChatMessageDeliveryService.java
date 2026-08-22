@@ -173,9 +173,15 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             return 0;
         }
 
-        String operationLockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
+        String operationLockToken;
+        try {
+            operationLockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
+        } catch (RuntimeException exception) {
+            deleteDeduplicationKeySafely(dedupKey);
+            throw exception;
+        }
         if (operationLockToken == null) {
-            chatRedisRepository.delete(dedupKey);
+            deleteDeduplicationKeySafely(dedupKey);
             throw new BusinessStateException("会话正在转接、结束或执行超时处理，请稍后重试");
         }
         try {
@@ -273,11 +279,22 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
 
 
         return 1;
+        } catch (RuntimeException exception) {
+            deleteDeduplicationKeySafely(dedupKey);
+            throw exception;
         } finally {
             chatRedisRepository.releaseSessionOperationLock(
                     message.getSessionId(),
                     operationLockToken
             );
+        }
+    }
+
+    private void deleteDeduplicationKeySafely(String dedupKey) {
+        try {
+            chatRedisRepository.delete(dedupKey);
+        } catch (RuntimeException cleanupException) {
+            log.warn("清理消息去重Key失败，dedupKey={}", dedupKey, cleanupException);
         }
     }
 
