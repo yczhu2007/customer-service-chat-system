@@ -61,7 +61,27 @@
                     <jvmArguments>-Djava.io.tmpdir=${project.build.directory}</jvmArguments>
                 </configuration>
             </plugin>
-            <!-- Frontend packaging is opt-in so backend test/compile never runs npm. -->
+            <!-- Always package an existing Vue build; use -Pfrontend when it must be rebuilt first. -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>copy-frontend</id>
+                        <phase>process-resources</phase>
+                        <goals><goal>copy-resources</goal></goals>
+                        <configuration>
+                            <outputDirectory>${project.build.outputDirectory}/static/frontend</outputDirectory>
+                            <resources>
+                                <resource>
+                                    <directory>${project.parent.basedir}/frontend/dist</directory>
+                                    <filtering>false</filtering>
+                                </resource>
+                            </resources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
         </plugins>
     </build>
 
@@ -99,26 +119,6 @@
                                 <phase>generate-resources</phase>
                                 <goals><goal>npm</goal></goals>
                                 <configuration><arguments>run build</arguments></configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                    <plugin>
-                        <groupId>org.apache.maven.plugins</groupId>
-                        <artifactId>maven-resources-plugin</artifactId>
-                        <executions>
-                            <execution>
-                                <id>copy-frontend</id>
-                                <phase>process-resources</phase>
-                                <goals><goal>copy-resources</goal></goals>
-                                <configuration>
-                                    <outputDirectory>${project.build.outputDirectory}/static/frontend</outputDirectory>
-                                    <resources>
-                                        <resource>
-                                            <directory>${project.parent.basedir}/frontend/dist</directory>
-                                            <filtering>false</filtering>
-                                        </resource>
-                                    </resources>
-                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
