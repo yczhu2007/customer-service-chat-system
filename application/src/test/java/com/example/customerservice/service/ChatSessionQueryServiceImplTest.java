@@ -4,6 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.Wrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.ChatSessionRating;
+import com.example.customerservice.dto.SessionRatingDTO;
+import com.example.customerservice.dto.SessionRatingVO;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.ChatSessionRatingMapper;
@@ -16,6 +19,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DuplicateKeyException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -82,6 +86,32 @@ class ChatSessionQueryServiceImplTest {
         );
 
         verifyNoInteractions(sessionMapper, messageReadMapper);
+    }
+
+    @Test
+    void concurrentDuplicateRatingReturnsPersistedRatingIdempotently() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setUserId("U001");
+        session.setStatus("CLOSED");
+        ChatSessionRating persisted = new ChatSessionRating();
+        persisted.setSessionId("S001");
+        persisted.setUserId("U001");
+        persisted.setRating(5);
+        persisted.setComment("已保存");
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+        when(ratingMapper.insert(any(ChatSessionRating.class)))
+                .thenThrow(new DuplicateKeyException("duplicate"));
+        when(ratingMapper.selectById("S001")).thenReturn(persisted);
+        SessionRatingDTO request = new SessionRatingDTO();
+        request.setRating(1);
+        request.setComment("重试请求");
+
+        SessionRatingVO result = service.rateSession("U001", "S001", request);
+
+        assertEquals(5, result.getRating());
+        assertEquals("已保存", result.getComment());
+        verify(ratingMapper).selectById("S001");
     }
 
     @Test

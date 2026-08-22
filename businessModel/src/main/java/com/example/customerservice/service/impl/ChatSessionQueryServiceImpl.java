@@ -106,10 +106,6 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         if (!userId.equals(session.getUserId())) {
             throw new IllegalArgumentException("只有会话发起方可以评价");
         }
-        if (ratingMapper.selectById(sessionId) != null) {
-            throw new BusinessStateException("该会话已经评价过");
-        }
-
         ChatSessionRating rating = new ChatSessionRating();
         rating.setSessionId(sessionId);
         rating.setUserId(userId);
@@ -120,10 +116,16 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             if (ratingMapper.insert(rating) != 1) {
                 throw new IllegalStateException("评价保存失败");
             }
+            return toRatingVO(rating);
         } catch (DuplicateKeyException e) {
-            throw new BusinessStateException("该会话已经评价过");
+            /* The primary-key constraint is the concurrency boundary. Replaying a
+             * concurrent/already-completed request returns the persisted result. */
+            ChatSessionRating existing = ratingMapper.selectById(sessionId);
+            if (existing == null) {
+                throw e;
+            }
+            return toRatingVO(existing);
         }
-        return toRatingVO(rating);
     }
 
     @Override

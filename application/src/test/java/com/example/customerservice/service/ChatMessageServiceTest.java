@@ -296,7 +296,7 @@ class ChatMessageServiceTest {
     }
 
     @Test
-    void historyCursorUsesSeparateIndexRangeQueries() {
+    void historyCursorUsesStrictCompositeCursorBoundary() {
         ChatMessage cursor = textMessage();
         cursor.setId("M010");
         ChatMessage sameTimeMessage = textMessage();
@@ -307,12 +307,9 @@ class ChatMessageServiceTest {
 
         when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
         when(chatMessageMapper.selectById("M010")).thenReturn(cursor);
-        when(chatMessageMapper.selectHistoryAtCursorTime(
+        when(chatMessageMapper.selectHistoryBeforeCursor(
                 "S001", cursor.getCreateTime(), "M010", 3
-        )).thenReturn(List.of(sameTimeMessage));
-        when(chatMessageMapper.selectHistoryBeforeTime(
-                "S001", cursor.getCreateTime(), 2
-        )).thenReturn(List.of(olderMessage));
+        )).thenReturn(List.of(sameTimeMessage, olderMessage));
         when(chatMessageMapper.selectCount(any())).thenReturn(10L);
         when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(0L);
 
@@ -322,11 +319,8 @@ class ChatMessageServiceTest {
                 .map(ChatMessage::getId)
                 .toList());
         assertEquals(false, result.hasMore());
-        verify(chatMessageMapper).selectHistoryAtCursorTime(
+        verify(chatMessageMapper).selectHistoryBeforeCursor(
                 "S001", cursor.getCreateTime(), "M010", 3
-        );
-        verify(chatMessageMapper).selectHistoryBeforeTime(
-                "S001", cursor.getCreateTime(), 2
         );
         verify(chatMessageMapper, never()).selectList(any());
     }

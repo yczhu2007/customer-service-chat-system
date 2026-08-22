@@ -416,22 +416,11 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
             return chatMessageMapper.selectLatestHistory(sessionId, limit);
         }
 
-        List<ChatMessage> messages = new ArrayList<>(
-                chatMessageMapper.selectHistoryAtCursorTime(
-                        sessionId,
-                        cursorMessage.getCreateTime(),
-                        cursorMessage.getId(),
-                        limit
-                )
+        return chatMessageMapper.selectHistoryBeforeCursor(
+                sessionId,
+                cursorMessage.getCreateTime(),
+                cursorMessage.getId(),
+                limit
         );
-        int remaining = limit - messages.size();
-        if (remaining > 0) {
-            messages.addAll(chatMessageMapper.selectHistoryBeforeTime(
-                    sessionId,
-                    cursorMessage.getCreateTime(),
-                    remaining
-            ));
-        }
-        return messages;
     }
 }

@@ -6,7 +6,7 @@
 <mapper namespace="com.example.customerservice.mapper.ChatMessageReadMapper">
 
     <insert id="markReadThrough">
-        INSERT IGNORE INTO chat_message_read
+        INSERT INTO chat_message_read
             (message_id, session_id, user_id, read_time)
         SELECT message.id,
                message.session_id,
@@ -26,6 +26,7 @@
                     AND message.id &lt;= anchor.id
                 )
           )
+        ON DUPLICATE KEY UPDATE read_time = VALUES(read_time)
     </insert>
 
     <select id="countUnread" resultType="long">
@@ -45,10 +46,15 @@
     <select id="countUnreadBySessions" resultType="java.util.Map">
         SELECT message.session_id AS sessionId, COUNT(*) AS unreadCount
         FROM chat_message message
-        WHERE message.session_id IN
-        <foreach collection="sessionIds" item="sid" open="(" separator="," close=")">
-            #{sid}
-        </foreach>
+        <if test="sessionIds != null and !sessionIds.isEmpty()">
+            WHERE message.session_id IN
+            <foreach collection="sessionIds" item="sid" open="(" separator="," close=")">
+                #{sid}
+            </foreach>
+        </if>
+        <if test="sessionIds == null or sessionIds.isEmpty()">
+            WHERE 1 = 0
+        </if>
           AND message.sender_id != #{userId}
           AND message.recalled = 0
           AND NOT EXISTS (

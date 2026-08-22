@@ -69,7 +69,7 @@ public class StompExceptionHandler {
 
         response.put(
                 "message",
-                exception.getMessage()
+                "请求参数不正确"
         );
 
         response.put(

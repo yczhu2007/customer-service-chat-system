@@ -37,6 +37,30 @@ class ExceptionBoundaryTest {
     }
 
     @Test
+    void httpClientExceptionsDoNotExposeInternalDetails() {
+        WebExceptionAdvice advice = new WebExceptionAdvice();
+
+        ResponseEntity<Result<Void>> response = advice.handleIllegalArgumentException(
+                new IllegalArgumentException("jdbc:mysql://secret-host:3306/private")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("请求参数不正确", response.getBody().getMessage());
+    }
+
+    @Test
+    void stompArgumentExceptionDoesNotExposeInternalDetails() {
+        StompExceptionHandler handler = new StompExceptionHandler();
+
+        Map<String, Object> response = handler.handleIllegalArgumentException(
+                new IllegalArgumentException("redis password=top-secret")
+        );
+
+        assertEquals("ERROR", response.get("event"));
+        assertEquals("请求参数不正确", response.get("message"));
+    }
+
+    @Test
     void stompBusinessConflictKeepsSafeActionableMessage() {
         StompExceptionHandler handler = new StompExceptionHandler();
 

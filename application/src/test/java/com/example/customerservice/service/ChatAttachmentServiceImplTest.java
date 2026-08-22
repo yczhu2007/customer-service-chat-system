@@ -32,10 +32,26 @@ class ChatAttachmentServiceImplTest {
         ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(attachmentMapper, sessionMapper, storage.toString());
 
         var result = service.upload("U1", "S1",
-                new MockMultipartFile("file", "safe.jpg", "text/html", "<script>alert(1)</script>".getBytes()));
+                new MockMultipartFile("file", "safe.jpg", "text/html", new byte[]{
+                        (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00, 0x01
+                }));
 
         assertEquals("image/jpeg", result.getContentType());
         assertEquals("IMAGE", result.getMessageType());
+    }
+
+    @Test
+    void uploadRejectsContentThatDoesNotMatchItsExtension() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        ChatSession session = new ChatSession(); session.setId("S1"); session.setUserId("U1"); session.setAgentId("A1");
+        when(sessionMapper.selectById("S1")).thenReturn(session);
+        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(attachmentMapper, sessionMapper, storage.toString());
+
+        assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
+                new MockMultipartFile("file", "payload.jpg", "image/jpeg", "<script>alert(1)</script>".getBytes())));
+        assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
+                new MockMultipartFile("file", "payload.zip", "application/zip", new byte[]{0x50, 0x4B, 0x03, 0x04})));
     }
 
     @Test

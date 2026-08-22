@@ -55,6 +55,7 @@ public class ChatAgentSessionRecoveryService {
                                     ChatConstants.SESSION_STATUS_ACTIVE
                             )
                             .orderByAsc(ChatSession::getCreateTime)
+                            .orderByAsc(ChatSession::getId)
             );
         }
 
@@ -104,9 +105,13 @@ public class ChatAgentSessionRecoveryService {
 
         activeSessions.sort(
                 Comparator.comparing(
-                        ChatSession::getCreateTime,
-                        Comparator.nullsLast(Comparator.naturalOrder())
-                )
+                                ChatSession::getCreateTime,
+                                Comparator.nullsLast(Comparator.naturalOrder())
+                        )
+                        .thenComparing(
+                                ChatSession::getId,
+                                Comparator.nullsLast(Comparator.naturalOrder())
+                        )
         );
         return activeSessions;
     }

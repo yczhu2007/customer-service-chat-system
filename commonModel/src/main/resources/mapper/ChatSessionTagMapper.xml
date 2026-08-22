@@ -30,10 +30,15 @@
     <select id="selectBySessionIds" resultMap="ChatSessionTagResultMap">
         SELECT session_id, tag, create_time
         FROM chat_session_tag
-        WHERE session_id IN
-        <foreach collection="sessionIds" item="sessionId" open="(" separator="," close=")">
-            #{sessionId}
-        </foreach>
+        <if test="sessionIds != null and !sessionIds.isEmpty()">
+            WHERE session_id IN
+            <foreach collection="sessionIds" item="sessionId" open="(" separator="," close=")">
+                #{sessionId}
+            </foreach>
+        </if>
+        <if test="sessionIds == null or sessionIds.isEmpty()">
+            WHERE 1 = 0
+        </if>
         ORDER BY session_id ASC, create_time ASC, tag ASC
     </select>
 

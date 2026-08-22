@@ -44,7 +44,7 @@
 
     <insert id="assignRole">
 
-        INSERT IGNORE INTO sys_user_role
+        INSERT INTO sys_user_role
         (
             user_id,
             role_id
@@ -54,6 +54,7 @@
                 #{userId},
                 #{roleId}
             )
+        ON DUPLICATE KEY UPDATE role_id = VALUES(role_id)
 
     </insert>
 

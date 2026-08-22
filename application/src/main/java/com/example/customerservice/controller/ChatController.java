@@ -21,6 +21,8 @@ import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.Validator;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -68,6 +70,9 @@ public class ChatController {
 
     @Autowired
     private ChatSessionQueryService chatSessionQueryService;
+
+    @Autowired
+    private Validator validator;
 
 
     @PostMapping("/login")
@@ -441,13 +446,9 @@ public class ChatController {
             );
         }
 
-        if (request == null) {
-            throw new IllegalArgumentException(
-                    "聊天消息不能为空"
-            );
-        }
+        requireValidStompPayload(request, "聊天消息不能为空");
 
-        /* STOMP @Valid 不保证触发，手动校验必填字段和长度。 */
+        /* STOMP @Valid 不保证触发，保留业务字段的额外白名单校验。 */
         if (
                 request.getSessionId() == null ||
                         request.getSessionId().isBlank()
@@ -534,9 +535,9 @@ public class ChatController {
         }
 
 
+        requireValidStompPayload(request, "结束会话请求不能为空");
         if (
-                request == null ||
-                        request.getSessionId() == null ||
+                request.getSessionId() == null ||
                         request.getSessionId().isBlank()
         ) {
             throw new IllegalArgumentException(
@@ -585,6 +586,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前STOMP连接没有用户身份");
         }
+        requireValidStompPayload(request, "转接会话请求不能为空");
         String sourceAgentId = principal.getName();
         requireWebSocketRole(sourceAgentId, "AGENT");
         requireWebSocketPermission(sourceAgentId, "chat:session:transfer");
@@ -623,9 +625,9 @@ public class ChatController {
         /*
          * 2. 检查请求参数
          */
+        requireValidStompPayload(request, "历史消息请求不能为空");
         if (
-                request == null ||
-                        request.getSessionId() == null ||
+                request.getSessionId() == null ||
                         request.getSessionId().isBlank()
         ) {
             throw new IllegalArgumentException(
@@ -740,12 +742,7 @@ public class ChatController {
         }
 
 
-        if (request == null) {
-
-            throw new IllegalArgumentException(
-                    "ACK请求不能为空"
-            );
-        }
+        requireValidStompPayload(request, "ACK请求不能为空");
         chatMessageOperations.handleAck(
                 request.getMessageId(),
                 principal.getName()
@@ -766,6 +763,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
+        requireValidStompPayload(request, "已读消息请求不能为空");
         return chatMessageOperations.markMessagesRead(
                 request.getSessionId(),
                 request.getLastReadMessageId(),
@@ -786,6 +784,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
+        requireValidStompPayload(request, "编辑消息请求不能为空");
         return chatMessageOperations.editMessage(
                 request.getMessageId(),
                 request.getContent(),
@@ -806,6 +805,7 @@ public class ChatController {
         if (principal == null) {
             throw new IllegalArgumentException("当前用户身份不存在");
         }
+        requireValidStompPayload(request, "撤回消息请求不能为空");
         return chatMessageOperations.recallMessage(
                 request.getMessageId(),
                 principal.getName()
@@ -845,6 +845,20 @@ public class ChatController {
         );
     }
 
+
+    /**
+     * STOMP 方法参数不会在所有消息转换路径上自动触发 Bean Validation，
+     * 因此在进入业务服务前显式执行一次，避免 null、空白和超限字段绕过校验。
+     */
+    private void requireValidStompPayload(Object payload, String nullMessage) {
+        if (payload == null) {
+            throw new IllegalArgumentException(nullMessage);
+        }
+        Set<ConstraintViolation<Object>> violations = validator.validate(payload);
+        if (violations != null && !violations.isEmpty()) {
+            throw new IllegalArgumentException(violations.iterator().next().getMessage());
+        }
+    }
 
     /**
      * 校验WebSocket用户是否具有指定角色。

@@ -324,10 +324,15 @@
         LEFT JOIN chat_session session
                ON session.agent_id = user.id
               AND session.status = 'ACTIVE'
-        WHERE user.id IN
-        <foreach collection="agentIds" item="agentId" open="(" separator="," close=")">
-            #{agentId}
-        </foreach>
+        <if test="agentIds != null and !agentIds.isEmpty()">
+            WHERE user.id IN
+            <foreach collection="agentIds" item="agentId" open="(" separator="," close=")">
+                #{agentId}
+            </foreach>
+        </if>
+        <if test="agentIds == null or agentIds.isEmpty()">
+            WHERE 1 = 0
+        </if>
         GROUP BY user.id, user.username
         ORDER BY active_session_count ASC, user.id ASC
     </select>

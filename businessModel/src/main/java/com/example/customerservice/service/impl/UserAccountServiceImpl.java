@@ -140,6 +140,14 @@ public class UserAccountServiceImpl implements UserAccountService {
         if (PasswordUtil.matches(request.getNewPassword(), user.getPassword())) {
             throw new IllegalArgumentException("新密码不能与原密码相同");
         }
+        /*
+         * The read above can only validate the submitted hash. This conditional delete
+         * is the single-use claim: exactly one concurrent reset can consume it.
+         */
+        if (passwordRecoveryMapper.consumeRecoveryCode(
+                user.getId(), recovery.getRecoveryHash(), java.time.LocalDateTime.now()) != 1) {
+            throw new IllegalArgumentException("用户名或恢复码错误");
+        }
         if (userMapper.updatePassword(user.getId(), PasswordUtil.hash(request.getNewPassword())) != 1) {
             throw new IllegalStateException("密码重置失败");
         }

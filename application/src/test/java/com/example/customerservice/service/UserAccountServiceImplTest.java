@@ -72,6 +72,8 @@ class UserAccountServiceImplTest {
         recovery.setExpiresTime(java.time.LocalDateTime.now().plusDays(1));
         when(userMapper.findByUsername("user001")).thenReturn(user);
         when(passwordRecoveryMapper.selectById("U001")).thenReturn(recovery);
+        when(passwordRecoveryMapper.consumeRecoveryCode(
+                eq("U001"), eq(recovery.getRecoveryHash()), any())).thenReturn(1);
         when(userMapper.updatePassword(eq("U001"), anyString())).thenReturn(1);
         when(passwordRecoveryMapper.updateById(any(SysPasswordRecovery.class))).thenReturn(1);
         PasswordResetDTO request = new PasswordResetDTO();
@@ -83,7 +85,35 @@ class UserAccountServiceImplTest {
 
         assertTrue(result.recoveryCode().matches("[0-9A-F]{4}(?:-[0-9A-F]{4}){3}"));
         assertNotEquals("ABCD-1234-EF56-7890", result.recoveryCode());
+        verify(passwordRecoveryMapper).consumeRecoveryCode(
+                eq("U001"), eq(recovery.getRecoveryHash()), any());
         verify(tokenService).revokeAllForUser("U001");
+    }
+
+    @Test
+    void recoveryCodeAlreadyConsumedCannotResetPassword() {
+        SysUser user = new SysUser();
+        user.setId("U001"); user.setUsername("user001"); user.setStatus("ENABLED");
+        user.setPassword(PasswordUtil.hash("old-password"));
+        SysPasswordRecovery recovery = new SysPasswordRecovery();
+        recovery.setUserId("U001");
+        recovery.setRecoveryHash(PasswordUtil.hash("ABCD-1234-EF56-7890"));
+        recovery.setExpiresTime(java.time.LocalDateTime.now().plusDays(1));
+        when(userMapper.findByUsername("user001")).thenReturn(user);
+        when(passwordRecoveryMapper.selectById("U001")).thenReturn(recovery);
+        when(passwordRecoveryMapper.consumeRecoveryCode(
+                eq("U001"), eq(recovery.getRecoveryHash()), any())).thenReturn(0);
+        PasswordResetDTO request = new PasswordResetDTO();
+        request.setUsername("user001");
+        request.setRecoveryCode("ABCD-1234-EF56-7890");
+        request.setNewPassword("new-password-123");
+
+        IllegalArgumentException error = assertThrows(
+                IllegalArgumentException.class, () -> service.resetPassword(request));
+
+        assertEquals("用户名或恢复码错误", error.getMessage());
+        verify(userMapper, never()).updatePassword(anyString(), anyString());
+        verify(tokenService, never()).revokeAllForUser(anyString());
     }
 
     @Test

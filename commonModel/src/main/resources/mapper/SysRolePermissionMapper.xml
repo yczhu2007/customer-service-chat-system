@@ -70,7 +70,7 @@
 
     <insert id="assignPermission">
 
-        INSERT IGNORE INTO sys_role_permission
+        INSERT INTO sys_role_permission
         (
             role_id,
             permission_id
@@ -80,6 +80,7 @@
                 #{roleId},
                 #{permissionId}
             )
+        ON DUPLICATE KEY UPDATE permission_id = VALUES(permission_id)
 
     </insert>
 

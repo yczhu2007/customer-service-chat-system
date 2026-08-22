@@ -29,16 +29,11 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
             @Param("limit") int limit
     );
 
-    List<ChatMessage> selectHistoryAtCursorTime(
+    /** Returns messages strictly before the composite (createTime, id) cursor. */
+    List<ChatMessage> selectHistoryBeforeCursor(
             @Param("sessionId") String sessionId,
             @Param("cursorTime") LocalDateTime cursorTime,
             @Param("cursorId") String cursorId,
-            @Param("limit") int limit
-    );
-
-    List<ChatMessage> selectHistoryBeforeTime(
-            @Param("sessionId") String sessionId,
-            @Param("cursorTime") LocalDateTime cursorTime,
             @Param("limit") int limit
     );
 }

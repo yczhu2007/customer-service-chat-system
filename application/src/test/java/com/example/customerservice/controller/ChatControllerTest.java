@@ -21,6 +21,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.validation.Validator;
 
 import java.security.Principal;
 import java.util.List;
@@ -45,6 +46,7 @@ class ChatControllerTest {
     @Mock private IAuthenticationService authenticationService;
     @Mock private CurrentUser currentUser;
     @Mock private ChatSessionQueryService chatSessionQueryService;
+    @Mock private Validator validator;
     @InjectMocks private ChatController controller;
 
     @Test

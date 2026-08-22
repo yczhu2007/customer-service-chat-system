@@ -36,7 +36,7 @@ public class AdminBootstrapRunner
     private final SysUserRoleMapper sysUserRoleMapper;
 
     @Value(
-            "${app.bootstrap.admin.enabled:true}"
+            "${app.bootstrap.admin.enabled:false}"
     )
     private boolean enabled;
 

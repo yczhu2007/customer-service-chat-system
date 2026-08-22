@@ -25,4 +25,15 @@ public class SysPasswordRecovery {
     public void setCreateTime(LocalDateTime createTime) { this.createTime = createTime; }
     public LocalDateTime getUpdateTime() { return updateTime; }
     public void setUpdateTime(LocalDateTime updateTime) { this.updateTime = updateTime; }
+
+    @Override
+    public String toString() {
+        return "SysPasswordRecovery{" +
+                "userId='" + userId + '\'' +
+                ", recoveryHash='[REDACTED]'" +
+                ", expiresTime=" + expiresTime +
+                ", createTime=" + createTime +
+                ", updateTime=" + updateTime +
+                '}';
+    }
 }

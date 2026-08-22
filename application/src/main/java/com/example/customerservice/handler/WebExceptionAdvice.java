@@ -71,9 +71,10 @@ public class WebExceptionAdvice {
     handleIllegalArgumentException(
             IllegalArgumentException exception
     ) {
+        log.warn("HTTP请求参数异常", exception);
         return buildResponse(
                 HttpStatus.BAD_REQUEST,
-                exception.getMessage()
+                "请求参数不正确"
         );
     }
 
@@ -84,9 +85,10 @@ public class WebExceptionAdvice {
     handleNotFoundException(
             NotFoundException exception
     ) {
+        log.warn("HTTP资源不存在", exception);
         return buildResponse(
                 HttpStatus.NOT_FOUND,
-                exception.getMessage()
+                "请求的资源不存在"
         );
     }
 
@@ -136,9 +138,10 @@ public class WebExceptionAdvice {
     handleUnauthorizedException(
             UnauthorizedException exception
     ) {
+        log.warn("HTTP访问被拒绝", exception);
         return buildResponse(
                 HttpStatus.FORBIDDEN,
-                exception.getMessage()
+                "当前操作没有权限"
         );
     }
 
@@ -155,14 +158,10 @@ public class WebExceptionAdvice {
                                 .value()
                 );
 
-        String message =
-                exception.getReason() == null
-                        ? status.getReasonPhrase()
-                        : exception.getReason();
-
+        log.warn("HTTP状态异常：{}", status, exception);
         return buildResponse(
                 status,
-                message
+                safeStatusMessage(status)
         );
     }
 
@@ -182,6 +181,16 @@ public class WebExceptionAdvice {
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "服务器内部错误"
         );
+    }
+
+    private String safeStatusMessage(HttpStatus status) {
+        return switch (status) {
+            case BAD_REQUEST -> "请求参数不正确";
+            case UNAUTHORIZED -> "当前用户尚未登录";
+            case FORBIDDEN -> "当前操作没有权限";
+            case NOT_FOUND -> "请求的资源不存在";
+            default -> status.is5xxServerError() ? "服务器内部错误" : "请求处理失败";
+        };
     }
 
     private ResponseEntity<Result<Void>>

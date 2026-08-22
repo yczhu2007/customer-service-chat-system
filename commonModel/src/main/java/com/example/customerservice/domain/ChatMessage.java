@@ -139,8 +139,8 @@ public class ChatMessage implements Serializable {
                 ", senderId='" + senderId + '\'' +
                 ", senderRole='" + senderRole + '\'' +
                 ", type='" + type + '\'' +
-                ", content='" + content + '\'' +
-                ", clientMsgId='" + clientMsgId + '\'' +
+                ", contentLength=" + (content == null ? 0 : content.length()) +
+                ", clientMsgId='[REDACTED]'" +
                 ", createTime=" + createTime +
                 ", edited=" + edited +
                 ", editedAt=" + editedAt +

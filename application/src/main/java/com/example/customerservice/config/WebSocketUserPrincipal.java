@@ -14,13 +14,11 @@ public class WebSocketUserPrincipal
 
     private final Set<String> roleCodes;
 
-    private final String token;
 
 
     public WebSocketUserPrincipal(
             String name,
-            Set<String> roleCodes,
-            String token
+            Set<String> roleCodes
     ) {
 
         this.name =
@@ -40,7 +38,6 @@ public class WebSocketUserPrincipal
                     );
         }
 
-        this.token = token;
     }
 
 
@@ -60,12 +57,6 @@ public class WebSocketUserPrincipal
     public Set<String> getRoleCodes() {
 
         return roleCodes;
-    }
-
-
-    public String getToken() {
-
-        return token;
     }
 
 

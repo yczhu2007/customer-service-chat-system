@@ -26,6 +26,11 @@ public class WebSocketHandshakeInterceptor
             WebSocketHandshakeInterceptor.class.getName()
                     + ".AUTHENTICATED_PRINCIPAL";
 
+    /** Session attribute used only for server-side per-frame token revalidation. */
+    static final String ACCESS_TOKEN_ATTRIBUTE =
+            WebSocketHandshakeInterceptor.class.getName()
+                    + ".ACCESS_TOKEN";
+
     private static final String BEARER_PREFIX =
             "Bearer ";
 
@@ -94,12 +99,13 @@ public class WebSocketHandshakeInterceptor
                                 userId
                         );
 
+        // Keep the credential in the server-side session attributes only; never expose it via Principal.
+        attributes.put(ACCESS_TOKEN_ATTRIBUTE, token);
         attributes.put(
                 AUTHENTICATED_PRINCIPAL,
                 new WebSocketUserPrincipal(
                         userId,
-                        roleCodes,
-                        token
+                        roleCodes
                 )
         );
 

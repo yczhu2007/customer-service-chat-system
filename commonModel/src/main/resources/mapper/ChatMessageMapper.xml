@@ -49,7 +49,7 @@
         LIMIT #{limit}
     </select>
 
-    <select id="selectHistoryAtCursorTime"
+    <select id="selectHistoryBeforeCursor"
             resultType="com.example.customerservice.domain.ChatMessage">
         SELECT id,
                session_id,
@@ -66,30 +66,10 @@
                recalled_at
         FROM chat_message
         WHERE session_id = #{sessionId}
-          AND create_time = #{cursorTime}
-          AND id &lt; #{cursorId}
-        ORDER BY id DESC
-        LIMIT #{limit}
-    </select>
-
-    <select id="selectHistoryBeforeTime"
-            resultType="com.example.customerservice.domain.ChatMessage">
-        SELECT id,
-               session_id,
-               sender_id,
-               sender_role,
-               type,
-               content,
-               client_msg_id,
-               create_time,
-               edited,
-               edited_at,
-               original_content,
-               recalled,
-               recalled_at
-        FROM chat_message
-        WHERE session_id = #{sessionId}
-          AND create_time &lt; #{cursorTime}
+          AND (
+              create_time &lt; #{cursorTime}
+              OR (create_time = #{cursorTime} AND id &lt; #{cursorId})
+          )
         ORDER BY create_time DESC, id DESC
         LIMIT #{limit}
     </select>

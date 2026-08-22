@@ -50,7 +50,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
-                    <argLine>-Djava.io.tmpdir=${project.build.directory} --enable-final-field-mutation=ALL-UNNAMED -Djdk.attach.allowAttachSelf=true</argLine>
+                    <argLine>-Djava.io.tmpdir=${project.build.directory} -Djdk.attach.allowAttachSelf=true</argLine>
                 </configuration>
             </plugin>
             <plugin>
@@ -58,7 +58,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <configuration>
                     <mainClass>com.example.customerservice.CustomerServiceChatApplication</mainClass>
-                    <jvmArguments>--enable-final-field-mutation=ALL-UNNAMED</jvmArguments>
+                    <jvmArguments>-Djava.io.tmpdir=${project.build.directory}</jvmArguments>
                 </configuration>
             </plugin>
             <!-- Frontend packaging is opt-in so backend test/compile never runs npm. -->

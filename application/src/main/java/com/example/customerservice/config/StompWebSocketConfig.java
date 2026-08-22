@@ -1,8 +1,10 @@
 package com.example.customerservice.config;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.TaskScheduler;
@@ -32,6 +34,8 @@ public class StompWebSocketConfig
 
     private final TaskScheduler stompHeartbeatTaskScheduler;
 
+    private final Environment environment;
+
     public StompWebSocketConfig(
             StompAuthChannelInterceptor
                     stompAuthChannelInterceptor,
@@ -41,6 +45,7 @@ public class StompWebSocketConfig
                     webSocketHandshakeHandler,
             @Qualifier("stompHeartbeatTaskScheduler")
             TaskScheduler stompHeartbeatTaskScheduler,
+            Environment environment,
             @Value("${app.websocket.allowed-origin-patterns:http://localhost:*,http://127.0.0.1:*}")
             String allowedOriginPatterns
     ) {
@@ -51,12 +56,39 @@ public class StompWebSocketConfig
         this.webSocketHandshakeHandler =
                 webSocketHandshakeHandler;
         this.stompHeartbeatTaskScheduler = stompHeartbeatTaskScheduler;
+        this.environment = environment;
 
         this.allowedOriginPatterns =
                 StringUtils
                         .commaDelimitedListToStringArray(
                                 allowedOriginPatterns
                         );
+    }
+
+    /**
+     * 生产环境不允许回退到开发环境的 localhost Origin 白名单。
+     */
+    @PostConstruct
+    void validateProductionOriginConfiguration() {
+        for (String profile : environment.getActiveProfiles()) {
+            if ("prod".equalsIgnoreCase(profile) && containsLocalDevelopmentOrigin()) {
+                throw new IllegalStateException(
+                        "生产环境必须通过 app.websocket.allowed-origin-patterns 配置明确的可信 Origin"
+                );
+            }
+        }
+    }
+
+    private boolean containsLocalDevelopmentOrigin() {
+        for (String pattern : allowedOriginPatterns) {
+            if (!StringUtils.hasText(pattern)
+                    || pattern.contains("localhost")
+                    || pattern.contains("127.0.0.1")
+                    || "*".equals(pattern.trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -362,6 +362,15 @@ class AgentSessionViewTest {
                 "offset",
                 "pageSize"
         );
+        assertTrue(sql.contains("ORDER BY SESSION.CREATE_TIME DESC, SESSION.ID DESC"));
+    }
+
+    @Test
+    void emptyAgentIdsProduceSafeNoRowsSql() throws IOException {
+        BoundSql boundSql = mappedSql("findAgentLoads", Map.of("agentIds", List.of()));
+        String sql = normalizeSql(boundSql.getSql());
+        assertTrue(sql.contains("WHERE 1 = 0"));
+        assertTrue(!sql.contains("IN ( )"));
     }
 
     private static Stream<Arguments> viewPredicates() {
