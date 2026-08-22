@@ -53,4 +53,15 @@ describe('workspace visual text', () => {
 
     expect(metadataEditor).not.toContain(':style="category ? categoryStyle(category) : undefined"')
   })
+
+  it('does not duplicate admin navigation in the dashboard content', async () => {
+    const dashboard = await readFile(
+      join(sourceRoot, 'components/admin/AdminDashboard.vue'),
+      'utf8'
+    )
+
+    expect(dashboard).not.toContain('快捷入口')
+    expect(dashboard).not.toContain('rating-summary')
+    expect(dashboard).not.toContain('quickLinks')
+  })
 })

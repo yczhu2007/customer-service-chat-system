@@ -129,20 +129,10 @@ onUnmounted(releaseAllBlobs)
 
         <!-- TEXT message -->
         <div v-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
-          <template v-if="chat.editingMessageId === msg.id">
-            <textarea v-model="chat.editingContent" class="edit-input" rows="2" />
-            <div class="message-actions">
-              <button class="message-action" @click="chat.editMessage(msg.id)">保存</button>
-              <button class="message-action" @click="chat.cancelEditing()">取消</button>
-            </div>
-          </template>
-          <template v-else>
-            <span>{{ msg.content }}</span>
-            <div v-if="isMine(msg)" class="message-actions">
-              <button class="message-action" @click="chat.startEditing(msg)">编辑</button>
-              <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
-            </div>
-          </template>
+          <span>{{ msg.content }}</span>
+          <div v-if="isMine(msg)" class="message-actions">
+            <button class="message-action" @click="chat.recallMessage(msg.id)">撤回</button>
+          </div>
         </div>
 
         <!-- IMAGE message -->
@@ -281,7 +271,6 @@ onUnmounted(releaseAllBlobs)
 .message-actions { display: flex; gap: 0.35rem; margin-top: 0.35rem; }
 .message-action { border: 0; padding: 0; background: transparent; color: inherit; font-size: 0.7rem; cursor: pointer; opacity: 0.7; }
 .message-action:hover { opacity: 1; text-decoration: underline; }
-.edit-input { width: 100%; box-sizing: border-box; border: 1px solid currentColor; border-radius: 4px; padding: .35rem; color: #111827; }
 .message-state { font-size: 0.7rem; color: #6b7280; }
 .file-info { font-size: 0.75rem; opacity: 0.75; }
 .mine .file-link {

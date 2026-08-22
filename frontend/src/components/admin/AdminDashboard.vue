@@ -1,21 +1,17 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { findAdminDashboard, findAdminRatingSummary } from '../../api/admin-api'
-
-const emit = defineEmits(['navigate'])
+import { findAdminDashboard } from '../../api/admin-api'
 
 const loading = ref(true)
 const error = ref(null)
 const dashboard = ref(null)
-const ratingSummary = ref(null)
 
 async function loadDashboard() {
   loading.value = true
   error.value = null
   try {
-    const [dashboardRes, ratingRes] = await Promise.all([findAdminDashboard(), findAdminRatingSummary()])
+    const dashboardRes = await findAdminDashboard()
     dashboard.value = dashboardRes.data
-    ratingSummary.value = ratingRes.data
   } catch (e) {
     error.value = e.message
   } finally {
@@ -24,14 +20,6 @@ async function loadDashboard() {
 }
 
 onMounted(loadDashboard)
-
-const quickLinks = [
-  { label: '用户管理', panel: 'users' },
-  { label: '角色管理', panel: 'roles' },
-  { label: '归档统计', panel: 'archive' },
-  { label: '死信管理', panel: 'deadletters' },
-  { label: 'VIP 技能组', panel: 'vip' },
-]
 </script>
 
 <template>
@@ -60,18 +48,6 @@ const quickLinks = [
         </div>
       </div>
 
-      <h3>快捷入口</h3>
-      <div class="rating-summary">满意度：{{ ratingSummary?.averageRating ?? '—' }} 分，共 {{ ratingSummary?.ratingCount ?? 0 }} 条评价</div>
-      <div class="quick-links">
-        <button
-          v-for="link in quickLinks"
-          :key="link.panel"
-          class="quick-link"
-          @click="emit('navigate', link.panel)"
-        >
-          <span>{{ link.label }}</span>
-        </button>
-      </div>
     </template>
   </section>
 </template>
@@ -105,26 +81,6 @@ const quickLinks = [
 .card-label {
   margin-top: 0.25rem;
   color: var(--color-muted);
-}
-.quick-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.quick-link {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 9px 14px;
-  border: 1px solid var(--color-line-strong);
-  border-radius: 8px;
-  background: var(--color-paper);
-  cursor: pointer;
-  font-size: 13px;
-  transition: border-color .12s ease;
-}
-.quick-link:hover {
-  border-color: var(--color-primary);
 }
 .loading, .error {
   padding: 1rem;

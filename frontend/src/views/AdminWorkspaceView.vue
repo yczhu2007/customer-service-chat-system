@@ -39,7 +39,7 @@ function switchTab(key) {
     </nav>
 
     <main class="tab-content">
-      <AdminDashboard v-if="activeTab === 'dashboard'" @navigate="switchTab" />
+      <AdminDashboard v-if="activeTab === 'dashboard'" />
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
       <SessionAuditPanel v-if="activeTab === 'sessions'" />

@@ -220,7 +220,7 @@ describe('User Workspace', () => {
     expect(chat.error).toBe('connection closed')
   })
 
-  it('renders an edit action for an own text message', async () => {
+  it('does not render an edit action for an own text message', async () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
     const chat = useChatStore()
@@ -228,7 +228,8 @@ describe('User Workspace', () => {
     chat.messages = [{ id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '原内容' }]
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
-    expect(wrapper.text()).toContain('编辑')
+    expect(wrapper.text()).not.toContain('编辑')
+    expect(wrapper.find('.edit-input').exists()).toBe(false)
   })
 
   it('releases attachment blob URLs when the message list is unmounted', async () => {
