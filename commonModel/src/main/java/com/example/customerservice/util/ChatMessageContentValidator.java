@@ -61,7 +61,7 @@ public final class ChatMessageContentValidator {
     ) {
         return new IllegalArgumentException(
                 messageType.name()
-                        + " 消息内容必须是合法的附件地址或http/https地址"
+                        + " 消息内容必须是合法的附件地址"
         );
     }
 }

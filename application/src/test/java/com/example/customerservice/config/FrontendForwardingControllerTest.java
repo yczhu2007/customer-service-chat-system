@@ -1,6 +1,7 @@
 package com.example.customerservice.config;
 
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
@@ -14,9 +15,15 @@ class FrontendForwardingControllerTest {
             .standaloneSetup(new FrontendForwardingController())
             .build();
 
-    @Test
-    void forwardsFrontendLoginRouteToVueEntryPage() throws Exception {
-        mockMvc.perform(get("/frontend/login"))
+    @ParameterizedTest
+    @ValueSource(strings = {
+            "/frontend/login", "/frontend/user/tickets/123",
+            "/user", "/user/tickets/123",
+            "/agent", "/agent/queues/active",
+            "/admin", "/admin/sessions"
+    })
+    void forwardsSpaRoutesToVueEntryPage(String route) throws Exception {
+        mockMvc.perform(get(route))
                 .andExpect(status().isOk())
                 .andExpect(forwardedUrl("/frontend/index.html"));
     }

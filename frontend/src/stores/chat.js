@@ -117,7 +117,9 @@ export const useChatStore = defineStore('chat', {
         this.connectionError = '自动重连次数已达上限，请手动重连'
         return
       }
-      this.disconnectStomp(false)
+      // This reconnect path schedules its own timer; suppress the close callback
+      // from scheduling a second concurrent reconnect attempt.
+      this.disconnectStomp({ manual: true })
       this.reconnectAttempts += 1
       const delay = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 10000)
       this.connectionState = 'reconnecting'
@@ -560,31 +562,31 @@ export const useChatStore = defineStore('chat', {
     /**
      * Disconnect STOMP.
      */
-    disconnectStomp(scheduleReconnect = true) {
+    /** Disconnect transport. Manual disconnects suppress automatic reconnect. */
+    disconnectStomp({ manual = true } = {}) {
       this._connectAttempt += 1
       if (this._ticketAbortController) {
         this._ticketAbortController.abort()
         this._ticketAbortController = null
       }
-      if (scheduleReconnect) this.manualDisconnect = true
+      this.manualDisconnect = manual
       this.stopHeartbeat()
       if (this._reconnectTimer) {
         clearTimeout(this._reconnectTimer)
         this._reconnectTimer = null
       }
       if (this._deactivateStomp) {
-        this.manualDisconnect = true
         this._deactivateStomp()
         this._deactivateStomp = null
       }
       this.connectionState = 'disconnected'
       this.connected = false
-      if (scheduleReconnect) this.logConnection('已手动断开 WebSocket')
+      if (manual) this.logConnection('已手动断开 WebSocket')
     },
 
     /** Clear data that belongs to the authenticated account after a token expires. */
     clearAuthenticatedChat() {
-      this.disconnectStomp()
+      this.disconnectStomp({ manual: true })
       this._clearHistoryTimeout()
       this._historyRequestSequence += 1
       this._historyPendingSessionId = null

@@ -14,9 +14,9 @@ const routes = [
   { path: '/register', component: RegisterView },
   { path: '/forgot-password', component: ForgotPasswordView },
   { path: '/account', component: AccountView, meta: { requiresAuth: true } },
-  { path: '/user', component: UserWorkspaceView, meta: { role: 'USER' } },
-  { path: '/agent', component: AgentWorkspaceView, meta: { role: 'AGENT' } },
-  { path: '/admin', component: AdminWorkspaceView, meta: { role: 'ADMIN' } },
+  { path: '/user', component: UserWorkspaceView, meta: { requiresAuth: true, role: 'USER' } },
+  { path: '/agent', component: AgentWorkspaceView, meta: { requiresAuth: true, role: 'AGENT' } },
+  { path: '/admin', component: AdminWorkspaceView, meta: { requiresAuth: true, role: 'ADMIN' } },
   { path: '/', redirect: '/login' },
 ]
 
@@ -26,7 +26,10 @@ router.beforeEach((to) => {
   if (to.path === '/login' || to.path === '/register' || to.path === '/forgot-password') {
     return auth.isAuthenticated ? `/${auth.homeRole.toLowerCase()}` : true
   }
-  if (!auth.isAuthenticated) return { path: '/login', query: { redirect: to.fullPath } }
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+    return { path: '/login', query: { redirect: to.fullPath } }
+  }
+  if (!auth.isAuthenticated) return true
   if (!to.meta.role) return true
   if (!auth.hasRole(to.meta.role)) return `/${auth.homeRole.toLowerCase()}`
   auth.setActiveRole(to.meta.role)

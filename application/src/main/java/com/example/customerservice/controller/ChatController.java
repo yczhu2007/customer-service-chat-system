@@ -298,8 +298,13 @@ public class ChatController {
     public Result<PageResult<ChatSessionListItemVO>> findMySessions(
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String archiveStatus,
-            @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize
+            @RequestParam(defaultValue = "1")
+            @jakarta.validation.constraints.Min(value = 1, message = "页码必须大于0")
+            long pageNo,
+            @RequestParam(defaultValue = "20")
+            @jakarta.validation.constraints.Min(value = 1, message = "每页数量必须大于0")
+            @jakarta.validation.constraints.Max(value = 100, message = "每页数量不能超过100")
+            long pageSize
     ) {
         currentUser.requirePermission("chat:session:view-own");
         return Result.success(
@@ -442,18 +447,59 @@ public class ChatController {
             );
         }
 
-        /* STOMP @Valid 不保证触发，手动校验核心字段长度。 */
-        if (request.getSessionId() != null
-                && request.getSessionId().length() > 64) {
-            throw new IllegalArgumentException("sessionId长度不能超过64个字符");
+        /* STOMP @Valid 不保证触发，手动校验必填字段和长度。 */
+        if (
+                request.getSessionId() == null ||
+                        request.getSessionId().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "sessionId不能为空"
+            );
         }
-        if (request.getClientMsgId() != null
-                && request.getClientMsgId().length() > 64) {
-            throw new IllegalArgumentException("clientMsgId长度不能超过64个字符");
+        if (request.getSessionId().length() > 64) {
+            throw new IllegalArgumentException(
+                    "sessionId长度不能超过64个字符"
+            );
         }
-        if (request.getContent() != null
-                && request.getContent().length() > 4000) {
-            throw new IllegalArgumentException("消息内容不能超过4000个字符");
+        if (
+                request.getClientMsgId() == null ||
+                        request.getClientMsgId().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "clientMsgId不能为空"
+            );
+        }
+        if (request.getClientMsgId().length() > 64) {
+            throw new IllegalArgumentException(
+                    "clientMsgId长度不能超过64个字符"
+            );
+        }
+        if (
+                request.getType() == null ||
+                        request.getType().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "消息类型不能为空"
+            );
+        }
+        if (!request.getType().toUpperCase()
+                .matches("TEXT|IMAGE|FILE")) {
+            throw new IllegalArgumentException(
+                    "消息类型只支持 TEXT、IMAGE、FILE"
+            );
+        }
+        if (
+                request.getContent() == null ||
+                        request.getContent().isBlank()
+        ) {
+            throw new IllegalArgumentException(
+                    "消息内容不能为空"
+            );
+        }
+        if (request.getContent().length() > 4000) {
+            throw new IllegalArgumentException(
+                    "消息内容不能超过4000个字符"
+            );
         }
 
         ChatMessage message =

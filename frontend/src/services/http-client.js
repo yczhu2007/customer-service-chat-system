@@ -6,9 +6,8 @@ export async function handleUnauthorized() {
   useChatStore().clearAuthenticatedChat()
   auth.logout()
   if (typeof window !== 'undefined' && !window.location.pathname.endsWith('/login')) {
-    const loginPath = `${import.meta.env.BASE_URL}login`
-    window.history.replaceState({}, '', loginPath)
-    window.dispatchEvent(new PopStateEvent('popstate'))
+    const { default: router } = await import('../router')
+    await router.replace('/login')
   }
 }
 

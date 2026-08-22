@@ -98,11 +98,15 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             );
         }
 
-        /* ── 每用户每秒最多 10 条消息（Redis 滑动窗口） ── */
+        /* ── 每用户每秒最多 10 条消息（Redis 原子限流） ── */
         String rateKey = RedisConstants.MSG_RATE_LIMIT + message.getSenderId();
-        Long msgCount = chatRedisRepository.increment(rateKey);
-        if (msgCount != null && msgCount == 1L) {
-            chatRedisRepository.expire(rateKey, 1, TimeUnit.SECONDS);
+        Long msgCount = null;
+        try {
+            // 使用Lua脚本原子执行INCR和条件EXPIRE，避免竞态条件
+            // 失败策略：Redis不可用时采用fail-open（允许消息通过），仅记录警告日志
+            msgCount = chatRedisRepository.incrementAndExpire(rateKey, 1, TimeUnit.SECONDS);
+        } catch (RuntimeException redisException) {
+            log.warn("Redis消息限流检查失败，采用fail-open策略放行消息，senderId={}", message.getSenderId(), redisException);
         }
         if (msgCount != null && msgCount > 10) {
             throw new BusinessStateException("消息发送过于频繁，请稍后重试");

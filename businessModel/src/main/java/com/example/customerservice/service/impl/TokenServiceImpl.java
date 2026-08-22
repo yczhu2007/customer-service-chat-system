@@ -51,6 +51,46 @@ public class TokenServiceImpl
                             + "return 1;",
                     Long.class
             );
+    /**
+     * 原子吊销Token的Lua脚本。
+     *
+     * <p>脚本逻辑：
+     * <ol>
+     *   <li>读取token:{token}对应的userId</li>
+     *   <li>删除token:{token}键</li>
+     *   <li>如果userId存在，构造user:tokens:{userId}键</li>
+     *   <li>检查该索引的数据类型（兼容历史SET或当前ZSET）</li>
+     *   <li>从索引中移除该token</li>
+     * </ol>
+     *
+     * <p>参数说明：
+     * <ul>
+     *   <li>KEYS[1] - token:{token} 完整键</li>
+     *   <li>ARGV[1] - token值（用于从索引中移除）</li>
+     *   <li>ARGV[2] - user:tokens: 前缀</li>
+     * </ul>
+     *
+     * <p>返回值：
+     * <ul>
+     *   <li>1 - 成功吊销（token存在且已删除）</li>
+     *   <li>0 - token不存在或已过期</li>
+     * </ul>
+     */
+    private static final DefaultRedisScript<Long> REVOKE_TOKEN_SCRIPT =
+            new DefaultRedisScript<>(
+                    "local userId = redis.call('GET', KEYS[1]); "
+                            + "if not userId then return 0; end; "
+                            + "redis.call('DEL', KEYS[1]); "
+                            + "local userTokensKey = ARGV[2] .. userId; "
+                            + "local indexType = redis.call('TYPE', userTokensKey)['ok']; "
+                            + "if indexType == 'set' then "
+                            + "redis.call('SREM', userTokensKey, ARGV[1]); "
+                            + "elseif indexType == 'zset' then "
+                            + "redis.call('ZREM', userTokensKey, ARGV[1]); "
+                            + "end; "
+                            + "return 1;",
+                    Long.class
+            );
 
     private final StringRedisTemplate
             redisTemplate;
@@ -195,16 +235,14 @@ public class TokenServiceImpl
 
 
         String tokenKey = RedisConstants.tokenKey(token);
-        String userId = redisTemplate.opsForValue().get(tokenKey);
-        redisTemplate.delete(tokenKey);
-        if (userId != null && !userId.isBlank()) {
-            String userTokensKey = RedisConstants.userTokensKey(userId);
-            if (DataType.SET.equals(redisTemplate.type(userTokensKey))) {
-                redisTemplate.opsForSet().remove(userTokensKey, token);
-            } else {
-                redisTemplate.opsForZSet().remove(userTokensKey, token);
-            }
-        }
+        // 使用Lua脚本原子执行：读取userId、删除token键、从用户索引中移除token
+        // 脚本会自动处理SET或ZSET两种索引类型（兼容历史数据）
+        redisTemplate.execute(
+                REVOKE_TOKEN_SCRIPT,
+                List.of(tokenKey),
+                token,
+                RedisConstants.USER_TOKENS_PREFIX
+        );
     }
 
     @Override

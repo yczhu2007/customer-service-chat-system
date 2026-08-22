@@ -35,6 +35,32 @@ public class ChatRedisRepository {
                             + "else return 0; end;",
                     Long.class
             );
+    /**
+     * 原子递增并设置TTL的Lua脚本。
+     *
+     * <p>用于消息发送频率限制，原子性地完成：
+     * <ol>
+     *   <li>对key执行INCR操作</li>
+     *   <li>如果key是新创建的（值为1），则设置过期时间</li>
+     * </ol>
+     *
+     * <p>参数说明：
+     * <ul>
+     *   <li>KEYS[1] - 限流key</li>
+     *   <li>ARGV[1] - 过期时间（秒）</li>
+     * </ul>
+     *
+     * <p>返回值：递增后的计数值
+     */
+    private static final DefaultRedisScript<Long> INCR_AND_EXPIRE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "local current = redis.call('INCR', KEYS[1]); "
+                            + "if current == 1 then "
+                            + "redis.call('EXPIRE', KEYS[1], ARGV[1]); "
+                            + "end; "
+                            + "return current;",
+                    Long.class
+            );
 
     private final StringRedisTemplate redisTemplate;
 
@@ -196,6 +222,22 @@ public class ChatRedisRepository {
 
     public Long increment(String key) {
         return redisTemplate.opsForValue().increment(key);
+    }
+
+    /**
+     * 原子递增并设置TTL（仅当key为新创建时）。
+     *
+     * <p>使用Lua脚本保证原子性，避免INCR和EXPIRE之间的竞态条件。
+     * 适用于频率限制场景，确保计数器在首次递增时立即设置过期时间。</p>
+     *
+     * @param key 限流key
+     * @param timeout 过期时间
+     * @param unit 时间单位
+     * @return 递增后的计数值，Redis不可用时返回null
+     */
+    public Long incrementAndExpire(String key, long timeout, TimeUnit unit) {
+        long timeoutSeconds = unit.toSeconds(timeout);
+        return execute(INCR_AND_EXPIRE_SCRIPT, java.util.Collections.singletonList(key), String.valueOf(timeoutSeconds));
     }
 
     public Boolean expire(String key, long timeout, TimeUnit unit) {

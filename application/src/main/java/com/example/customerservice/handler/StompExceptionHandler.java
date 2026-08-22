@@ -2,6 +2,7 @@ package com.example.customerservice.handler;
 
 import com.example.customerservice.exception.BusinessStateException;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.shiro.authz.UnauthorizedException;
 import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.web.bind.annotation.ControllerAdvice;
@@ -77,11 +78,50 @@ public class StompExceptionHandler {
         );
 
 
-        log.info(
-                "STOMP业务异常："
-                        + exception.getMessage()
+        log.warn(
+                "STOMP业务异常：{}",
+                exception.getMessage()
         );
 
+
+        return response;
+    }
+
+
+    /**
+     * 处理Shiro权限不足异常
+     */
+    @MessageExceptionHandler(UnauthorizedException.class)
+    @SendToUser(
+            value = "/queue/errors",
+            broadcast = false
+    )
+    public Map<String, Object> handleUnauthorizedException(
+            UnauthorizedException exception
+    ) {
+
+        Map<String, Object> response =
+                new HashMap<>();
+
+        response.put(
+                "event",
+                "FORBIDDEN"
+        );
+
+        response.put(
+                "message",
+                "当前操作没有权限"
+        );
+
+        response.put(
+                "time",
+                LocalDateTime.now()
+        );
+
+        log.warn(
+                "STOMP权限不足：{}",
+                exception.getMessage()
+        );
 
         return response;
     }

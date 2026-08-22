@@ -18,7 +18,7 @@ async function signOut() {
   } catch {
     // The local session must still be cleared so another account can sign in.
   } finally {
-    chat.disconnectStomp()
+    chat.disconnectStomp({ manual: true })
     auth.logout()
     await router.replace('/login')
   }

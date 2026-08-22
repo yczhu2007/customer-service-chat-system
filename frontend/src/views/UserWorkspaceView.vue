@@ -9,6 +9,7 @@ import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 
 const chat = useChatStore()
 const auth = useAuthStore()
+let queueTimer = null
 
 const activeSession = computed(() => chat.activeSession)
 const isClosed = computed(() => activeSession.value?.status === 'CLOSED')
@@ -42,15 +43,15 @@ onMounted(() => {
   // Load sessions
   chat.loadSessions()
   // Refresh queue status periodically
-  chat._queueTimer = setInterval(() => {
+  queueTimer = setInterval(() => {
     chat.loadQueueStatus()
   }, 15000)
 })
 
 onUnmounted(() => {
-  if (chat._queueTimer) {
-    clearInterval(chat._queueTimer)
-    chat._queueTimer = null
+  if (queueTimer) {
+    clearInterval(queueTimer)
+    queueTimer = null
   }
 })
 </script>

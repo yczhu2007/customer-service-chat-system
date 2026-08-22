@@ -26,7 +26,7 @@ public class HistoryRequest implements Serializable {
 
     @Min(value = 1, message = "每页数量必须大于等于1")
     @Max(value = 100, message = "每页数量不能超过100")
-    private Integer pageSize = 20;
+    private int pageSize = 20;
 
 
     public String getSessionId() {
@@ -56,12 +56,12 @@ public class HistoryRequest implements Serializable {
     }
 
 
-    public Integer getPageSize() {
+    public int getPageSize() {
         return pageSize;
     }
 
 
-    public void setPageSize(Integer pageSize) {
+    public void setPageSize(int pageSize) {
         this.pageSize = pageSize;
     }
 }

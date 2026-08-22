@@ -10,8 +10,12 @@ import org.apache.shiro.authc.AuthenticationException;
 import org.apache.shiro.subject.Subject;
 import org.apache.shiro.web.filter.AccessControlFilter;
 
+import tools.jackson.databind.ObjectMapper;
+
 import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 
 /**
@@ -19,6 +23,9 @@ import java.time.LocalDateTime;
  */
 public class StatelessAuthFilter
         extends AccessControlFilter {
+
+    private static final ObjectMapper OBJECT_MAPPER =
+            new ObjectMapper();
 
     private static final String
             AUTHORIZATION_HEADER =
@@ -186,21 +193,16 @@ public class StatelessAuthFilter
                 "application/json;charset=UTF-8"
         );
 
-        String time =
-                LocalDateTime.now()
-                        .toString();
+        Map<String, Object> body =
+                new LinkedHashMap<>();
+
+        body.put("code", 401);
+        body.put("message", message);
+        body.put("data", null);
+        body.put("time", LocalDateTime.now().toString());
 
         response.getWriter().write(
-                "{"
-                        + "\"code\":401,"
-                        + "\"message\":\""
-                        + message
-                        + "\","
-                        + "\"data\":null,"
-                        + "\"time\":\""
-                        + time
-                        + "\""
-                        + "}"
+                OBJECT_MAPPER.writeValueAsString(body)
         );
     }
 }

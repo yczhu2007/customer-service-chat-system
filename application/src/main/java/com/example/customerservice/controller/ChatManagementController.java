@@ -12,6 +12,8 @@ import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatManagementQueryService;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -63,8 +65,8 @@ public class ChatManagementController {
     @GetMapping("/agent/views/{viewCode}/sessions")
     public Result<PageResult<ChatSessionListItemVO>> findAgentViewSessions(
             @PathVariable String viewCode,
-            @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
         currentUser.requireRole("AGENT");
         currentUser.requirePermission("chat:session:view-own");
@@ -138,8 +140,8 @@ public class ChatManagementController {
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime to,
-            @RequestParam(defaultValue = "1") long pageNo,
-            @RequestParam(defaultValue = "20") long pageSize
+            @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
+            @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:session:audit:view");

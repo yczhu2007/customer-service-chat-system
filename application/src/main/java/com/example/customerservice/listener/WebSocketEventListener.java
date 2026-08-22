@@ -151,11 +151,10 @@ public class WebSocketEventListener {
 
         } catch (Exception e) {
 
-            log.info(
-                    "WebSocket业务断线处理失败，sessionId："
-                            + sessionId
-                            + "，原因："
-                            + e.getMessage()
+            log.warn(
+                    "WebSocket业务断线处理失败，sessionId：{}",
+                    sessionId,
+                    e
             );
         }
 

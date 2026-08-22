@@ -40,14 +40,20 @@ function cancelTransfer() {
   targetAgentId.value = ''
 }
 
+watch(() => session.value?.sessionId, (sessionId, previousSessionId) => {
+  if (showTransfer.value && previousSessionId && sessionId !== previousSessionId) cancelTransfer()
+})
+
 async function doTransfer() {
   if (!targetAgentId.value.trim()) return
   transferring.value = true
   try {
-    if (chat.transferSession(chat.activeSessionId, targetAgentId.value.trim())) {
-      showTransfer.value = false
-      targetAgentId.value = ''
+    if (!chat.transferSession(chat.activeSessionId, targetAgentId.value.trim())) {
+      return
     }
+    // STOMP publish only confirms local delivery to the broker. Keep the dialog
+    // open until the server's session event refreshes the workspace, so the
+    // target agent ID remains available if the server rejects the transfer.
   } finally {
     transferring.value = false
   }

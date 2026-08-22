@@ -1,6 +1,7 @@
 package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.io.Serializable;
@@ -10,6 +11,7 @@ public class SessionArchiveDTO implements Serializable {
     private static final long serialVersionUID = 1L;
 
     @NotBlank(message = "归档状态不能为空")
+    @Pattern(regexp = "(?i)COMPLETED|PENDING|ON_HOLD|OTHER", message = "归档状态只允许 COMPLETED、PENDING、ON_HOLD 或 OTHER")
     @Size(max = 16, message = "归档状态长度不能超过16个字符")
     private String archiveStatus;
 

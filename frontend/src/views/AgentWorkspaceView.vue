@@ -52,7 +52,7 @@ async function goOffline() {
     presenceError.value = e.message || '下线失败，请稍后重试'
   } finally {
     chat.agentOnline = false
-    chat.disconnectStomp()
+    chat.disconnectStomp({ manual: true })
   }
 }
 
@@ -69,7 +69,11 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
-  goOffline()
+  if (!chat.agentOnline) return
+  // Disconnect synchronously; the best-effort HTTP presence update can finish later.
+  chat.agentOnline = false
+  chat.disconnectStomp({ manual: true })
+  agentOffline().catch(() => {})
 })
 </script>
 

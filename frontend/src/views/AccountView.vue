@@ -12,8 +12,26 @@ const message = ref('')
 const error = ref('')
 const loading = ref(false)
 onMounted(async () => { try { const result = await getProfile(); username.value = result?.data?.username || username.value } catch (e) { error.value = e.message } })
-async function saveProfile() { await run(async () => { const result = await updateProfile({ username: username.value.trim() }); username.value = result?.data?.username || username.value; auth.userId = username.value; message.value = '用户名已更新' }) }
-async function savePassword() { await run(async () => { await updatePassword({ currentPassword: currentPassword.value, newPassword: newPassword.value }); currentPassword.value = ''; newPassword.value = ''; message.value = '密码已更新，请重新登录' }) }
+async function saveProfile() {
+  await run(async () => {
+    const result = await updateProfile({ username: username.value.trim() })
+    username.value = result?.data?.username || username.value
+    auth.updateUsername(username.value)
+    message.value = '用户名已更新'
+  })
+}
+async function savePassword() {
+  if (newPassword.value.length < 8) {
+    error.value = '新密码至少需要 8 个字符'
+    return
+  }
+  await run(async () => {
+    await updatePassword({ currentPassword: currentPassword.value, newPassword: newPassword.value })
+    currentPassword.value = ''
+    newPassword.value = ''
+    message.value = '密码已更新，请重新登录'
+  })
+}
 async function createRecoveryCode() { await run(async () => { const result = await regenerateRecoveryCode(); recoveryCode.value = result?.data?.recoveryCode || ''; message.value = '请立即保存新的恢复码' }) }
 async function run(action) { error.value = ''; message.value = ''; loading.value = true; try { await action() } catch (e) { error.value = e.message || '操作失败' } finally { loading.value = false } }
 </script>
