@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
-import { categoryLabel, statusLabel } from '../../constants/session-ui'
+import { categoryLabel, categoryStyle, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const session = computed(() => chat.activeSession)
@@ -30,7 +30,7 @@ const priorityClass = computed(() => {
         <span class="session-title">{{ session.title || '会话' }}</span>
         <span class="status-badge" :class="session.status?.toLowerCase()">{{ statusText }}</span>
         <span v-if="session.priority" class="priority-badge" :class="priorityClass">{{ session.priority }}</span>
-        <span v-if="session.category" class="category-badge">{{ categoryLabel(session.category) }}</span>
+        <span v-if="session.category" class="category-badge" :style="categoryStyle(session.category)">{{ categoryLabel(session.category) }}</span>
       </div>
       <div class="header-meta">
         <span v-if="session.agentId" class="agent-info">客服: {{ session.agentId }}</span>
@@ -125,8 +125,6 @@ const priorityClass = computed(() => {
   font-size: 0.7rem;
   padding: 0.1rem 0.4rem;
   border-radius: 4px;
-  background: #ede9fe;
-  color: #6d28d9;
 }
 .header-meta {
   margin-top: 0.25rem;

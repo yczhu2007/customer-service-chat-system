@@ -27,4 +27,21 @@ describe('workspace visual text', () => {
 
     expect(app).toContain('--color-primary: #4d6bfe')
   })
+
+  it('keeps ordinary ticket interface copy in Chinese', async () => {
+    const files = [
+      'components/session/UserSessionList.vue',
+      'components/session/SessionArchiveActions.vue',
+      'components/session/SessionMetadataEditor.vue',
+      'components/admin/SessionAuditPanel.vue',
+    ]
+    const contents = (await Promise.all(files.map((file) => readFile(join(sourceRoot, file), 'utf8')))).join('\n')
+
+    expect(contents).toContain('我的会话')
+    expect(contents).toContain('归档操作')
+    expect(contents).toContain('当前状态')
+    expect(contents).toContain('会话元数据')
+    expect(contents).toContain('开始时间')
+    expect(contents).toContain('结束时间')
+  })
 })

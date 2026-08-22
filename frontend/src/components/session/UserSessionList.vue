@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, statusLabel } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const archiveFilter = ref('')
@@ -48,8 +48,8 @@ function refresh() {
 
 /** Archive filter options */
 const archiveOptions = [
-  { label: 'All', value: '' },
-  { label: 'Unarchived', value: 'NONE' },
+  { label: '全部', value: '' },
+  { label: '未归档', value: 'NONE' },
   ...ARCHIVE_STATUS_OPTIONS,
 ]
 
@@ -61,9 +61,9 @@ onMounted(() => {
 <template>
   <div class="session-list-panel">
     <div class="panel-header">
-      <h3>My tickets</h3>
+      <h3>我的会话</h3>
       <button class="refresh-btn" @click="refresh" :disabled="chat.sessionsLoading">
-        {{ chat.sessionsLoading ? 'Loading…' : 'Refresh' }}
+        {{ chat.sessionsLoading ? '加载中…' : '刷新' }}
       </button>
     </div>
 
@@ -99,7 +99,7 @@ onMounted(() => {
           <span class="time">{{ formatTime(session.lastMessageTime || session.createTime) }}</span>
         </div>
         <div class="item-body">
-          <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || 'No messages' }}</span>
+          <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || '暂无消息' }}</span>
           <span class="status-badge" :class="statusClass(session.status)">
             {{ statusLabel(session.status) }}
           </span>
@@ -111,7 +111,7 @@ onMounted(() => {
           <span v-if="chat.unreadCounts[session.sessionId]" class="unread-badge">
             {{ chat.unreadCounts[session.sessionId] }}
           </span>
-          <span v-if="session.archiveStatus" class="archive-tag">{{ archiveStatusLabel(session.archiveStatus) }}</span>
+          <span v-if="session.archiveStatus" class="archive-tag" :style="archiveStatusStyle(session.archiveStatus)">{{ archiveStatusLabel(session.archiveStatus) }}</span>
         </div>
       </li>
     </ul>
@@ -271,8 +271,6 @@ onMounted(() => {
 }
 .archive-tag {
   font-size: 0.65rem;
-  color: #635bce;
-  background: #eef0ff;
   padding: 0.05rem 0.3rem;
   border-radius: 3px;
 }

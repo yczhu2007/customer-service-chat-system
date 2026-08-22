@@ -166,6 +166,15 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('暂无数据')
   })
 
+  it('only offers ACTIVE and CLOSED in the status filter', async () => {
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await nextTick()
+
+    const statusOptions = wrapper.find('select[aria-label="Status"]').findAll('option')
+    expect(statusOptions.map((option) => option.attributes('value'))).toEqual(['', 'ACTIVE', 'CLOSED'])
+  })
+
   it('renders returned audit records and their transfer row safely', async () => {
     const { request } = await import('../services/http-client')
     request.mockResolvedValueOnce({

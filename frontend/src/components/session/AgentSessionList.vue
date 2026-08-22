@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, categoryLabel } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
@@ -59,8 +59,8 @@ function selectSession(sessionId) {
           <span v-if="s.priority" class="priority-tag" :class="priorityClass(s.priority)">
             {{ s.priority }}
           </span>
-          <span v-if="s.category" class="category-tag">{{ categoryLabel(s.category) }}</span>
-          <span v-if="s.archiveStatus" class="archive-tag">{{ archiveStatusLabel(s.archiveStatus) }}</span>
+          <span v-if="s.category" class="category-tag" :style="categoryStyle(s.category)">{{ categoryLabel(s.category) }}</span>
+          <span v-if="s.archiveStatus" class="archive-tag" :style="archiveStatusStyle(s.archiveStatus)">{{ archiveStatusLabel(s.archiveStatus) }}</span>
           <span v-if="s.unreadCount > 0" class="unread-badge">{{ s.unreadCount }}</span>
         </div>
         <div v-if="s.lastMessageContent" class="session-preview">
@@ -150,14 +150,6 @@ function selectSession(sessionId) {
 .priority-low {
   background: #f3f4f6;
   color: #6b7280;
-}
-.category-tag {
-  background: #ede9fe;
-  color: #6d28d9;
-}
-.archive-tag {
-  background: #eef0ff;
-  color: #635bce;
 }
 .unread-badge {
   font-size: 0.65rem;

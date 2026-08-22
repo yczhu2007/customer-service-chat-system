@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle } from '../../constants/session-ui'
 
 const chat = useChatStore()
 
@@ -54,7 +54,7 @@ async function setArchive(code) {
       archiveStatus: code,
       remark: remark.value.trim() || undefined,
     })
-    successMsg.value = `Archived as: ${archiveStatusLabel(code)}`
+    successMsg.value = `已归档为：${archiveStatusLabel(code)}`
     remark.value = ''
     setTimeout(() => { successMsg.value = '' }, 2000)
   } catch (e) {
@@ -67,27 +67,27 @@ async function setArchive(code) {
 
 <template>
   <div class="archive-actions">
-    <h4 class="archive-title">Ticket status</h4>
+    <h4 class="archive-title">归档操作</h4>
 
-    <div v-if="!session" class="no-data">Select a ticket first</div>
-    <div v-else-if="!isClosed" class="no-data">Ticket status is available after the conversation is closed</div>
+    <div v-if="!session" class="no-data">请先选择会话</div>
+    <div v-else-if="!isClosed" class="no-data">会话结束后可进行归档</div>
 
     <template v-else>
       <div v-if="currentArchiveStatus" class="current-status">
-        Current status:
-        <span class="current-badge">
+        当前状态：
+        <span class="current-badge" :style="archiveStatusStyle(currentArchiveStatus)">
           {{ ARCHIVE_STATUSES.find((s) => s.code === currentArchiveStatus)?.label || currentArchiveStatus }}
         </span>
       </div>
 
       <div class="field">
-        <label class="field-label">Internal note</label>
+        <label class="field-label">备注</label>
         <textarea
           v-model="remark"
           rows="2"
           maxlength="255"
           class="remark-input"
-          placeholder="Add an internal note (optional)"
+          placeholder="归档备注（可选）"
         />
       </div>
 
@@ -134,8 +134,6 @@ async function setArchive(code) {
 .current-badge {
   display: inline-block;
   padding: 0.1rem 0.4rem;
-  background: #eef0ff;
-  color: #635bce;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 500;

@@ -20,11 +20,11 @@ const pendingQuickReply = ref('')
 const presenceError = ref('')
 
 const QUICK_REPLY_LABELS = {
-  MY_ACTIVE: 'Open',
-  MY_UNREAD: 'Unread',
-  MY_HIGH_PRIORITY: 'High priority',
-  MY_UNARCHIVED: 'Unarchived',
-  MY_RECENT_CLOSED: 'Recently closed',
+  MY_ACTIVE: '处理中',
+  MY_UNREAD: '未读',
+  MY_HIGH_PRIORITY: '高优先级',
+  MY_UNARCHIVED: '未归档',
+  MY_RECENT_CLOSED: '最近关闭',
 }
 
 /** Set agent online and connect STOMP */

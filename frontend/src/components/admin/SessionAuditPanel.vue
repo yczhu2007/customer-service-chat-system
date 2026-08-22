@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
 import { findTransferLogs } from '../../api/admin-api'
-import { ARCHIVE_STATUS_OPTIONS, statusLabel } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS } from '../../constants/session-ui'
 
 const loading = ref(false)
 const error = ref(null)
@@ -24,7 +24,7 @@ const filters = ref({
   to: '',
 })
 
-const statusOptions = ['', 'ACTIVE', 'CLOSED', 'PENDING']
+const statusOptions = ['', 'ACTIVE', 'CLOSED']
 
 async function loadSessions() {
   loading.value = true
@@ -94,17 +94,17 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       <input v-model="filters.userId" placeholder="用户 ID" />
       <input v-model="filters.agentId" placeholder="客服 ID" />
       <select v-model="filters.status" aria-label="Status">
-        <option v-for="s in statusOptions" :key="s" :value="s">{{ s ? statusLabel(s) : 'All statuses' }}</option>
+        <option v-for="s in statusOptions" :key="s" :value="s">{{ s || '全部状态' }}</option>
       </select>
       <select v-model="filters.archiveStatus" aria-label="Archive status">
-        <option value="">All ticket statuses</option><option value="NONE">Unarchived</option>
+        <option value="">全部归档</option><option value="NONE">未归档</option>
         <option v-for="option in ARCHIVE_STATUS_OPTIONS" :key="option.code" :value="option.code">{{ option.label }}</option>
       </select>
-      <label class="date-field rating-field">Rating<input v-model="filters.rating" type="number" min="1" max="5" placeholder="1–5" /></label>
-      <label class="date-field">Start time<input v-model="filters.from" type="datetime-local" /></label>
-      <label class="date-field">End time<input v-model="filters.to" type="datetime-local" /></label>
-      <button class="btn btn-primary" @click="applyFilters">Search</button>
-      <button class="btn" @click="clearFilters">Clear</button>
+      <label class="date-field rating-field">评分<input v-model="filters.rating" type="number" min="1" max="5" placeholder="1–5" /></label>
+      <label class="date-field">开始时间<input v-model="filters.from" type="datetime-local" /></label>
+      <label class="date-field">结束时间<input v-model="filters.to" type="datetime-local" /></label>
+      <button class="btn btn-primary" @click="applyFilters">查询</button>
+      <button class="btn" @click="clearFilters">清空</button>
     </div>
 
     <div v-if="loading" class="loading">加载中...</div>
@@ -116,11 +116,11 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <th>会话 ID</th>
             <th>用户 ID</th>
             <th>客服 ID</th>
-            <th>Status</th>
-            <th>Rating</th>
-            <th>Created</th>
-            <th>Ended</th>
-            <th>Transfer log</th>
+            <th>状态</th>
+            <th>评分</th>
+            <th>创建时间</th>
+            <th>结束时间</th>
+            <th>转接记录</th>
           </tr>
         </thead>
         <tbody>
@@ -129,7 +129,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
               <td class="mono">{{ s.sessionId }}</td>
               <td class="mono">{{ s.userId }}</td>
               <td class="mono">{{ s.agentId || '-' }}</td>
-              <td>{{ statusLabel(s.status) }}</td>
+              <td>{{ s.status }}</td>
               <td :title="s.rating + '/5'">{{ ratingStars(s.rating) }}</td>
               <td>{{ formatDate(s.createTime) }}</td>
               <td>{{ formatDate(s.endTime) }}</td>
