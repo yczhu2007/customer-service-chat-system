@@ -537,22 +537,17 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         if (sessionIds == null || sessionIds.isEmpty()) {
             return Collections.emptyMap();
         }
-        try {
-            List<Map<String, Object>> rows =
-                    messageReadMapper.countUnreadBySessions(sessionIds, userId);
-            Map<String, Long> result = new HashMap<>();
-            for (Map<String, Object> row : rows) {
-                String sid = (String) row.get("sessionId");
-                Number count = (Number) row.get("unreadCount");
-                if (sid != null) {
-                    result.put(sid, count == null ? 0L : count.longValue());
-                }
+        List<Map<String, Object>> rows =
+                messageReadMapper.countUnreadBySessions(sessionIds, userId);
+        Map<String, Long> result = new HashMap<>();
+        for (Map<String, Object> row : rows) {
+            String sid = (String) row.get("sessionId");
+            Number count = (Number) row.get("unreadCount");
+            if (sid != null) {
+                result.put(sid, count == null ? 0L : count.longValue());
             }
-            return result;
-        } catch (Exception e) {
-            log.warn("批量查询未读消息数失败，将返回全零结果，userId={}", userId, e);
-            return Collections.emptyMap();
         }
+        return result;
     }
 
     private Map<String, List<String>> loadSessionTags(List<String> sessionIds) {

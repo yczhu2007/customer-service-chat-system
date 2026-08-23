@@ -21,8 +21,6 @@ public class ChatMessage implements Serializable {
     private String content;
     private String clientMsgId;
     private LocalDateTime createTime;
-    private Boolean edited;
-    private LocalDateTime editedAt;
     private String originalContent;
     private Boolean recalled;
     private LocalDateTime recalledAt;
@@ -91,22 +89,6 @@ public class ChatMessage implements Serializable {
         this.createTime = createTime;
     }
 
-    public Boolean getEdited() {
-        return edited;
-    }
-
-    public void setEdited(Boolean edited) {
-        this.edited = edited;
-    }
-
-    public LocalDateTime getEditedAt() {
-        return editedAt;
-    }
-
-    public void setEditedAt(LocalDateTime editedAt) {
-        this.editedAt = editedAt;
-    }
-
     public String getOriginalContent() {
         return originalContent;
     }
@@ -142,8 +124,6 @@ public class ChatMessage implements Serializable {
                 ", contentLength=" + (content == null ? 0 : content.length()) +
                 ", clientMsgId='[REDACTED]'" +
                 ", createTime=" + createTime +
-                ", edited=" + edited +
-                ", editedAt=" + editedAt +
                 ", recalled=" + recalled +
                 ", recalledAt=" + recalledAt +
                 '}';

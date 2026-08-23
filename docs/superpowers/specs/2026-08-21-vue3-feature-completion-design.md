@@ -30,7 +30,7 @@ Vue 3 增加注册、忘记密码、重置密码、修改用户名、修改密�
 
 ## Data Flow
 
-认证页面调用 REST 接口并写入 `auth` store；工作台进入后由 `chat` store 建立 STOMP 连接并订阅 `/user/queue/chat`、`/user/queue/messages` 和 `/user/queue/errors`。历史消息、消息编辑/撤回、已读和 ACK 都通过现有 `/app` 目的地发送。管理员和客服统计、转接记录继续通过现有 REST API 获取。
+认证页面调用 REST 接口并写入 `auth` store；工作台进入后由 `chat` store 建立 STOMP 连接并订阅 `/user/queue/chat`、`/user/queue/messages` 和 `/user/queue/errors`。历史消息、消息撤回、已读和 ACK 都通过现有 `/app` 目的地发送。管理员和客服统计、转接记录继续通过现有 REST API 获取。
 
 ## Error Handling
 
@@ -43,7 +43,7 @@ Vue 3 增加注册、忘记密码、重置密码、修改用户名、修改密�
 ## Acceptance Criteria
 
 1. 用户可以在 Vue 3 页面完成注册、登录、忘记密码、重置密码和账号资料修改。
-2. 用户或客服可以加载更早历史消息，并对自己发送的文本消息编辑或撤回。
+2. 用户或客服可以加载更早历史消息，并撤回自己发送的消息。
 3. 客服可以看到概况、满意度摘要和转接日志。
 4. 管理员可以按归档状态查询会话，并查看会话转接记录和客服负载。
 5. WebSocket 断开后页面显示状态并支持重连，错误不会只出现在浏览器控制台。

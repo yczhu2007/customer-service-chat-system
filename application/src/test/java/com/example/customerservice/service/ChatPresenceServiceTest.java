@@ -41,7 +41,7 @@ class ChatPresenceServiceTest {
 
     @BeforeEach
     void setUp() {
-        when(callbacksProvider.getObject()).thenReturn(callbacks);
+        org.mockito.Mockito.lenient().when(callbacksProvider.getObject()).thenReturn(callbacks);
         service = new ChatPresenceService(
                 chatRedisRepository,
                 chatSessionMapper,
@@ -51,6 +51,35 @@ class ChatPresenceServiceTest {
                 callbacksProvider,
                 30
         );
+    }
+
+    @Test
+    void staleDisconnectKeepsNewConnectionAndStopsRenewal() {
+        @SuppressWarnings("unchecked")
+        java.util.concurrent.ScheduledFuture<?> renewal =
+                (java.util.concurrent.ScheduledFuture<?>) org.mockito.Mockito.mock(java.util.concurrent.ScheduledFuture.class);
+        when(chatRedisRepository.getValue(RedisConstants.WS_SESSION + "WS-old")).thenReturn("U001");
+        when(chatRedisRepository.acquireLock(
+                RedisConstants.PRESENCE_OPERATION_LOCK + "U001",
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        )).thenReturn("lock-token");
+        when(chatRedisRepository.startLockRenewal(
+                RedisConstants.PRESENCE_OPERATION_LOCK + "U001",
+                "lock-token",
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        )).thenReturn((java.util.concurrent.ScheduledFuture) renewal);
+        when(chatRedisRepository.getValue(RedisConstants.USER_WS + "U001")).thenReturn("WS-new");
+
+        service.handleDisconnect("WS-old");
+
+        verify(chatRedisRepository).delete(RedisConstants.WS_SESSION + "WS-old");
+        verify(chatRedisRepository).stopLockRenewal(renewal);
+        verify(chatRedisRepository).releaseLock(
+                RedisConstants.PRESENCE_OPERATION_LOCK + "U001", "lock-token"
+        );
+        verify(chatSessionMapper, org.mockito.Mockito.never()).selectById(org.mockito.ArgumentMatchers.anyString());
     }
 
     @Test

@@ -318,8 +318,15 @@ abstract class ChatRoutingSessionSupport
             return false;
         }
 
+        java.util.concurrent.ScheduledFuture<?> operationLockRenewal = chatRedisRepository.startLockRenewal(
+                RedisConstants.SESSION_OPERATION_LOCK + session.getId(),
+                operationLockToken,
+                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
+
         try {
-        ChatSession latestSession = chatSessionMapper.selectById(session.getId());
+            ChatSession latestSession = chatSessionMapper.selectById(session.getId());
         if (latestSession == null
                 || !ChatConstants.SESSION_STATUS_ACTIVE.equals(latestSession.getStatus())) {
             return false;
@@ -409,6 +416,7 @@ abstract class ChatRoutingSessionSupport
 
         return true;
         } finally {
+            chatRedisRepository.stopLockRenewal(operationLockRenewal);
             releaseSessionOperationLock(session.getId(), operationLockToken);
         }
     }

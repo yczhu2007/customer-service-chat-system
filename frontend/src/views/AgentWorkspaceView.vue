@@ -18,6 +18,7 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const pendingQuickReply = ref('')
 const presenceError = ref('')
+const presencePending = ref(false)
 
 const QUICK_REPLY_LABELS = {
   MY_ACTIVE: '处理中',
@@ -45,14 +46,17 @@ async function goOnline() {
 
 /** Set agent offline */
 async function goOffline() {
+  if (presencePending.value) return
   presenceError.value = ''
+  presencePending.value = true
   try {
     await agentOffline()
+    chat.agentOnline = false
+    chat.disconnectStomp({ manual: true })
   } catch (e) {
     presenceError.value = e.message || '下线失败，请稍后重试'
   } finally {
-    chat.agentOnline = false
-    chat.disconnectStomp({ manual: true })
+    presencePending.value = false
   }
 }
 

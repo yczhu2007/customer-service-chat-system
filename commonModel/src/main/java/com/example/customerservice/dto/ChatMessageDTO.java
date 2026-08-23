@@ -47,8 +47,6 @@ public class ChatMessageDTO implements Serializable {
     private String clientMsgId;
 
     private LocalDateTime createTime;
-    private boolean edited;
-    private LocalDateTime editedAt;
     private boolean recalled;
     private LocalDateTime recalledAt;
 
@@ -80,8 +78,6 @@ public class ChatMessageDTO implements Serializable {
         dto.setContent(Boolean.TRUE.equals(message.getRecalled()) ? null : message.getContent());
         dto.setClientMsgId(message.getClientMsgId());
         dto.setCreateTime(message.getCreateTime());
-        dto.setEdited(Boolean.TRUE.equals(message.getEdited()));
-        dto.setEditedAt(message.getEditedAt());
         dto.setRecalled(Boolean.TRUE.equals(message.getRecalled()));
         dto.setRecalledAt(message.getRecalledAt());
         return dto;
@@ -159,10 +155,6 @@ public class ChatMessageDTO implements Serializable {
         this.ackStatus = ackStatus;
     }
 
-    public boolean isEdited() { return edited; }
-    public void setEdited(boolean edited) { this.edited = edited; }
-    public LocalDateTime getEditedAt() { return editedAt; }
-    public void setEditedAt(LocalDateTime editedAt) { this.editedAt = editedAt; }
     public boolean isRecalled() { return recalled; }
     public void setRecalled(boolean recalled) { this.recalled = recalled; }
     public LocalDateTime getRecalledAt() { return recalledAt; }

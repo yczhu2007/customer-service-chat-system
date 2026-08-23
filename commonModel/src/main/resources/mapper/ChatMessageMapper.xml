@@ -5,18 +5,16 @@
 
 <mapper namespace="com.example.customerservice.mapper.ChatMessageMapper">
 
-    <update id="editOwnMessage">
-        UPDATE chat_message
-        SET original_content = COALESCE(original_content, content),
-            content = #{content},
-            edited = 1,
-            edited_at = #{editedAt}
-        WHERE id = #{messageId}
+    <select id="findByClientMessage"
+            resultType="com.example.customerservice.domain.ChatMessage">
+        SELECT id, session_id, sender_id, sender_role, type, content,
+               client_msg_id, create_time, original_content, recalled, recalled_at
+        FROM chat_message
+        WHERE session_id = #{sessionId}
           AND sender_id = #{senderId}
-          AND type = 'TEXT'
-          AND recalled = 0
-          AND create_time &gt;= #{cutoffTime}
-    </update>
+          AND client_msg_id = #{clientMsgId}
+        LIMIT 1
+    </select>
 
     <update id="recallOwnMessage">
         UPDATE chat_message
@@ -28,6 +26,23 @@
           AND create_time &gt;= #{cutoffTime}
     </update>
 
+    <select id="selectLatestHistoryBySessionIds"
+            resultType="com.example.customerservice.domain.ChatMessage">
+        SELECT id, session_id, sender_id, sender_role, type, content,
+               client_msg_id, create_time, original_content, recalled, recalled_at
+        FROM (
+            SELECT id, session_id, sender_id, sender_role, type, content,
+                   client_msg_id, create_time, original_content, recalled, recalled_at,
+                   ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY create_time DESC, id DESC) AS row_num
+            FROM chat_message
+            WHERE session_id IN
+            <foreach collection="sessionIds" item="sessionId" open="(" separator="," close=")">
+                #{sessionId}
+            </foreach>
+        ) latest
+        WHERE row_num = 1
+    </select>
+
     <select id="selectLatestHistory"
             resultType="com.example.customerservice.domain.ChatMessage">
         SELECT id,
@@ -38,8 +53,6 @@
                content,
                client_msg_id,
                create_time,
-               edited,
-               edited_at,
                original_content,
                recalled,
                recalled_at
@@ -59,8 +72,6 @@
                content,
                client_msg_id,
                create_time,
-               edited,
-               edited_at,
                original_content,
                recalled,
                recalled_at

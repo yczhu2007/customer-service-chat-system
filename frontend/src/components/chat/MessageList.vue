@@ -120,7 +120,6 @@ onUnmounted(releaseAllBlobs)
         <div class="message-meta">
           <span class="sender">{{ isMine(msg) ? '我' : (msg.senderRole === 'AGENT' ? '客服' : '用户') }}</span>
           <span class="time">{{ formatTime(msg.createTime) }}</span>
-          <span v-if="msg.edited" class="edited-tag">(已编辑)</span>
           <span v-if="msg.recalled" class="recalled-tag">(已撤回)</span>
           <span v-if="msg.ackStatus === 'STORED'" class="message-state">已保存</span>
           <span v-else-if="msg.ackStatus === 'DELIVERED'" class="message-state">已送达</span>
@@ -291,7 +290,6 @@ onUnmounted(releaseAllBlobs)
   opacity: 0.6;
   font-style: italic;
 }
-.edited-tag,
 .recalled-tag {
   font-size: 0.7rem;
   opacity: 0.5;

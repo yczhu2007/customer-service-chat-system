@@ -22,6 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 public class ChatSessionTransferService implements ChatSessionTransferOperations {
@@ -108,6 +109,13 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
         if (operationLockToken == null) {
             throw new BusinessStateException("会话正在转接或结束，请稍后重试");
         }
+
+        ScheduledFuture<?> operationLockRenewal = chatRedisRepository.startLockRenewal(
+                RedisConstants.SESSION_OPERATION_LOCK + sessionId,
+                operationLockToken,
+                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        );
 
         boolean redisTransferred = false;
         String resolvedTargetAgentId = targetAgentId;
@@ -213,6 +221,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             }
             throw exception;
         } finally {
+            chatRedisRepository.stopLockRenewal(operationLockRenewal);
             chatRedisRepository.releaseSessionOperationLock(sessionId, operationLockToken);
         }
     }

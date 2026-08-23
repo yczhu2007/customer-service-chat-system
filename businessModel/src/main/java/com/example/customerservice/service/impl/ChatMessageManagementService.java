@@ -26,6 +26,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 public class ChatMessageManagementService implements ChatMessageManagementOperations {
@@ -37,7 +38,6 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
     private final SimpMessagingTemplate messagingTemplate;
     private final ObjectMapper objectMapper;
     private final long messageRecallWindowSeconds;
-    private final long messageEditWindowSeconds;
 
     public ChatMessageManagementService(
             ChatRedisRepository chatRedisRepository,
@@ -46,8 +46,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
             ChatMessageReadMapper chatMessageReadMapper,
             SimpMessagingTemplate messagingTemplate,
             ObjectMapper objectMapper,
-            long messageRecallWindowSeconds,
-            long messageEditWindowSeconds
+            long messageRecallWindowSeconds
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.chatSessionMapper = chatSessionMapper;
@@ -56,7 +55,6 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
         this.messagingTemplate = messagingTemplate;
         this.objectMapper = objectMapper;
         this.messageRecallWindowSeconds = Math.max(1L, messageRecallWindowSeconds);
-        this.messageEditWindowSeconds = Math.max(1L, messageEditWindowSeconds);
     }
 
     @Override
@@ -98,11 +96,11 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 ? session.getAgentId()
                 : session.getUserId();
         if (counterpartId != null && !counterpartId.isBlank()) {
-            messagingTemplate.convertAndSendToUser(
+            afterCommit(() -> messagingTemplate.convertAndSendToUser(
                     counterpartId,
                     "/queue/messages",
                     result
-            );
+            ));
         }
         return result;
     }
@@ -114,56 +112,6 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
     ) {
         requireSessionParticipant(sessionId, userId);
         return chatMessageReadMapper.countUnread(sessionId, userId);
-    }
-
-    @Override
-    public MessageMutationResult editMessage(
-            String messageId,
-            String newContent,
-            String operatorId
-    ) {
-        ChatMessageContentValidator.validate(ChatMessageType.TEXT.name(), newContent);
-        ChatMessage message = requireMutableOwnMessage(messageId, operatorId);
-        if (!ChatMessageType.TEXT.name().equalsIgnoreCase(message.getType())) {
-            throw new IllegalArgumentException("只有文本消息支持编辑");
-        }
-
-        LocalDateTime now = LocalDateTime.now();
-        LocalDateTime cutoff = now.minusSeconds(messageEditWindowSeconds);
-        if (message.getCreateTime().isBefore(cutoff)) {
-            throw new IllegalArgumentException("消息已超过允许编辑的时间");
-        }
-
-        String lockToken = chatRedisRepository.acquireSessionOperationLock(message.getSessionId());
-        if (lockToken == null) {
-            throw new BusinessStateException("当前会话正在执行其他操作，请稍后重试");
-        }
-        try {
-            int updated = chatMessageMapper.editOwnMessage(
-                    messageId,
-                    operatorId,
-                    newContent,
-                    now,
-                    cutoff
-            );
-            if (updated != 1) {
-                throw new BusinessStateException("消息状态已发生变化，请刷新后重试");
-            }
-            if (message.getOriginalContent() == null) {
-                message.setOriginalContent(message.getContent());
-            }
-            message.setContent(newContent);
-            message.setEdited(true);
-            message.setEditedAt(now);
-            synchronizeMutatedMessageCache(message);
-            touchSessionActivity(message.getSessionId());
-
-            MessageMutationResult result = MessageMutationResult.edited(message);
-            notifyMessageMutationCounterpart(message, result);
-            return result;
-        } finally {
-            chatRedisRepository.releaseSessionOperationLock(message.getSessionId(), lockToken);
-        }
     }
 
     @Override
@@ -182,6 +130,12 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
         if (lockToken == null) {
             throw new BusinessStateException("当前会话正在执行其他操作，请稍后重试");
         }
+        ScheduledFuture<?> lockRenewal = chatRedisRepository.startLockRenewal(
+                RedisConstants.SESSION_OPERATION_LOCK + message.getSessionId(),
+                lockToken,
+                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        );
         try {
             int updated = chatMessageMapper.recallOwnMessage(
                     messageId,
@@ -194,13 +148,15 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
             }
             message.setRecalled(true);
             message.setRecalledAt(now);
-            synchronizeMutatedMessageCache(message);
-            touchSessionActivity(message.getSessionId());
-
             MessageMutationResult result = MessageMutationResult.recalled(message);
-            notifyMessageMutationCounterpart(message, result);
+            afterCommit(() -> {
+                synchronizeMutatedMessageCache(message);
+                touchSessionActivity(message.getSessionId());
+                notifyMessageMutationCounterpart(message, result);
+            });
             return result;
         } finally {
+            chatRedisRepository.stopLockRenewal(lockRenewal);
             chatRedisRepository.releaseSessionOperationLock(message.getSessionId(), lockToken);
         }
     }
@@ -221,7 +177,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
         }
         requireSessionParticipant(message.getSessionId(), operatorId);
         if (!operatorId.equals(message.getSenderId())) {
-            throw new IllegalArgumentException("只能编辑或撤回自己发送的消息");
+            throw new IllegalArgumentException("只能撤回自己发送的消息");
         }
         if (Boolean.TRUE.equals(message.getRecalled())) {
             throw new IllegalArgumentException("消息已经撤回");
@@ -304,6 +260,21 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 log.warn("跳过无法解析的消息缓存，key={}，index={}", key, index);
             }
         }
+    }
+
+    private void afterCommit(Runnable action) {
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+            org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+                    new org.springframework.transaction.support.TransactionSynchronization() {
+                        @Override
+                        public void afterCommit() {
+                            action.run();
+                        }
+                    }
+            );
+            return;
+        }
+        action.run();
     }
 
     private void touchSessionActivity(String sessionId) {

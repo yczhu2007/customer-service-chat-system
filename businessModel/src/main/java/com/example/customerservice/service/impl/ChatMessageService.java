@@ -62,15 +62,6 @@ public class ChatMessageService implements ChatMessageOperations {
     }
 
     @Override
-    public MessageMutationResult editMessage(
-            String messageId,
-            String newContent,
-            String operatorId
-    ) {
-        return managementOperations.editMessage(messageId, newContent, operatorId);
-    }
-
-    @Override
     public MessageMutationResult recallMessage(String messageId, String operatorId) {
         return managementOperations.recallMessage(messageId, operatorId);
     }

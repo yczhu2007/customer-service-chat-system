@@ -9,12 +9,10 @@ import java.util.List;
 
 public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
 
-    int editOwnMessage(
-            @Param("messageId") String messageId,
+    ChatMessage findByClientMessage(
+            @Param("sessionId") String sessionId,
             @Param("senderId") String senderId,
-            @Param("content") String content,
-            @Param("editedAt") LocalDateTime editedAt,
-            @Param("cutoffTime") LocalDateTime cutoffTime
+            @Param("clientMsgId") String clientMsgId
     );
 
     int recallOwnMessage(
@@ -22,6 +20,10 @@ public interface ChatMessageMapper extends BaseMapper<ChatMessage> {
             @Param("senderId") String senderId,
             @Param("recalledAt") LocalDateTime recalledAt,
             @Param("cutoffTime") LocalDateTime cutoffTime
+    );
+
+    List<ChatMessage> selectLatestHistoryBySessionIds(
+            @Param("sessionIds") List<String> sessionIds
     );
 
     List<ChatMessage> selectLatestHistory(

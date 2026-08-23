@@ -5,7 +5,7 @@ import com.example.customerservice.domain.ChatMessage;
 import java.time.LocalDateTime;
 import java.io.Serializable;
 
-/** 消息编辑或撤回后推送给会话双方的统一事件。 */
+/** 消息撤回后推送给会话双方的事件。 */
 public class MessageMutationResult implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -15,17 +15,8 @@ public class MessageMutationResult implements Serializable {
     private String sessionId;
     private String operatorId;
     private String content;
-    private boolean edited;
-    private LocalDateTime editedAt;
     private boolean recalled;
     private LocalDateTime recalledAt;
-
-    public static MessageMutationResult edited(ChatMessage message) {
-        MessageMutationResult result = from(message);
-        result.setEvent("MESSAGE_EDITED");
-        result.setContent(message.getContent());
-        return result;
-    }
 
     public static MessageMutationResult recalled(ChatMessage message) {
         MessageMutationResult result = from(message);
@@ -39,8 +30,6 @@ public class MessageMutationResult implements Serializable {
         result.setMessageId(message.getId());
         result.setSessionId(message.getSessionId());
         result.setOperatorId(message.getSenderId());
-        result.setEdited(Boolean.TRUE.equals(message.getEdited()));
-        result.setEditedAt(message.getEditedAt());
         result.setRecalled(Boolean.TRUE.equals(message.getRecalled()));
         result.setRecalledAt(message.getRecalledAt());
         return result;
@@ -56,10 +45,6 @@ public class MessageMutationResult implements Serializable {
     public void setOperatorId(String operatorId) { this.operatorId = operatorId; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-    public boolean isEdited() { return edited; }
-    public void setEdited(boolean edited) { this.edited = edited; }
-    public LocalDateTime getEditedAt() { return editedAt; }
-    public void setEditedAt(LocalDateTime editedAt) { this.editedAt = editedAt; }
     public boolean isRecalled() { return recalled; }
     public void setRecalled(boolean recalled) { this.recalled = recalled; }
     public LocalDateTime getRecalledAt() { return recalledAt; }

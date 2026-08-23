@@ -26,12 +26,6 @@ public interface ChatMessageOperations {
 
     long countUnreadMessages(String sessionId, String userId);
 
-    MessageMutationResult editMessage(
-            String messageId,
-            String newContent,
-            String operatorId
-    );
-
     MessageMutationResult recallMessage(String messageId, String operatorId);
 
     ChatHistoryPage getHistory(

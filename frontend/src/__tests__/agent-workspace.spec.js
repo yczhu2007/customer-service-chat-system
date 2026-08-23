@@ -152,7 +152,7 @@ describe('Chat Store - Agent Workspace', () => {
   it('loads sessions for a specific agent view', async () => {
     const chat = useChatStore()
     await chat.loadAgentViewSessions('MY_ACTIVE')
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', {})
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', { pageNo: 1, pageSize: 20 })
     expect(chat.sessions).toHaveLength(2)
     expect(chat.sessions[0].sessionId).toBe('s1')
   })
@@ -161,7 +161,7 @@ describe('Chat Store - Agent Workspace', () => {
     const chat = useChatStore()
     await chat.switchAgentView('MY_UNREAD')
     expect(chat.activeAgentView).toBe('MY_UNREAD')
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_UNREAD', {})
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_UNREAD', { pageNo: 1, pageSize: 20 })
   })
 
   it('loads agent dashboard and rating summary data', async () => {
@@ -291,7 +291,7 @@ describe('Chat Store - Agent Workspace', () => {
     await chat.updateArchiveStatus('s1', { archiveStatus: 'COMPLETED' })
     expect(setArchiveStatus).toHaveBeenCalledWith('s1', { archiveStatus: 'COMPLETED' })
     // Should reload sessions after archive
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', {})
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', { pageNo: 1, pageSize: 20 })
   })
 
   it('loads user profile', async () => {

@@ -74,8 +74,7 @@ public class ChatServiceConfiguration {
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
             ChatOfflineMessageOperations chatOfflineMessageOperations,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds,
-            @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds
+            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
     ) {
         return new ChatMessageDeliveryService(
                 chatRedisRepository,
@@ -88,7 +87,7 @@ public class ChatServiceConfiguration {
                 objectMapper,
                 chatOfflineMessageOperations,
                 messageRecallWindowSeconds,
-                messageEditWindowSeconds
+                 300
         );
     }
 
@@ -100,8 +99,8 @@ public class ChatServiceConfiguration {
             ChatMessageReadMapper chatMessageReadMapper,
             SimpMessagingTemplate messagingTemplate,
             ObjectMapper objectMapper,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds,
-            @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds
+            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
+            
     ) {
         return new ChatMessageManagementService(
                 chatRedisRepository,
@@ -110,8 +109,7 @@ public class ChatServiceConfiguration {
                 chatMessageReadMapper,
                 messagingTemplate,
                 objectMapper,
-                messageRecallWindowSeconds,
-                messageEditWindowSeconds
+                messageRecallWindowSeconds
         );
     }
 
@@ -210,8 +208,8 @@ public class ChatServiceConfiguration {
             @Value("${app.chat.vip.reserved-slots:1}") int vipReservedSlots,
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}") long vipPriorityStepSeconds,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds,
-            @Value("${app.chat.message.edit-window-seconds:300}") long messageEditWindowSeconds,
+            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
+            ,
             @Value("${app.chat.reconciliation.active-session-batch-size:200}")
             int activeSessionReconciliationBatchSize
     ) {
@@ -235,8 +233,8 @@ public class ChatServiceConfiguration {
                 averageHandleSeconds,
                 vipPriorityStepSeconds,
                 messageRecallWindowSeconds,
-                messageEditWindowSeconds,
-                activeSessionReconciliationBatchSize
+                 300,
+                 activeSessionReconciliationBatchSize
         );
     }
 

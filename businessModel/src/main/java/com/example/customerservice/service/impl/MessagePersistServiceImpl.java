@@ -26,6 +26,11 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
+import java.util.UUID;
 import org.springframework.data.redis.core.ZSetOperations;
 
 /**
@@ -39,6 +44,25 @@ public class MessagePersistServiceImpl implements MessagePersistService {
     /** 首次执行 + 3 次指数退避重试。 */
     private static final int MAX_ATTEMPTS = 4;
     private static final long[] RETRY_DELAYS_SECONDS = {10L, 30L, 60L};
+    private static final DefaultRedisScript<Long> RELEASE_RETRY_LEASE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]); end; return 0;",
+                    Long.class
+            );
+    private static final DefaultRedisScript<Long> RENEW_RETRY_LEASE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('EXPIRE', KEYS[1], ARGV[2]); end; return 0;",
+                    Long.class
+            );
+    private static final ScheduledExecutorService RETRY_LEASE_WATCHDOG =
+            Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable runnable) {
+                    Thread thread = new Thread(runnable, "message-persist-lease-watchdog");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
     private static final DefaultRedisScript<Long> MARK_PENDING_SCRIPT =
             new DefaultRedisScript<>(
                     "redis.call('SET', KEYS[1], ARGV[1]); " +
@@ -108,13 +132,16 @@ public class MessagePersistServiceImpl implements MessagePersistService {
     @Override
     @Async("messagePersistExecutor")
     public void persistMessageAsync(ChatMessage message) {
-        if (!tryAcquireRetryLease(message.getId())) {
+        String leaseToken = tryAcquireRetryLease(message.getId());
+        if (leaseToken == null) {
             return;
         }
+        ScheduledFuture<?> renewal = startRetryLeaseRenewal(message.getId(), leaseToken);
         try {
             persistWithRetry(message);
         } finally {
-            releaseRetryLease(message.getId());
+            stopRetryLeaseRenewal(renewal);
+            releaseRetryLease(message.getId(), leaseToken);
         }
     }
 
@@ -132,7 +159,8 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         }
         for (String messageId : pendingIds) {
             try {
-                if (!tryAcquireRetryLease(messageId)) {
+                String leaseToken = tryAcquireRetryLease(messageId);
+                if (leaseToken == null) {
                     continue;
                 }
                 String payload = redisTemplate.opsForValue().get(
@@ -140,19 +168,20 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 );
                 if (payload == null || payload.isBlank()) {
                     moveToDeadLetter(messageId);
-                    releaseRetryLease(messageId);
+                    releaseRetryLease(messageId, leaseToken);
                     continue;
                 }
                 ChatMessage message = objectMapper.readValue(payload, ChatMessage.class);
                 messagePersistExecutor.execute(() -> {
+                    ScheduledFuture<?> renewal = startRetryLeaseRenewal(message.getId(), leaseToken);
                     try {
                         persistWithRetry(message);
                     } finally {
-                        releaseRetryLease(message.getId());
+                        stopRetryLeaseRenewal(renewal);
+                        releaseRetryLease(message.getId(), leaseToken);
                     }
                 });
             } catch (Exception exception) {
-                releaseRetryLease(messageId);
                 log.error("重新提交待落库消息失败，messageId={}", messageId, exception);
             }
         }
@@ -244,13 +273,16 @@ public class MessagePersistServiceImpl implements MessagePersistService {
             }
             ChatMessage message = objectMapper.readValue(payload, ChatMessage.class);
             messagePersistExecutor.execute(() -> {
-                if (!tryAcquireRetryLease(messageId)) {
+                String leaseToken = tryAcquireRetryLease(messageId);
+                if (leaseToken == null) {
                     return;
                 }
+                ScheduledFuture<?> renewal = startRetryLeaseRenewal(messageId, leaseToken);
                 try {
                     persistWithRetry(message);
                 } finally {
-                    releaseRetryLease(messageId);
+                    stopRetryLeaseRenewal(renewal);
+                    releaseRetryLease(messageId, leaseToken);
                 }
             });
         } catch (BusinessStateException | IllegalArgumentException exception) {
@@ -306,8 +338,15 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 markStored(message);
                 return true;
             } catch (DuplicateKeyException exception) {
-                // 主键或 clientMsgId 重复代表上次写入已经成功，按成功处理。
-                markStored(message);
+                ChatMessage storedMessage = chatMessageMapper.findByClientMessage(
+                        message.getSessionId(), message.getSenderId(), message.getClientMsgId()
+                );
+                if (!isSameLogicalMessage(message, storedMessage)) {
+                    log.error("消息唯一键冲突且内容不匹配，messageId={}", message.getId(), exception);
+                    moveToDeadLetter(message.getId());
+                    return false;
+                }
+                markStored(storedMessage);
                 return true;
             } catch (Exception exception) {
                 log.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
@@ -334,7 +373,6 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         String messageId = message.getId();
         redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_PENDING, messageId);
         redisTemplate.delete(RedisConstants.PERSIST_PENDING_PAYLOAD + messageId);
-        releaseRetryLease(messageId);
         ChatMessageDTO acknowledgement = ChatMessageDTO.fromEntity(message);
         acknowledgement.setAckStatus("STORED");
         messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/chat", acknowledgement);
@@ -352,7 +390,6 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                 RedisConstants.PERSIST_DEADLETTER_RETENTION_DAYS,
                 TimeUnit.DAYS
         );
-        releaseRetryLease(messageId);
         log.error("消息达到最大落库重试次数，已转入死信集合，messageId={}", messageId);
     }
 
@@ -362,22 +399,61 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         }
     }
 
-    private void releaseRetryLease(String messageId) {
-        if (messageId != null && !messageId.isBlank()) {
-            redisTemplate.delete(RedisConstants.PERSIST_RETRY_LEASE + messageId);
+    private boolean isSameLogicalMessage(ChatMessage expected, ChatMessage stored) {
+        return stored != null
+                && expected.getSessionId().equals(stored.getSessionId())
+                && expected.getSenderId().equals(stored.getSenderId())
+                && expected.getClientMsgId().equals(stored.getClientMsgId())
+                && expected.getType().equals(stored.getType())
+                && expected.getContent().equals(stored.getContent());
+    }
+
+    private void releaseRetryLease(String messageId, String token) {
+        if (messageId != null && !messageId.isBlank() && token != null && !token.isBlank()) {
+            redisTemplate.execute(
+                    RELEASE_RETRY_LEASE_SCRIPT,
+                    List.of(RedisConstants.PERSIST_RETRY_LEASE + messageId),
+                    token
+            );
         }
     }
 
-    private boolean tryAcquireRetryLease(String messageId) {
+    private String tryAcquireRetryLease(String messageId) {
         if (messageId == null || messageId.isBlank()) {
-            return false;
+            return null;
         }
+        String token = UUID.randomUUID().toString();
         Boolean acquired = redisTemplate.opsForValue().setIfAbsent(
                 RedisConstants.PERSIST_RETRY_LEASE + messageId,
-                "1",
+                token,
                 RedisConstants.PERSIST_RETRY_LEASE_SECONDS,
                 TimeUnit.SECONDS
         );
-        return Boolean.TRUE.equals(acquired);
+        return Boolean.TRUE.equals(acquired) ? token : null;
+    }
+
+    private ScheduledFuture<?> startRetryLeaseRenewal(String messageId, String token) {
+        long interval = Math.max(1L, RedisConstants.PERSIST_RETRY_LEASE_SECONDS / 3L);
+        return RETRY_LEASE_WATCHDOG.scheduleAtFixedRate(() -> {
+            try {
+                Long renewed = redisTemplate.execute(
+                        RENEW_RETRY_LEASE_SCRIPT,
+                        List.of(RedisConstants.PERSIST_RETRY_LEASE + messageId),
+                        token,
+                        String.valueOf(RedisConstants.PERSIST_RETRY_LEASE_SECONDS)
+                );
+                if (!Long.valueOf(1L).equals(renewed)) {
+                    log.warn("消息落库 lease 已失效，messageId={}", messageId);
+                }
+            } catch (RuntimeException exception) {
+                log.warn("消息落库 lease 续期失败，messageId={}", messageId, exception);
+            }
+        }, interval, interval, TimeUnit.SECONDS);
+    }
+
+    private void stopRetryLeaseRenewal(ScheduledFuture<?> renewal) {
+        if (renewal != null) {
+            renewal.cancel(false);
+        }
     }
 }

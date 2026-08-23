@@ -11,6 +11,10 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ThreadFactory;
 
 /**
  * 聊天模块的 Redis 数据访问入口。
@@ -21,6 +25,15 @@ import java.util.concurrent.TimeUnit;
 @Repository
 public class ChatRedisRepository {
 
+    private static final ScheduledExecutorService LOCK_WATCHDOG =
+            Executors.newScheduledThreadPool(2, new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable runnable) {
+                    Thread thread = new Thread(runnable, "chat-redis-lock-watchdog");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
     private static final DefaultRedisScript<Long> RELEASE_LOCK_SCRIPT =
             new DefaultRedisScript<>(
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then "
@@ -95,6 +108,26 @@ public class ChatRedisRepository {
             return;
         }
         execute(RELEASE_LOCK_SCRIPT, java.util.Collections.singletonList(key), token);
+    }
+
+    public ScheduledFuture<?> startLockRenewal(String key, String token, long timeout, TimeUnit unit) {
+        if (key == null || token == null || timeout <= 0) {
+            return null;
+        }
+        long timeoutSeconds = Math.max(1L, unit.toSeconds(timeout));
+        long intervalSeconds = Math.max(1L, timeoutSeconds / 3L);
+        return LOCK_WATCHDOG.scheduleAtFixedRate(
+                () -> renewLock(key, token, timeoutSeconds),
+                intervalSeconds,
+                intervalSeconds,
+                TimeUnit.SECONDS
+        );
+    }
+
+    public void stopLockRenewal(ScheduledFuture<?> renewal) {
+        if (renewal != null) {
+            renewal.cancel(false);
+        }
     }
 
     public boolean renewLock(String key, String token, long timeoutSeconds) {

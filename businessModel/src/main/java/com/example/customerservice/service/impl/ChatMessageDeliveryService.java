@@ -36,6 +36,7 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations {
@@ -188,11 +189,16 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             deleteDeduplicationKeySafely(dedupKey);
             throw new BusinessStateException("会话正在转接、结束或执行超时处理，请稍后重试");
         }
+        ScheduledFuture<?> operationLockRenewal = chatRedisRepository.startLockRenewal(
+                RedisConstants.SESSION_OPERATION_LOCK + message.getSessionId(),
+                operationLockToken,
+                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
         try {
-        ChatSession session =
-                chatSessionMapper.selectById(
-                        message.getSessionId()
-                );
+            ChatSession session = chatSessionMapper.selectById(
+                    message.getSessionId()
+            );
 
 
         if (session == null) {
@@ -287,6 +293,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             deleteDeduplicationKeySafely(dedupKey);
             throw exception;
         } finally {
+            chatRedisRepository.stopLockRenewal(operationLockRenewal);
             chatRedisRepository.releaseSessionOperationLock(
                     message.getSessionId(),
                     operationLockToken

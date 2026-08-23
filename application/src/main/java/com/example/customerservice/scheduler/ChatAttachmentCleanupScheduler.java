@@ -10,8 +10,14 @@ import org.springframework.stereotype.Component;
 @Slf4j
 public class ChatAttachmentCleanupScheduler {
     private final ChatAttachmentService attachmentService;
-    public ChatAttachmentCleanupScheduler(ChatAttachmentService attachmentService) {
+    private final DistributedSchedulerLock schedulerLock;
+
+    public ChatAttachmentCleanupScheduler(
+            ChatAttachmentService attachmentService,
+            DistributedSchedulerLock schedulerLock
+    ) {
         this.attachmentService = attachmentService;
+        this.schedulerLock = schedulerLock;
     }
 
     @Scheduled(
@@ -20,10 +26,14 @@ public class ChatAttachmentCleanupScheduler {
     )
     public void cleanup() {
         try {
-            int removed = attachmentService.cleanupOrphanFiles();
-            if (removed > 0) log.info("孤儿附件清理完成，删除文件数={}", removed);
+            schedulerLock.execute("chat-attachment-cleanup", this::cleanupLocked);
         } catch (RuntimeException exception) {
             log.error("孤儿附件清理失败", exception);
         }
+    }
+
+    private void cleanupLocked() {
+        int removed = attachmentService.cleanupOrphanFiles();
+        if (removed > 0) log.info("孤儿附件清理完成，删除文件数={}", removed);
     }
 }

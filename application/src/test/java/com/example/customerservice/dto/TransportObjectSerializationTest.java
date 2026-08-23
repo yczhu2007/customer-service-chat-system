@@ -23,7 +23,6 @@ class TransportObjectSerializationTest {
                 ChatHistoryPage.class,
                 ChatMessageDTO.class,
                 ChatSessionDTO.class,
-                EditMessageRequest.class,
                 EndSessionRequest.class,
                 HistoryRequest.class,
                 LoginRequest.class,

@@ -63,18 +63,8 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
 
 
             /*
-             * 最多保留最近200条
-             */
-            chatRedisRepository.listTrim(
-                            offlineKey,
-                            -RedisConstants
-                                    .OFFLINE_MSG_MAX_COUNT,
-                            -1
-                    );
-
-
-            /*
-             * 消息最多保留7天
+             * 待确认队列不能按固定数量截断；消息在 MySQL 持久化前后都可能
+             * 依赖该队列重投。容量控制由 Redis 内存告警和数据库历史回放承担。
              */
             chatRedisRepository.expire(
                     offlineKey,

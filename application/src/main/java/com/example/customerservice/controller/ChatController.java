@@ -772,27 +772,6 @@ public class ChatController {
     }
 
     /**
-     * 编辑当前用户自己发送且仍在允许时间内的文本消息。
-     * 会话双方均从 /user/queue/messages 接收 MESSAGE_EDITED 事件。
-     */
-    @MessageMapping("/chat.message.edit")
-    @SendToUser("/queue/messages")
-    public MessageMutationResult editMessage(
-            @Valid EditMessageRequest request,
-            Principal principal
-    ) {
-        if (principal == null) {
-            throw new IllegalArgumentException("当前用户身份不存在");
-        }
-        requireValidStompPayload(request, "编辑消息请求不能为空");
-        return chatMessageOperations.editMessage(
-                request.getMessageId(),
-                request.getContent(),
-                principal.getName()
-        );
-    }
-
-    /**
      * 撤回当前用户自己发送且仍在允许时间内的消息。
      * 会话双方均从 /user/queue/messages 接收 MESSAGE_RECALLED 事件。
      */

@@ -51,6 +51,13 @@ export const useChatStore = defineStore('chat', {
     _sentClientMsgIds: new Set(),
     /** Loading state for sessions */
     sessionsLoading: false,
+    sessionsPageNo: 1,
+    sessionsPageSize: 20,
+    sessionsTotal: 0,
+    sessionsTotalPages: 0,
+    sessionsHasMore: false,
+    _sessionsRequestSequence: 0,
+    _consultationTimeout: null,
     /** Loading state for messages */
     messagesLoading: false,
     /** Cursor state for loading earlier messages */
@@ -77,9 +84,6 @@ export const useChatStore = defineStore('chat', {
     agentDashboard: null,
     agentRatingSummary: null,
     transferLogs: [],
-    /** Message currently being edited */
-    editingMessageId: null,
-    editingContent: '',
   }),
 
   getters: {
@@ -131,18 +135,32 @@ export const useChatStore = defineStore('chat', {
      * Load sessions from REST.
      */
     async loadSessions(params = {}) {
+      const pageNo = Number(params.pageNo || 1)
+      const pageSize = Number(params.pageSize || this.sessionsPageSize)
+      const requestSequence = ++this._sessionsRequestSequence
       this.sessionsLoading = true
       this.error = null
       try {
-        const result = await listSessions(params)
-        // result is Result<PageResult<ChatSessionListItemVO>>
+        const result = await listSessions({ ...params, pageNo, pageSize })
+        if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
-        this.sessions = page?.records || []
+        const records = page?.records || []
+        this.sessions = pageNo > 1 ? [...this.sessions, ...records] : records
+        this.sessionsPageNo = page?.current || pageNo
+        this.sessionsPageSize = page?.size || pageSize
+        this.sessionsTotal = page?.total || 0
+        this.sessionsTotalPages = page?.pages || (this.sessionsPageSize ? Math.ceil(this.sessionsTotal / this.sessionsPageSize) : 0)
+        this.sessionsHasMore = this.sessionsPageNo < this.sessionsTotalPages
       } catch (e) {
-        this.error = e.message
+        if (requestSequence === this._sessionsRequestSequence) this.error = e.message
       } finally {
-        this.sessionsLoading = false
+        if (requestSequence === this._sessionsRequestSequence) this.sessionsLoading = false
       }
+    },
+
+    async loadNextSessionsPage(params = {}) {
+      if (this.sessionsLoading || !this.sessionsHasMore) return
+      return this.loadSessions({ ...params, pageNo: this.sessionsPageNo + 1, pageSize: this.sessionsPageSize })
     },
 
     /**
@@ -157,8 +175,6 @@ export const useChatStore = defineStore('chat', {
       this.activeSessionId = sessionId
       this.messages = []
       this._sentClientMsgIds.clear()
-      this.editingMessageId = null
-      this.editingContent = ''
       this.historyCursor = null
       this.historyHasMore = false
       this.historyLoadingMore = false
@@ -244,27 +260,6 @@ export const useChatStore = defineStore('chat', {
       })
     },
 
-    startEditing(message) {
-      const auth = useAuthStore()
-      if (!message || message.senderId !== auth.userId || message.type !== 'TEXT' || message.recalled) return
-      this.editingMessageId = message.id
-      this.editingContent = message.content || ''
-    },
-
-    cancelEditing() {
-      this.editingMessageId = null
-      this.editingContent = ''
-    },
-
-    editMessage(messageId, content = this.editingContent) {
-      const auth = useAuthStore()
-      const message = this.messages.find((item) => item.id === messageId)
-      const value = content.trim()
-      if (!message || message.senderId !== auth.userId || message.type !== 'TEXT' || !value) return
-      if (!this._stomp || !this.connected) { this.error = '未连接到服务器'; return }
-      this._stomp.publish('/app/chat.message.edit', { messageId, content: value })
-    },
-
     recallMessage(messageId) {
       const auth = useAuthStore()
       const message = this.messages.find((item) => item.id === messageId)
@@ -291,11 +286,18 @@ export const useChatStore = defineStore('chat', {
         this._stomp.publish('/app/chat.start', {})
       } catch (e) {
         this.consultationStarting = false
+        if (this._consultationTimeout) { clearTimeout(this._consultationTimeout); this._consultationTimeout = null }
         this.queueNotice = null
         this.error = e.message || '咨询请求发送失败'
         return
       }
-      // The session-assigned event is asynchronous; refresh once as a fallback.
+      this._consultationTimeout = setTimeout(() => {
+        if (!this.consultationStarting) return
+        this.consultationStarting = false
+        if (this._consultationTimeout) { clearTimeout(this._consultationTimeout); this._consultationTimeout = null }
+        this.queueNotice = null
+        this.error = '咨询请求超时，请重试'
+      }, 15000)
       setTimeout(() => this.loadSessions(), 500)
     },
 
@@ -313,8 +315,13 @@ export const useChatStore = defineStore('chat', {
         this.error = '未连接到服务器'
         return false
       }
-      this._stomp.publish('/app/chat.end', { sessionId })
-      return true
+      try {
+        this._stomp.publish('/app/chat.end', { sessionId })
+        return true
+      } catch (e) {
+        this.error = e.message || '结束会话失败'
+        return false
+      }
     },
 
     /**
@@ -510,7 +517,7 @@ export const useChatStore = defineStore('chat', {
                 const body = JSON.parse(frame.body)
                 this._handleChatEvent(body)
               })
-              // Subscribe to message events (read, edit, recall, ack)
+              // Subscribe to message events (read, recall, ack)
               stomp.subscribe('/user/queue/messages', (frame) => {
                 const body = JSON.parse(frame.body)
                 this._handleMessageEvent(body)
@@ -556,6 +563,7 @@ export const useChatStore = defineStore('chat', {
           if (e.name === 'AbortError' || attempt !== this._connectAttempt) return
           this.error = 'WebSocket连接失败: ' + e.message
           this.handleConnectionError(this.error)
+          if (!this.manualDisconnect) this.reconnectStomp()
         })
     },
 
@@ -611,8 +619,6 @@ export const useChatStore = defineStore('chat', {
       this.agentDashboard = null
       this.agentRatingSummary = null
       this.transferLogs = []
-      this.editingMessageId = null
-      this.editingContent = ''
       this.error = null
     },
 
@@ -661,17 +667,32 @@ export const useChatStore = defineStore('chat', {
      * Load sessions for a specific agent view.
      */
     async loadAgentViewSessions(viewCode, params = {}) {
+      const pageNo = Number(params.pageNo || 1)
+      const pageSize = Number(params.pageSize || this.sessionsPageSize)
+      const requestSequence = ++this._sessionsRequestSequence
       this.sessionsLoading = true
       this.error = null
       try {
-        const result = await listAgentViewSessions(viewCode, params)
+        const result = await listAgentViewSessions(viewCode, { ...params, pageNo, pageSize })
+        if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
-        this.sessions = page?.records || []
+        const records = page?.records || []
+        this.sessions = pageNo > 1 ? [...this.sessions, ...records] : records
+        this.sessionsPageNo = page?.current || pageNo
+        this.sessionsPageSize = page?.size || pageSize
+        this.sessionsTotal = page?.total || 0
+        this.sessionsTotalPages = page?.pages || (this.sessionsPageSize ? Math.ceil(this.sessionsTotal / this.sessionsPageSize) : 0)
+        this.sessionsHasMore = this.sessionsPageNo < this.sessionsTotalPages
       } catch (e) {
-        this.error = e.message
+        if (requestSequence === this._sessionsRequestSequence) this.error = e.message
       } finally {
-        this.sessionsLoading = false
+        if (requestSequence === this._sessionsRequestSequence) this.sessionsLoading = false
       }
+    },
+
+    async loadNextAgentSessionsPage() {
+      if (this.sessionsLoading || !this.sessionsHasMore) return
+      return this.loadAgentViewSessions(this.activeAgentView, { pageNo: this.sessionsPageNo + 1, pageSize: this.sessionsPageSize })
     },
 
     /**
@@ -821,6 +842,8 @@ export const useChatStore = defineStore('chat', {
 
       if (event === 'ERROR') {
         this.consultationStarting = false
+        if (this._consultationTimeout) { clearTimeout(this._consultationTimeout); this._consultationTimeout = null }
+        this.queueNotice = null
         this.error = body.message || body.error || '咨询请求失败'
         return
       }
@@ -886,21 +909,6 @@ export const useChatStore = defineStore('chat', {
         return
       }
 
-      if (event === 'MESSAGE_EDITED') {
-        const idx = this.messages.findIndex((m) => m.id === body.messageId)
-        if (idx !== -1) {
-          this.messages[idx] = {
-            ...this.messages[idx],
-            content: body.content,
-            edited: true,
-            editedAt: body.editedAt,
-          }
-        }
-        if (this.editingMessageId === body.messageId) this.cancelEditing()
-        this.refreshAgentViews()
-        return
-      }
-
       if (event === 'MESSAGE_RECALLED') {
         const idx = this.messages.findIndex((m) => m.id === body.messageId)
         if (idx !== -1) {
@@ -911,7 +919,6 @@ export const useChatStore = defineStore('chat', {
             recalledAt: body.recalledAt,
           }
         }
-        if (this.editingMessageId === body.messageId) this.cancelEditing()
         return
       }
 

@@ -313,38 +313,6 @@ describe('User Workspace', () => {
     })
   })
 
-  describe('message operations', () => {
-    it('publishes edit and recall operations for a selected own message', () => {
-      const auth = useAuthStore()
-      auth.login({ token: 't', userId: 'u1', role: 'USER' })
-      const chat = useChatStore()
-      chat._stomp = { publish: vi.fn() }
-      chat.connected = true
-      chat.messages = [{ id: 'm1', senderId: 'u1', type: 'TEXT', content: '原内容' }]
-
-      chat.editMessage('m1', '修改后的内容')
-      chat.recallMessage('m1')
-
-      expect(chat._stomp.publish).toHaveBeenNthCalledWith(1, '/app/chat.message.edit', {
-        messageId: 'm1', content: '修改后的内容',
-      })
-      expect(chat._stomp.publish).toHaveBeenNthCalledWith(2, '/app/chat.message.recall', {
-        messageId: 'm1',
-      })
-    })
-
-    it('applies edited and recalled events to the current message', () => {
-      const chat = useChatStore()
-      chat.messages = [{ id: 'm1', type: 'TEXT', content: '原内容' }]
-
-      chat._handleMessageEvent({ event: 'MESSAGE_EDITED', messageId: 'm1', content: '新内容' })
-      expect(chat.messages[0]).toMatchObject({ content: '新内容', edited: true })
-
-      chat._handleMessageEvent({ event: 'MESSAGE_RECALLED', messageId: 'm1' })
-      expect(chat.messages[0]).toMatchObject({ recalled: true, content: null })
-    })
-  })
-
   describe('chat store — queue status', () => {
     it('loads queue status', async () => {
       const chat = useChatStore()
@@ -492,17 +460,6 @@ describe('User Workspace', () => {
       expect(msg.content).toBeNull()
     })
 
-    it('handles edited messages', () => {
-      const msg = {
-        id: 'm1',
-        type: 'TEXT',
-        content: 'edited content',
-        edited: true,
-        editedAt: '2026-01-01T00:02:00',
-      }
-      expect(msg.edited).toBe(true)
-      expect(msg.content).toBe('edited content')
-    })
   })
 
   describe('chat store — message deduplication', () => {

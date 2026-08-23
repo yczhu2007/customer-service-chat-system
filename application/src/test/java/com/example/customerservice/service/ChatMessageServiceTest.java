@@ -146,53 +146,6 @@ class ChatMessageServiceTest {
     }
 
     @Test
-    void editMessageUpdatesDatabaseAndNotifiesCounterpart() {
-        ChatMessage message = textMessage();
-        when(chatMessageMapper.selectById("M001")).thenReturn(message);
-        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
-        when(valueOperations.setIfAbsent(
-                eq(RedisConstants.SESSION_OPERATION_LOCK + "S001"),
-                anyString(),
-                anyLong(),
-                eq(TimeUnit.SECONDS)
-        )).thenReturn(true);
-        when(chatMessageMapper.editOwnMessage(
-                eq("M001"), eq("A001"), eq("修改后的内容"),
-                any(LocalDateTime.class), any(LocalDateTime.class)
-        )).thenReturn(1);
-        when(listOperations.range(anyString(), eq(0L), eq(-1L))).thenReturn(List.of());
-
-        MessageMutationResult result = service.editMessage(
-                "M001", "修改后的内容", "A001"
-        );
-
-        assertEquals("MESSAGE_EDITED", result.getEvent());
-        assertEquals("修改后的内容", result.getContent());
-        verify(messagingTemplate).convertAndSendToUser(
-                eq("U001"), eq("/queue/messages"), eq(result)
-        );
-    }
-
-    @Test
-    void editMessageRejectsExpiredMessage() {
-        ChatMessage message = textMessage();
-        message.setCreateTime(LocalDateTime.now().minusMinutes(10));
-        when(chatMessageMapper.selectById("M001")).thenReturn(message);
-        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
-
-        IllegalArgumentException exception = assertThrows(
-                IllegalArgumentException.class,
-                () -> service.editMessage("M001", "修改后的内容", "A001")
-        );
-
-        assertTrue(exception.getMessage().contains("超过允许编辑"));
-        verify(chatMessageMapper, never()).editOwnMessage(
-                anyString(), anyString(), anyString(),
-                any(LocalDateTime.class), any(LocalDateTime.class)
-        );
-    }
-
-    @Test
     void recallMessageUpdatesDatabaseAndNotifiesCounterpart() {
         ChatMessage message = textMessage();
         when(chatMessageMapper.selectById("M001")).thenReturn(message);
@@ -473,7 +426,7 @@ class ChatMessageServiceTest {
                 ),
                 new ChatMessageManagementService(
                         chatRedisRepository, chatSessionMapper, chatMessageMapper,
-                        chatMessageReadMapper, messagingTemplate, objectMapper, 120, 300
+                        chatMessageReadMapper, messagingTemplate, objectMapper, 120
                 )
         );
     }
@@ -497,7 +450,6 @@ class ChatMessageServiceTest {
         message.setType("TEXT");
         message.setContent("原始内容");
         message.setCreateTime(LocalDateTime.now().minusSeconds(10));
-        message.setEdited(false);
         message.setRecalled(false);
         return message;
     }

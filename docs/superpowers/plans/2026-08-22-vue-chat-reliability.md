@@ -51,16 +51,6 @@
 - [ ] Clear the appropriate loading flag only in `CHAT_HISTORY` handling for the matching active session.
 - [ ] Clear the loading flags on publish failure and connection teardown.
 
-### Task 4: Complete message editing UI
-
-**Files:**
-- Modify: `frontend/src/components/chat/MessageList.vue`
-- Test: `frontend/src/__tests__/user-workspace.spec.js`
-
-- [ ] Add a failing component test for editing a current user's text message.
-- [ ] Render an edit action, inline editor, save and cancel actions only for eligible own text messages.
-- [ ] Call `chat.startEditing`, `chat.editMessage`, and `chat.cancelEditing` without adding a new transport contract.
-
 ### Task 5: Make transfer and close actions truthful
 
 **Files:**

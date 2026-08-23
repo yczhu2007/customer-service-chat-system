@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ScheduledFuture;
 
 @Slf4j
 public class ChatPresenceService implements ChatPresenceOperations {
@@ -94,6 +95,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         if (presenceLockToken == null) {
             return;
         }
+        ScheduledFuture<?> presenceLockRenewal = startPresenceLockRenewal(userId, presenceLockToken);
         try {
         String currentWsSessionId =
                 chatRedisRepository.getValue(
@@ -145,9 +147,19 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 ChatConstants.REASON_WEBSOCKET_DISCONNECT
         );
         } finally {
+            chatRedisRepository.stopLockRenewal(presenceLockRenewal);
             releasePresenceLock(userId, presenceLockToken);
         }
     }
+    private ScheduledFuture<?> startPresenceLockRenewal(String userId, String token) {
+        return chatRedisRepository.startLockRenewal(
+                RedisConstants.PRESENCE_OPERATION_LOCK + userId,
+                token,
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                TimeUnit.SECONDS
+        );
+    }
+
     /**
      * 处理聊天消息
      */
@@ -169,6 +181,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         if (presenceLockToken == null) {
             return;
         }
+        ScheduledFuture<?> presenceLockRenewal = startPresenceLockRenewal(userId, presenceLockToken);
         try {
         String currentWsSessionId =
                 chatRedisRepository.getValue(
@@ -197,6 +210,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 wsSessionId
         );
         } finally {
+            chatRedisRepository.stopLockRenewal(presenceLockRenewal);
             releasePresenceLock(userId, presenceLockToken);
         }
     }
@@ -219,6 +233,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         if (presenceLockToken == null) {
             return;
         }
+        ScheduledFuture<?> presenceLockRenewal = startPresenceLockRenewal(userId, presenceLockToken);
         try {
 
 
@@ -261,6 +276,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 ChatConstants.REASON_HEARTBEAT_TIMEOUT
         );
         } finally {
+            chatRedisRepository.stopLockRenewal(presenceLockRenewal);
             releasePresenceLock(userId, presenceLockToken);
         }
     }
