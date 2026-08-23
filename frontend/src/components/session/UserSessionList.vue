@@ -115,26 +115,10 @@ onMounted(() => {
         </div>
       </li>
     </ul>
-    <div v-if="chat.sessionsTotalPages > 1" class="pagination">
-      <span>第 {{ chat.sessionsPageNo }} / {{ chat.sessionsTotalPages }} 页</span>
-      <button :disabled="chat.sessionsLoading || !chat.sessionsHasMore" @click="chat.loadNextSessionsPage(archiveFilter ? { archiveStatus: archiveFilter } : {})">加载下一页</button>
-    </div>
   </div>
 </template>
 
 <style scoped>
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-.pagination button {
-  padding: 0.25rem 0.5rem;
-}
-
 .session-list-panel {
   display: flex;
   flex-direction: column;

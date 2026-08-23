@@ -68,23 +68,11 @@ function selectSession(sessionId) {
         </div>
       </li>
     </ul>
-    <div v-if="chat.sessionsTotalPages > 1" class="pagination">
-      <span>第 {{ chat.sessionsPageNo }} / {{ chat.sessionsTotalPages }} 页</span>
-      <button :disabled="chat.sessionsLoading || !chat.sessionsHasMore" @click="chat.loadNextAgentSessionsPage">加载下一页</button>
-    </div>
+
   </div>
 </template>
 
 <style scoped>
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  padding: 0.5rem 1rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-.pagination button { padding: 0.25rem 0.5rem; }
-
 .agent-session-list {
   overflow-y: auto;
   flex: 1;

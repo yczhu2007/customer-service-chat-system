@@ -38,13 +38,13 @@ async function switchWorkspace(role) {
         <span class="brand-subtitle">SERVICE WORKSPACE</span>
       </div>
       <div v-if="auth.isAuthenticated" class="header-actions">
-        <div v-if="auth.roles.length > 1" class="workspace-switcher">
-          <button v-for="role in auth.roles" :key="role" :class="{ active: auth.activeRole === role }" type="button" @click="switchWorkspace(role)">
+        <el-button-group v-if="auth.roles.length > 1">
+          <el-button v-for="role in auth.roles" :key="role" :type="auth.activeRole === role ? 'primary' : 'default'" size="small" @click="switchWorkspace(role)">
             {{ role === 'ADMIN' ? '管理' : role === 'AGENT' ? '客服' : '用户' }}
-          </button>
-        </div>
+          </el-button>
+        </el-button-group>
         <RouterLink class="account-link" to="/account">{{ auth.username || auth.userId }}</RouterLink>
-        <button class="logout-button" type="button" @click="signOut">退出登录</button>
+        <el-button class="logout-button" type="default" plain size="small" @click="signOut">退出登录</el-button>
       </div>
     </header>
     <slot />

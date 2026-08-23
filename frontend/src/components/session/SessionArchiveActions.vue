@@ -75,37 +75,46 @@ async function setArchive(code) {
     <template v-else>
       <div v-if="currentArchiveStatus" class="current-status">
         当前状态：
-        <span class="current-badge" :style="archiveStatusStyle(currentArchiveStatus)">
+        <el-tag
+          size="small"
+          effect="light"
+          class="current-badge"
+          :style="archiveStatusStyle(currentArchiveStatus)"
+        >
           {{ ARCHIVE_STATUSES.find((s) => s.code === currentArchiveStatus)?.label || currentArchiveStatus }}
-        </span>
+        </el-tag>
       </div>
 
       <div class="field">
         <label class="field-label">备注</label>
-        <textarea
+        <el-input
           v-model="remark"
-          rows="2"
+          type="textarea"
+          :rows="2"
           maxlength="255"
+          show-word-limit
           class="remark-input"
           placeholder="归档备注（可选）"
         />
       </div>
 
       <div class="btn-group">
-        <button
+        <el-button
           v-for="s in availableStatuses"
           :key="s.code"
+          size="small"
+          plain
           :disabled="saving || s.code === currentArchiveStatus"
           class="archive-btn"
           :style="{ borderColor: s.color, color: s.color }"
           @click="setArchive(s.code)"
         >
           {{ s.label }}
-        </button>
+        </el-button>
       </div>
 
-      <div v-if="errorMsg" class="msg error">{{ errorMsg }}</div>
-      <div v-if="successMsg" class="msg success">{{ successMsg }}</div>
+      <el-alert v-if="errorMsg" :title="errorMsg" type="error" :closable="false" class="msg" />
+      <el-alert v-if="successMsg" :title="successMsg" type="success" :closable="false" class="msg" />
     </template>
   </div>
 </template>

@@ -10,10 +10,11 @@ function reconnect() { chat.reconnectAttempts = 0; chat.reconnectStomp() }
 </script>
 <template>
   <div class="connection-status" :class="chat.connectionState">
-    <span class="status-dot" />
-    <span>{{ stateLabel }}</span>
+    <el-tag :type="chat.connectionState === 'connected' ? 'success' : chat.connectionState === 'error' ? 'danger' : 'info'" size="small">
+      {{ stateLabel }}
+    </el-tag>
     <span v-if="chat.lastActivityAt" class="activity">最近活动 {{ new Date(chat.lastActivityAt).toLocaleTimeString('zh-CN') }}</span>
-    <button v-if="chat.connectionState !== 'connected'" type="button" @click="reconnect">重连</button>
+    <el-button v-if="chat.connectionState !== 'connected'" size="small" @click="reconnect">重连</el-button>
   </div>
 </template>
 <style scoped>

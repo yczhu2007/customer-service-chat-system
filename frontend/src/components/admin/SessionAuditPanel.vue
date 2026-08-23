@@ -9,7 +9,7 @@ const error = ref(null)
 const sessions = ref([])
 const total = ref(0)
 const pageNo = ref(1)
-const pageSize = ref(20)
+const pageSize = ref(100)
 const expandedSessionId = ref(null)
 const transferLogs = ref({})
 
@@ -98,7 +98,6 @@ function ratingStars(rating) {
   return '★'.repeat(rating) + '☆'.repeat(5 - rating)
 }
 
-const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 </script>
 
 <template>
@@ -125,46 +124,44 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>会话 ID</th>
-            <th>用户 ID</th>
-            <th>客服 ID</th>
-            <th>状态</th>
-            <th>评分</th>
-            <th>创建时间</th>
-            <th>结束时间</th>
-            <th>转接记录</th>
-          </tr>
-        </thead>
-        <tbody>
-          <template v-for="s in sessions" :key="s.sessionId">
-            <tr>
-              <td class="mono">{{ s.sessionId }}</td>
-              <td class="mono">{{ s.userId }}</td>
-              <td class="mono">{{ s.agentId || '-' }}</td>
-              <td>{{ s.status }}</td>
-              <td :title="s.rating + '/5'">{{ ratingStars(s.rating) }}</td>
-              <td>{{ formatDate(s.createTime) }}</td>
-              <td>{{ formatDate(s.endTime) }}</td>
-              <td><button class="btn" @click="toggleTransferLogs(s.sessionId)">{{ expandedSessionId === s.sessionId ? '收起' : '查看' }}</button></td>
-            </tr>
-            <tr v-if="expandedSessionId === s.sessionId">
-              <td colspan="8"><div v-if="!transferLogs[s.sessionId]?.length" class="empty">暂无转接记录</div><div v-for="log in transferLogs[s.sessionId]" :key="log.id">{{ log.sourceAgentUsername || log.sourceAgentId }} → {{ log.targetAgentUsername || log.targetAgentId }}，{{ formatDate(log.createTime) }}</div></td>
-            </tr>
+      <el-table v-loading="loading" class="data-table" :data="sessions" row-key="sessionId">
+        <el-table-column prop="sessionId" label="会话 ID" min-width="170">
+          <template #default="{ row }"><span class="mono">{{ row.sessionId }}</span></template>
+        </el-table-column>
+        <el-table-column prop="userId" label="用户 ID" min-width="120">
+          <template #default="{ row }"><span class="mono">{{ row.userId }}</span></template>
+        </el-table-column>
+        <el-table-column prop="agentId" label="客服 ID" min-width="120">
+          <template #default="{ row }"><span class="mono">{{ row.agentId || '-' }}</span></template>
+        </el-table-column>
+        <el-table-column label="状态" width="100">
+          <template #default="{ row }"><span class="status-cell">{{ row.status }}</span></template>
+        </el-table-column>
+        <el-table-column label="评分" width="110">
+          <template #default="{ row }"><span class="rating-cell" :title="row.rating + '/5'">{{ ratingStars(row.rating) }}</span></template>
+        </el-table-column>
+        <el-table-column label="创建时间" min-width="145">
+          <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
+        </el-table-column>
+        <el-table-column label="结束时间" min-width="145">
+          <template #default="{ row }">{{ formatDate(row.endTime) }}</template>
+        </el-table-column>
+        <el-table-column label="转接记录" min-width="170">
+          <template #default="{ row }">
+            <el-button class="btn" size="small" @click="toggleTransferLogs(row.sessionId)">
+              {{ expandedSessionId === row.sessionId ? '收起' : '查看' }}
+            </el-button>
+            <div v-if="expandedSessionId === row.sessionId" class="transfer-details">
+              <div v-if="!transferLogs[row.sessionId]?.length" class="empty">暂无转接记录</div>
+              <div v-for="log in transferLogs[row.sessionId]" :key="log.id">
+                {{ log.sourceAgentUsername || log.sourceAgentId }} → {{ log.targetAgentUsername || log.targetAgentId }}，{{ formatDate(log.createTime) }}
+              </div>
+            </div>
           </template>
-          <tr v-if="sessions.length === 0">
-            <td colspan="8" class="empty">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
+        </el-table-column>
+        <template #empty><div class="empty">暂无数据</div></template>
+      </el-table>
 
-      <div class="pagination">
-        <button :disabled="pageNo <= 1" @click="pageNo--; loadSessions()">上一页</button>
-        <span>{{ pageNo }} / {{ totalPages() }} (共 {{ total }} 条)</span>
-        <button :disabled="pageNo >= totalPages()" @click="pageNo++; loadSessions()">下一页</button>
-      </div>
     </template>
   </section>
 </template>
@@ -218,13 +215,10 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   color: #888;
   padding: 2rem 0;
 }
-.pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 1rem;
-}
+.status-cell { display: inline-block; white-space: nowrap; overflow: visible; text-overflow: clip; }
+.rating-cell { display: inline-block; white-space: nowrap; overflow: visible; text-overflow: clip; }
+.data-table :deep(td:nth-child(5) .cell) { overflow: visible; white-space: nowrap; text-overflow: clip; }
+.data-table :deep(td:nth-child(4) .cell) { overflow: visible; white-space: nowrap; text-overflow: clip; }
 .btn {
   padding: 0.4rem 0.75rem;
   border: 1px solid #d1d5db;
@@ -250,4 +244,11 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 .error {
   color: #dc2626;
 }
+.data-table { width: 100%; }
+.data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
+.data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; vertical-align: top; }
+.data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
+.status-cell { display: inline-block; white-space: nowrap; }
+.data-table :deep(.el-table__body-wrapper td.el-table__cell:nth-child(4)) { white-space: nowrap; }
+.transfer-details { margin-top: 0.5rem; color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
 </style>

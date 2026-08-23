@@ -94,10 +94,10 @@ async function save() {
     <template v-else>
       <div class="field">
         <label class="field-label">标题</label>
-        <input
+        <el-input
           v-model="title"
-          type="text"
           maxlength="100"
+          show-word-limit
           :disabled="!isAssignedAgent"
           class="field-input"
           placeholder="会话标题"
@@ -106,41 +106,41 @@ async function save() {
 
       <div class="field">
         <label class="field-label">优先级</label>
-        <select v-model="priority" :disabled="!isAssignedAgent" class="field-select">
-          <option v-for="p in PRIORITIES" :key="p" :value="p">{{ p }}</option>
-        </select>
+        <el-select v-model="priority" :disabled="!isAssignedAgent" class="field-select">
+          <el-option v-for="p in PRIORITIES" :key="p" :label="p" :value="p" />
+        </el-select>
       </div>
 
       <div class="field">
         <label class="field-label">分类</label>
-        <select v-model="category" :disabled="!isAssignedAgent" class="field-select">
-          <option value="">未分类</option>
-          <option v-for="c in CATEGORIES" :key="c" :value="c">{{ categoryLabel(c) }}</option>
-        </select>
+        <el-select v-model="category" :disabled="!isAssignedAgent" class="field-select">
+          <el-option label="未分类" value="" />
+          <el-option v-for="c in CATEGORIES" :key="c" :label="categoryLabel(c)" :value="c" />
+        </el-select>
       </div>
 
       <div class="field">
         <label class="field-label">标签 <span class="hint">（逗号分隔，最多10个）</span></label>
-        <input
+        <el-input
           v-model="tagsInput"
-          type="text"
           :disabled="!isAssignedAgent"
           class="field-input"
           placeholder="tag1, tag2, tag3"
         />
       </div>
 
-      <div v-if="errorMsg" class="msg error">{{ errorMsg }}</div>
-      <div v-if="successMsg" class="msg success">{{ successMsg }}</div>
+      <el-alert v-if="errorMsg" :title="errorMsg" type="error" :closable="false" class="msg" />
+      <el-alert v-if="successMsg" :title="successMsg" type="success" :closable="false" class="msg" />
 
-      <button
+      <el-button
         v-if="isAssignedAgent"
-        :disabled="saving"
+        type="primary"
+        :loading="saving"
         class="save-btn"
         @click="save"
       >
         {{ saving ? '保存中…' : '保存' }}
-      </button>
+      </el-button>
       <p v-else class="not-allowed">仅分配的客服可编辑元数据</p>
     </template>
   </div>
@@ -179,21 +179,14 @@ async function save() {
 .field-select {
   width: 100%;
   font-size: 0.825rem;
-  padding: 0.35rem 0.5rem;
-  border: 1px solid #d1d5db;
+}
+.field-input :deep(.el-input__wrapper),
+.field-select :deep(.el-select__wrapper) {
+  min-height: 34px;
+  padding: 1px 8px;
   border-radius: 0.375rem;
-  outline: none;
-  box-sizing: border-box;
 }
-.field-input:focus,
-.field-select:focus {
-  border-color: #3b82f6;
-}
-.field-input:disabled,
-.field-select:disabled {
-  background: #f9fafb;
-  color: #9ca3af;
-}
+
 .msg {
   font-size: 0.75rem;
   margin: 0.375rem 0;

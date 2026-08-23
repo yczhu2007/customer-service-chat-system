@@ -87,70 +87,63 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>消息 ID</th>
-            <th>失败时间</th>
-            <th>载荷可用</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="dl in deadLetters" :key="dl.messageId">
-            <td class="mono">{{ dl.messageId }}</td>
-            <td>{{ formatDate(dl.failedAt) }}</td>
-            <td>
-              <span :class="dl.payloadAvailable ? 'badge yes' : 'badge no'">
-                {{ dl.payloadAvailable ? '是' : '否' }}
-              </span>
-            </td>
-            <td>
-              <button
-                class="btn btn-sm btn-primary"
-                :disabled="!dl.payloadAvailable"
-                @click="confirmReplay(dl.messageId)"
-              >
-                重放
-              </button>
-            </td>
-          </tr>
-          <tr v-if="deadLetters.length === 0">
-            <td colspan="4" class="empty">暂无死信消息</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table v-loading="loading" class="data-table" :data="deadLetters" row-key="messageId">
+        <el-table-column prop="messageId" label="消息 ID" min-width="260">
+          <template #default="{ row }"><span class="mono">{{ row.messageId }}</span></template>
+        </el-table-column>
+        <el-table-column label="失败时间" min-width="180">
+          <template #default="{ row }">{{ formatDate(row.failedAt) }}</template>
+        </el-table-column>
+        <el-table-column label="载荷可用" width="110">
+          <template #default="{ row }">
+            <span :class="row.payloadAvailable ? 'badge yes' : 'badge no'">
+              {{ row.payloadAvailable ? '是' : '否' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button
+              class="btn btn-sm btn-primary"
+              size="small"
+              :disabled="!row.payloadAvailable"
+              @click="confirmReplay(row.messageId)"
+            >
+              重放
+            </el-button>
+          </template>
+        </el-table-column>
+        <template #empty><div class="empty">暂无死信消息</div></template>
+      </el-table>
 
-      <div class="pagination">
-        <button :disabled="pageNo <= 1" @click="prevPage">上一页</button>
+      <el-pagination
+        class="pagination"
+        layout="prev, slot, next"
+        :current-page="pageNo"
+        :page-size="pageSize"
+        :total="total"
+        :disabled="loading"
+        @current-change="pageNo = $event; loadDeadLetters()"
+      >
         <span>{{ pageNo }} / {{ totalPages() }} (共 {{ total }} 条)</span>
-        <button :disabled="pageNo >= totalPages()" @click="nextPage">下一页</button>
-      </div>
+      </el-pagination>
     </template>
 
-    <!-- Replay Confirmation Dialog -->
-    <div v-if="showReplayConfirm" class="dialog-overlay" @click.self="showReplayConfirm = false">
-      <div class="dialog">
-        <h3>确认重放</h3>
-        <p>确定要重放消息 <strong class="mono">{{ replayId }}</strong> 吗？</p>
-        <p class="warn">重放操作将重新处理该消息，请谨慎操作。</p>
-
-        <div v-if="replayResult" :class="replayResult.success ? 'success-msg' : 'error-msg'">
-          {{ replayResult.message }}
-        </div>
-
-        <div class="dialog-actions">
-          <button class="btn" @click="showReplayConfirm = false">取消</button>
-          <button
-            class="btn btn-primary"
-            :disabled="replayLoading"
-            @click="executeReplay"
-          >
-            {{ replayLoading ? '重放中...' : '确认重放' }}
-          </button>
-        </div>
+    <el-dialog v-model="showReplayConfirm" class="dialog" title="确认重放" width="460px">
+      <p>确定要重放消息 <strong class="mono">{{ replayId }}</strong> 吗？</p>
+      <p class="warn">重放操作将重新处理该消息，请谨慎操作。</p>
+      <div v-if="replayResult" :class="replayResult.success ? 'success-msg' : 'error-msg'">
+        {{ replayResult.message }}
       </div>
-    </div>
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button class="btn" @click="showReplayConfirm = false">取消</el-button>
+          <el-button class="btn btn-primary" :loading="replayLoading" @click="executeReplay">
+            {{ replayLoading ? '重放中...' : '确认重放' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -292,4 +285,16 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   gap: 0.5rem;
   margin-top: 1rem;
 }
+.data-table { width: 100%; }
+.data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
+.data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; }
+.data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
+.data-table :deep(.el-table__empty-text) { color: #888; }
+.pagination :deep(.btn-prev), .pagination :deep(.btn-next), .pagination :deep(.el-pager li) { font-size: 0.9rem; }
+.dialog :deep(.el-dialog) { border: 1px solid var(--color-line); border-radius: 8px; }
+.dialog :deep(.el-dialog__header) { margin: 0; padding: 1.5rem 1.5rem 1rem; }
+.dialog :deep(.el-dialog__title) { font-size: 1.1rem; font-weight: 600; }
+.dialog :deep(.el-dialog__body) { padding: 0 1.5rem 1rem; }
+.dialog :deep(.el-dialog__footer) { padding: 0 1.5rem 1.5rem; }
+.dialog-actions :deep(.el-button) { min-height: 32px; }
 </style>

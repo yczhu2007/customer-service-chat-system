@@ -82,10 +82,10 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="agent-workspace">
+  <el-container class="agent-workspace">
     <AgentOverviewPanel />
     <!-- Top bar -->
-    <header class="workspace-header">
+    <el-header class="workspace-header">
       <h1 class="workspace-title">客服工作台</h1>
       <div class="header-right">
         <span class="agent-id">{{ auth.userId }}</span>
@@ -97,11 +97,11 @@ onUnmounted(() => {
         <ConnectionStatus />
       </div>
       <p v-if="presenceError" class="presence-error">{{ presenceError }}</p>
-    </header>
+    </el-header>
 
-    <div class="workspace-body">
+    <el-container class="workspace-body">
       <!-- Left sidebar: view nav + session list -->
-      <aside class="left-sidebar">
+      <el-aside class="left-sidebar">
         <AgentViewNav />
         <div class="sidebar-divider" />
         <div class="session-list-header">
@@ -109,27 +109,27 @@ onUnmounted(() => {
           <button class="refresh-btn" @click="chat.loadAgentViewSessions(chat.activeAgentView)">刷新</button>
         </div>
         <AgentSessionList />
-      </aside>
+      </el-aside>
 
       <!-- Center: chat window -->
-      <main class="chat-area">
+      <el-main class="chat-area">
         <AgentChatWindow
           :quick-reply-content="pendingQuickReply"
           @quick-reply-inserted="pendingQuickReply = ''"
         />
-      </main>
+      </el-main>
 
       <!-- Right sidebar: metadata + user profile -->
-      <aside class="right-sidebar">
+      <el-aside class="right-sidebar">
         <UserProfileSidebar />
         <div class="sidebar-divider" />
         <SessionMetadataEditor />
         <TransferLogPanel :session-id="chat.activeSessionId" />
-      </aside>
-    </div>
+      </el-aside>
+    </el-container>
 
     <!-- Bottom panel: quick replies + archive actions -->
-    <footer class="workspace-footer">
+    <el-footer class="workspace-footer">
       <div class="footer-section quick-reply-section">
         <QuickReplyPanel @insert="onQuickReplyInsert" />
       </div>
@@ -137,8 +137,8 @@ onUnmounted(() => {
       <div class="footer-section archive-section">
         <SessionArchiveActions />
       </div>
-    </footer>
-  </div>
+    </el-footer>
+  </el-container>
 </template>
 
 <style scoped>
@@ -147,6 +147,9 @@ onUnmounted(() => {
 
 <style scoped>
 .agent-workspace {
+  --el-header-padding: 0;
+  --el-footer-padding: 0;
+  --el-main-padding: 0;
   display: flex;
   flex-direction: column;
   height: calc(100vh - 54px);
@@ -158,6 +161,8 @@ onUnmounted(() => {
 
 /* ─── Header ─── */
 .workspace-header {
+  height: auto;
+  line-height: normal;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -292,6 +297,8 @@ onUnmounted(() => {
 
 /* ─── Footer ─── */
 .workspace-footer {
+  height: auto;
+  line-height: normal;
   display: flex;
   background: var(--color-paper);
   border-top: 1px solid var(--color-line);

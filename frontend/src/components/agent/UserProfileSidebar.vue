@@ -22,10 +22,10 @@ function formatTime(ts) {
 
 /** VIP level badge */
 function vipBadge(level) {
-  if (level >= 5) return { text: `VIP ${level}`, class: 'vip-diamond' }
-  if (level >= 3) return { text: `VIP ${level}`, class: 'vip-gold' }
-  if (level >= 1) return { text: `VIP ${level}`, class: 'vip-silver' }
-  return { text: '普通用户', class: 'vip-none' }
+  if (level >= 5) return { text: `VIP ${level}`, color: '#7c3aed', background: '#ede9fe' }
+  if (level >= 3) return { text: `VIP ${level}`, color: '#d97706', background: '#fef3c7' }
+  if (level >= 1) return { text: `VIP ${level}`, color: '#0284c7', background: '#e0f2fe' }
+  return { text: '普通用户', color: '#6b7280', background: '#f3f4f6' }
 }
 </script>
 
@@ -40,9 +40,14 @@ function vipBadge(level) {
         <div class="avatar">{{ (profile.username || '?')[0] }}</div>
         <div class="name-row">
           <span class="username">{{ profile.username || '-' }}</span>
-          <span class="vip-badge" :class="vipBadge(profile.vipLevel).class">
+          <el-tag
+            size="small"
+            effect="light"
+            class="vip-badge"
+            :style="{ color: vipBadge(profile.vipLevel).color, backgroundColor: vipBadge(profile.vipLevel).background, borderColor: vipBadge(profile.vipLevel).background }"
+          >
             {{ vipBadge(profile.vipLevel).text }}
-          </span>
+          </el-tag>
         </div>
       </div>
 
@@ -110,27 +115,9 @@ function vipBadge(level) {
   color: #111827;
 }
 .vip-badge {
-  font-size: 0.65rem;
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  display: inline-block;
+  --el-tag-font-size: 0.65rem;
+  height: 20px;
   width: fit-content;
-}
-.vip-none {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-.vip-silver {
-  background: #e0f2fe;
-  color: #0284c7;
-}
-.vip-gold {
-  background: #fef3c7;
-  color: #d97706;
-}
-.vip-diamond {
-  background: #ede9fe;
-  color: #7c3aed;
 }
 .info-grid {
   display: flex;

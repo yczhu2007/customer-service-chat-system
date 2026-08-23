@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   listQuickReplies,
   createQuickReply,
@@ -78,12 +79,17 @@ async function saveForm() {
 }
 
 async function removeReply(id) {
-  if (!confirm('确定删除此快捷回复？')) return
   try {
+    await ElMessageBox.confirm('确定删除此快捷回复？', '删除快捷回复', {
+      type: 'warning',
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+    })
     await deleteQuickReply(id)
     await loadReplies()
+    ElMessage.success('快捷回复已删除')
   } catch (e) {
-    errorMsg.value = e.message
+    if (e !== 'cancel' && e !== 'close') errorMsg.value = e.message
   }
 }
 

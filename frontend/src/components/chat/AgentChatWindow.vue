@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
@@ -61,8 +62,16 @@ async function doTransfer() {
 
 // End session
 async function endSession() {
-  if (!confirm('确定结束此会话？')) return
-  chat.endSession(chat.activeSessionId)
+  try {
+    await ElMessageBox.confirm('确定结束此会话？', '结束会话', {
+      type: 'warning',
+      confirmButtonText: '确定结束',
+      cancelButtonText: '取消',
+    })
+    chat.endSession(chat.activeSessionId)
+  } catch {
+    // 用户取消确认时不执行结束操作。
+  }
 }
 
 // Quick reply insertion

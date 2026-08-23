@@ -42,18 +42,24 @@ class StompAuthChannelInterceptorTest {
     @Test
     void rejectsUnauthenticatedNonConnectFrame() {
         assertThrows(MessageDeliveryException.class,
-                () -> interceptor.preSend(frame(StompCommand.DISCONNECT, null, null), null));
+                () -> interceptor.preSend(frame(StompCommand.SEND, "/app/chat.send", null), null));
     }
 
     @Test
     void rejectsRevokedTokenForEveryStompCommand() {
         when(tokenService.resolveUserId("revoked-token")).thenReturn(null);
         for (StompCommand command : Set.of(StompCommand.CONNECT, StompCommand.SEND,
-                StompCommand.SUBSCRIBE, StompCommand.ACK, StompCommand.DISCONNECT)) {
+                StompCommand.SUBSCRIBE, StompCommand.ACK)) {
             assertThrows(MessageDeliveryException.class,
                     () -> interceptor.preSend(frame(command, destinationFor(command), rawPrincipal(),
                             "revoked-token"), null), command.name());
         }
+    }
+
+    @Test
+    void allowsDisconnectAfterTokenExpires() {
+        assertDoesNotThrow(
+                () -> interceptor.preSend(frame(StompCommand.DISCONNECT, null, rawPrincipal(), null), null));
     }
 
     @Test

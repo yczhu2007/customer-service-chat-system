@@ -26,8 +26,8 @@ function switchTab(key) {
 </script>
 
 <template>
-  <div class="admin-workspace">
-    <nav class="tab-bar">
+  <el-container class="admin-workspace">
+    <el-header class="tab-bar">
       <button
         v-for="tab in tabs"
         :key="tab.key"
@@ -36,9 +36,9 @@ function switchTab(key) {
       >
         {{ tab.label }}
       </button>
-    </nav>
+    </el-header>
 
-    <main class="tab-content">
+    <el-main class="tab-content">
       <AdminDashboard v-if="activeTab === 'dashboard'" />
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
@@ -46,18 +46,22 @@ function switchTab(key) {
       <ArchiveStatsPanel v-if="activeTab === 'archive'" />
       <DeadLetterPanel v-if="activeTab === 'deadletters'" />
       <VipSkillPanel v-if="activeTab === 'vip'" />
-    </main>
-  </div>
+    </el-main>
+  </el-container>
 </template>
 
 <style scoped>
 .admin-workspace {
+  --el-header-padding: 0;
+  --el-main-padding: 0;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 54px);
   background: var(--color-bg);
 }
 .tab-bar {
+  height: auto;
+  line-height: normal;
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--color-line);

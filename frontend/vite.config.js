@@ -3,10 +3,13 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig } from "vite";
 import vue from "@vitejs/plugin-vue";
 
-export default defineConfig({
+const backendTarget = process.env.VITE_BACKEND_URL || 'http://localhost:8080'
+const backendWebSocketTarget = process.env.VITE_BACKEND_WS_URL || backendTarget.replace(/^http/, 'ws')
+
+export default defineConfig(({ command }) => ({
   plugins: [vue()],
-  // Spring Boot serves the app below /frontend; Vercel serves it at the domain root.
-  base: process.env.VERCEL === '1' || process.env.VERCEL_ENV ? '/' : '/frontend/',
+  // Spring Boot serves production assets below /frontend; Vite serves development at the root.
+  base: command === 'serve' || process.env.VERCEL === '1' || process.env.VERCEL_ENV ? '/' : '/frontend/',
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url))
@@ -21,32 +24,32 @@ export default defineConfig({
     port: 5173,
     proxy: {
       "/chat": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true,
         ws: true
       },
       "/auth": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true
       },
       "/account": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true
       },
       "/users": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true
       },
       "/roles": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true
       },
       "/permissions": {
-        target: "http://localhost:8080",
+        target: backendTarget,
         changeOrigin: true
       },
       "/ws/chat": {
-        target: "ws://localhost:8080",
+        target: backendWebSocketTarget,
         changeOrigin: true,
         ws: true
       }
@@ -55,6 +58,7 @@ export default defineConfig({
   test: {
     environment: "jsdom",
     globals: true,
-    clearMocks: true
+    clearMocks: true,
+    setupFiles: './src/__tests__/setup.js'
   }
-});
+}));

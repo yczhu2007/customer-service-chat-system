@@ -9,14 +9,12 @@ const props = defineProps({
 const chat = useChatStore()
 const rating = ref(0)
 const comment = ref('')
-const hoverStar = ref(0)
 const existingRating = ref(null)
 const loading = ref(false)
 const submitting = ref(false)
 const error = ref(null)
 const submitted = ref(false)
 
-/** Load existing rating if any */
 async function loadRating() {
   loading.value = true
   error.value = null
@@ -32,14 +30,12 @@ async function loadRating() {
       comment.value = ''
     }
   } catch {
-    // No rating yet — that's fine
     existingRating.value = null
   } finally {
     loading.value = false
   }
 }
 
-/** Submit rating */
 async function submit() {
   if (rating.value < 1 || rating.value > 5) {
     error.value = '请选择评分'
@@ -60,17 +56,6 @@ async function submit() {
     submitting.value = false
   }
 }
-
-/** Star display for already-rated state */
-function starClass(index) {
-  const val = existingRating.value ? existingRating.value.rating : rating.value
-  const hover = hoverStar.value
-  if (hover > 0) return index <= hover ? 'star filled' : 'star empty'
-  return index <= val ? 'star filled' : 'star empty'
-}
-
-/** Is the form in read-only (already rated) mode? */
-const isReadonly = ref(false)
 
 watch(
   () => props.sessionId,
@@ -98,7 +83,7 @@ onMounted(() => {
     <!-- Already rated (read-only) -->
     <div v-else-if="existingRating && !submitted" class="rated-display">
       <div class="stars-display">
-        <span v-for="i in 5" :key="i" :class="i <= existingRating.rating ? 'star filled' : 'star empty'">★</span>
+        <el-rate :model-value="existingRating.rating" disabled text-color="#f59e0b" disabled-void-color="#d1d5db" />
       </div>
       <p v-if="existingRating.comment" class="rated-comment">{{ existingRating.comment }}</p>
       <p class="rated-time">评价时间: {{ existingRating.createTime }}</p>
@@ -112,32 +97,28 @@ onMounted(() => {
     <!-- Rating input form -->
     <div v-else class="rating-input">
       <div class="stars-input">
-        <span
-          v-for="i in 5"
-          :key="i"
-          :class="starClass(i)"
-          class="star clickable"
-          @click="rating = i"
-          @mouseenter="hoverStar = i"
-          @mouseleave="hoverStar = 0"
-        >★</span>
+        <el-rate v-model="rating" :disabled="submitting" text-color="#f59e0b" void-color="#d1d5db" />
       </div>
-      <textarea
+      <el-input
         v-model="comment"
-        placeholder="输入评价内容（可选）"
-        rows="3"
-        class="comment-input"
+        type="textarea"
+        :rows="3"
         maxlength="500"
+        show-word-limit
+        placeholder="输入评价内容（可选）"
+        class="comment-input"
       />
       <div class="form-footer">
-        <span v-if="error" class="error-msg">{{ error }}</span>
-        <button
+        <el-alert v-if="error" :title="error" type="error" :closable="false" class="error-msg" />
+        <el-button
+          type="primary"
+          :loading="submitting"
+          :disabled="rating < 1"
           class="submit-btn"
-          :disabled="submitting || rating < 1"
           @click="submit"
         >
           {{ submitting ? '提交中…' : '提交评价' }}
-        </button>
+        </el-button>
       </div>
     </div>
   </div>
@@ -157,37 +138,15 @@ onMounted(() => {
 }
 .stars-display,
 .stars-input {
-  display: flex;
-  gap: 0.25rem;
   margin-bottom: 0.5rem;
 }
-.star {
-  font-size: 1.5rem;
-}
-.star.filled {
-  color: #f59e0b;
-}
-.star.empty {
-  color: #d1d5db;
-}
-.star.clickable {
-  cursor: pointer;
-  transition: color 0.15s;
+.stars-display :deep(.el-rate),
+.stars-input :deep(.el-rate) {
+  height: 28px;
 }
 .comment-input {
   width: 100%;
-  resize: none;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
-  padding: 0.5rem;
-  font-size: 0.85rem;
-  font-family: inherit;
   margin-bottom: 0.5rem;
-  box-sizing: border-box;
-}
-.comment-input:focus {
-  border-color: #3b82f6;
-  outline: none;
 }
 .form-footer {
   display: flex;

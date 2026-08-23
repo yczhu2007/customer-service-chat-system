@@ -57,9 +57,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="user-workspace">
-    <!-- Left panel: queue status + session list -->
-    <aside class="left-panel">
+  <el-container class="user-workspace">
+    <el-aside class="left-panel">
       <!-- Queue status panel -->
       <div class="queue-panel">
         <h3>排队状态</h3>
@@ -93,10 +92,9 @@ onUnmounted(() => {
 
       <!-- Session list -->
       <UserSessionList class="session-list-container" />
-    </aside>
+    </el-aside>
 
-    <!-- Center: chat window -->
-    <main class="center-panel">
+    <el-main class="center-panel">
       <ChatWindow />
 
       <!-- Rating form (shown at bottom when session is closed) -->
@@ -104,12 +102,13 @@ onUnmounted(() => {
         v-if="showRating"
         :session-id="activeSession.sessionId"
       />
-    </main>
-  </div>
+    </el-main>
+  </el-container>
 </template>
 
 <style scoped>
 .user-workspace {
+  --el-main-padding: 0;
   display: flex;
   height: calc(100vh - 54px);
   min-height: 0;

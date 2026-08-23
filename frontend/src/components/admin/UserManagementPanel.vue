@@ -152,111 +152,96 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>用户名</th>
-            <th>昵称</th>
-            <th>状态</th>
-            <th>VIP 等级</th>
-            <th>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="user in users" :key="user.id">
-            <td>{{ user.username }}</td>
-            <td>{{ user.nickname || '-' }}</td>
-            <td>
-              <span :class="['status-badge', user.status === 'ENABLED' ? 'enabled' : 'disabled']">
-                {{ user.status === 'ENABLED' ? '启用' : '禁用' }}
-              </span>
-            </td>
-            <td>{{ user.vipLevel ?? 0 }}</td>
-            <td class="actions">
-              <button class="btn btn-sm" @click="openEdit(user)">编辑</button>
-              <button class="btn btn-sm" @click="openPasswordDialog(user.id)">密码</button>
-              <button class="btn btn-sm btn-danger" @click="confirmDelete(user.id)">删除</button>
-            </td>
-          </tr>
-          <tr v-if="users.length === 0">
-            <td colspan="5" class="empty">暂无数据</td>
-          </tr>
-        </tbody>
-      </table>
+      <el-table v-loading="loading" class="data-table" :data="users" row-key="id">
+        <el-table-column prop="username" label="用户名" />
+        <el-table-column label="昵称">
+          <template #default="{ row }">{{ row.nickname || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="状态">
+          <template #default="{ row }">
+            <span :class="['status-badge', row.status === 'ENABLED' ? 'enabled' : 'disabled']">
+              {{ row.status === 'ENABLED' ? '启用' : '禁用' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column prop="vipLevel" label="VIP 等级">
+          <template #default="{ row }">{{ row.vipLevel ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="190">
+          <template #default="{ row }">
+            <div class="actions">
+              <el-button class="btn btn-sm" size="small" @click="openEdit(row)">编辑</el-button>
+              <el-button class="btn btn-sm" size="small" @click="openPasswordDialog(row.id)">密码</el-button>
+              <el-button class="btn btn-sm btn-danger" size="small" @click="confirmDelete(row.id)">删除</el-button>
+            </div>
+          </template>
+        </el-table-column>
+        <template #empty><div class="empty">暂无数据</div></template>
+      </el-table>
 
-      <div class="pagination">
-        <button :disabled="pageNo <= 1" @click="pageNo--">上一页</button>
+      <el-pagination
+        class="pagination"
+        layout="prev, slot, next"
+        :current-page="pageNo"
+        :page-size="pageSize"
+        :total="total"
+        :disabled="loading"
+        @current-change="pageNo = $event"
+      >
         <span>{{ pageNo }} / {{ totalPages() }}</span>
-        <button :disabled="pageNo >= totalPages()" @click="pageNo++">下一页</button>
-      </div>
+      </el-pagination>
     </template>
 
-    <!-- Create/Edit Dialog -->
-    <div v-if="showDialog" class="dialog-overlay" @click.self="showDialog = false">
-      <div class="dialog">
-        <h3>{{ dialogMode === 'create' ? '新增用户' : '编辑用户' }}</h3>
-        <div v-if="formError" class="error">{{ formError }}</div>
-        <form @submit.prevent="submitForm">
-          <label v-if="dialogMode === 'create'">
-            用户名
-            <input v-model="formData.username" required maxlength="64" />
-          </label>
-          <label>
-            昵称
-            <input v-model="formData.nickname" maxlength="64" />
-          </label>
-          <label>
-            状态
-            <select v-model="formData.status">
-              <option value="ENABLED">启用</option>
-              <option value="DISABLED">禁用</option>
-            </select>
-          </label>
-          <label>
-            VIP 等级
-            <input v-model.number="formData.vipLevel" type="number" min="0" max="99" />
-          </label>
-          <label v-if="dialogMode === 'create'">
-            密码
-            <input v-model="formData.password" type="password" maxlength="128" />
-          </label>
-          <div class="dialog-actions">
-            <button type="button" class="btn" @click="showDialog = false">取消</button>
-            <button type="submit" class="btn btn-primary">确定</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Password Dialog -->
-    <div v-if="showPasswordDialog" class="dialog-overlay" @click.self="showPasswordDialog = false">
-      <div class="dialog">
-        <h3>修改密码</h3>
-        <div v-if="passwordError" class="error">{{ passwordError }}</div>
-        <form @submit.prevent="submitPassword">
-          <label>
-            新密码
-            <input v-model="passwordForm.newPassword" type="password" required maxlength="128" />
-          </label>
-          <div class="dialog-actions">
-            <button type="button" class="btn" @click="showPasswordDialog = false">取消</button>
-            <button type="submit" class="btn btn-primary">确定</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Delete Confirmation -->
-    <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="showDeleteConfirm = false">
-      <div class="dialog">
-        <h3>确认删除</h3>
-        <p>确定要删除该用户吗？此操作不可撤销。</p>
+    <el-dialog v-model="showDialog" class="dialog" :title="dialogMode === 'create' ? '新增用户' : '编辑用户'" width="420px">
+      <div v-if="formError" class="error">{{ formError }}</div>
+      <el-form label-position="top" @submit.prevent="submitForm">
+        <el-form-item v-if="dialogMode === 'create'" label="用户名">
+          <el-input v-model="formData.username" required maxlength="64" />
+        </el-form-item>
+        <el-form-item label="昵称">
+          <el-input v-model="formData.nickname" maxlength="64" />
+        </el-form-item>
+        <el-form-item label="状态">
+          <el-select v-model="formData.status">
+            <el-option label="启用" value="ENABLED" />
+            <el-option label="禁用" value="DISABLED" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="VIP 等级">
+          <el-input-number v-model="formData.vipLevel" :min="0" :max="99" />
+        </el-form-item>
+        <el-form-item v-if="dialogMode === 'create'" label="密码">
+          <el-input v-model="formData.password" type="password" show-password maxlength="128" />
+        </el-form-item>
         <div class="dialog-actions">
-          <button class="btn" @click="showDeleteConfirm = false">取消</button>
-          <button class="btn btn-danger" @click="executeDelete">删除</button>
+          <el-button class="btn" @click="showDialog = false">取消</el-button>
+          <el-button class="btn btn-primary" native-type="submit">确定</el-button>
         </div>
-      </div>
-    </div>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="showPasswordDialog" class="dialog" title="修改密码" width="420px">
+      <div v-if="passwordError" class="error">{{ passwordError }}</div>
+      <el-form label-position="top" @submit.prevent="submitPassword">
+        <el-form-item label="新密码">
+          <el-input v-model="passwordForm.newPassword" type="password" show-password required maxlength="128" />
+        </el-form-item>
+        <div class="dialog-actions">
+          <el-button class="btn" @click="showPasswordDialog = false">取消</el-button>
+          <el-button class="btn btn-primary" native-type="submit">确定</el-button>
+        </div>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="showDeleteConfirm" class="dialog" title="确认删除" width="420px">
+      <p>确定要删除该用户吗？此操作不可撤销。</p>
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button class="btn" @click="showDeleteConfirm = false">取消</el-button>
+          <el-button class="btn btn-danger" @click="executeDelete">删除</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -388,4 +373,20 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   gap: 0.5rem;
   margin-top: 1rem;
 }
+.data-table { width: 100%; }
+.data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
+.data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; }
+.data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
+.data-table :deep(.el-table__empty-text) { color: #888; }
+.pagination :deep(.el-pagination__total), .pagination :deep(.btn-prev), .pagination :deep(.btn-next), .pagination :deep(.el-pager li) { font-size: 0.9rem; }
+.pagination :deep(.el-pagination__total) { margin: 0; }
+.dialog :deep(.el-dialog) { border: 1px solid var(--color-line); border-radius: 8px; }
+.dialog :deep(.el-dialog__header) { margin: 0; padding: 1.5rem 1.5rem 1rem; }
+.dialog :deep(.el-dialog__title) { font-size: 1.1rem; font-weight: 600; }
+.dialog :deep(.el-dialog__body) { padding: 0 1.5rem 1rem; }
+.dialog :deep(.el-dialog__footer) { padding: 0 1.5rem 1.5rem; }
+.dialog :deep(.el-form-item) { margin-bottom: 0.75rem; }
+.dialog :deep(.el-form-item__label) { margin-bottom: 0.25rem; }
+.dialog :deep(.el-select), .dialog :deep(.el-input-number) { width: 100%; }
+.dialog-actions :deep(.el-button) { min-height: 32px; }
 </style>

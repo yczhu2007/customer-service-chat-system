@@ -140,9 +140,11 @@ onUnmounted(releaseAllBlobs)
             <span class="recalled-hint">图片已撤回</span>
           </template>
           <template v-else>
-            <img
+            <el-image
               v-if="blobCache[msg.id]"
               :src="blobCache[msg.id].url"
+              :preview-src-list="[blobCache[msg.id].url]"
+              fit="contain"
               alt="图片消息"
               class="msg-image"
             />

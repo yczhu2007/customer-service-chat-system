@@ -169,38 +169,30 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
       <div class="col">
         <h3>角色列表</h3>
         <div v-if="loading" class="loading">加载中...</div>
-        <table v-else class="data-table">
-          <thead>
-            <tr>
-              <th>编码</th>
-              <th>名称</th>
-              <th>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="role in roles"
-              :key="role.id"
-              :class="{ selected: selectedRoleId === role.id }"
-              @click="loadRolePermissions(role.id)"
-            >
-              <td>{{ role.roleCode }}</td>
-              <td>{{ role.roleName }}</td>
-              <td class="actions">
-                <button class="btn btn-sm" @click.stop="openEditRole(role)">编辑</button>
-                <button class="btn btn-sm btn-danger" @click.stop="confirmDeleteRole(role.id)">删除</button>
-              </td>
-            </tr>
-            <tr v-if="roles.length === 0">
-              <td colspan="3" class="empty">暂无数据</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="pagination">
-          <button :disabled="rolePageNo <= 1" @click="rolePageNo--">上一页</button>
+        <el-table v-else class="data-table" :data="roles" row-key="id" highlight-current-row :current-row-key="selectedRoleId" @row-click="(row) => loadRolePermissions(row.id)">
+          <el-table-column prop="roleCode" label="编码" />
+          <el-table-column prop="roleName" label="名称" />
+          <el-table-column label="操作" width="130">
+            <template #default="{ row }">
+              <div class="actions">
+                <el-button class="btn btn-sm" size="small" @click.stop="openEditRole(row)">编辑</el-button>
+                <el-button class="btn btn-sm btn-danger" size="small" @click.stop="confirmDeleteRole(row.id)">删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
+          <template #empty><div class="empty">暂无数据</div></template>
+        </el-table>
+        <el-pagination
+          class="pagination"
+          layout="prev, slot, next"
+          :current-page="rolePageNo"
+          :page-size="rolePageSize"
+          :total="totalRoles"
+          :disabled="loading"
+          @current-change="rolePageNo = $event"
+        >
           <span>{{ rolePageNo }} / {{ roleTotalPages() }}</span>
-          <button :disabled="rolePageNo >= roleTotalPages()" @click="rolePageNo++">下一页</button>
-        </div>
+        </el-pagination>
       </div>
 
       <!-- Permission List / Assignment -->
@@ -211,77 +203,62 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
         </p>
         <p v-else class="hint">请先点击左侧角色以查看/编辑其权限</p>
         <div v-if="permissionsLoading" class="loading">加载中...</div>
-        <table v-else class="data-table">
-          <thead>
-            <tr>
-              <th style="width:40px">✓</th>
-              <th>编码</th>
-              <th>名称</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="perm in permissions" :key="perm.id">
-              <td>
-                <input
-                  type="checkbox"
-                  :checked="selectedRolePerms.has(perm.permissionCode)"
-                  :disabled="!selectedRoleId || permAssignLoading"
-                  @change="togglePermission(perm.id)"
-                />
-              </td>
-              <td>{{ perm.permissionCode }}</td>
-              <td>{{ perm.permissionName }}</td>
-            </tr>
-            <tr v-if="permissions.length === 0">
-              <td colspan="3" class="empty">暂无数据</td>
-            </tr>
-          </tbody>
-        </table>
-        <div class="pagination">
-          <button :disabled="permPageNo <= 1" @click="permPageNo--">上一页</button>
+        <el-table v-else class="data-table" :data="permissions" row-key="id">
+          <el-table-column label="✓" width="52">
+            <template #default="{ row }">
+              <el-checkbox
+                :model-value="selectedRolePerms.has(row.permissionCode)"
+                :disabled="!selectedRoleId || permAssignLoading"
+                @change="togglePermission(row.id)"
+              />
+            </template>
+          </el-table-column>
+          <el-table-column prop="permissionCode" label="编码" />
+          <el-table-column prop="permissionName" label="名称" />
+          <template #empty><div class="empty">暂无数据</div></template>
+        </el-table>
+        <el-pagination
+          class="pagination"
+          layout="prev, slot, next"
+          :current-page="permPageNo"
+          :page-size="permPageSize"
+          :total="totalPermissions"
+          :disabled="permissionsLoading"
+          @current-change="permPageNo = $event"
+        >
           <span>{{ permPageNo }} / {{ permTotalPages() }}</span>
-          <button :disabled="permPageNo >= permTotalPages()" @click="permPageNo++">下一页</button>
-        </div>
+        </el-pagination>
       </div>
     </div>
 
-    <!-- Role Dialog -->
-    <div v-if="showRoleDialog" class="dialog-overlay" @click.self="showRoleDialog = false">
-      <div class="dialog">
-        <h3>{{ roleDialogMode === 'create' ? '新增角色' : '编辑角色' }}</h3>
-        <div v-if="roleFormError" class="error">{{ roleFormError }}</div>
-        <form @submit.prevent="submitRoleForm">
-          <label v-if="roleDialogMode === 'create'">
-            角色编码
-            <input v-model="roleForm.code" required maxlength="64" />
-          </label>
-          <label>
-            角色名称
-            <input v-model="roleForm.name" required maxlength="64" />
-          </label>
-          <label>
-            描述
-            <input v-model="roleForm.description" maxlength="256" />
-          </label>
-          <div class="dialog-actions">
-            <button type="button" class="btn" @click="showRoleDialog = false">取消</button>
-            <button type="submit" class="btn btn-primary">确定</button>
-          </div>
-        </form>
-      </div>
-    </div>
-
-    <!-- Delete Confirmation -->
-    <div v-if="showDeleteConfirm" class="dialog-overlay" @click.self="showDeleteConfirm = false">
-      <div class="dialog">
-        <h3>确认删除</h3>
-        <p>确定要删除该角色吗？此操作不可撤销。</p>
+    <el-dialog v-model="showRoleDialog" class="dialog" :title="roleDialogMode === 'create' ? '新增角色' : '编辑角色'" width="420px">
+      <div v-if="roleFormError" class="error">{{ roleFormError }}</div>
+      <el-form label-position="top" @submit.prevent="submitRoleForm">
+        <el-form-item v-if="roleDialogMode === 'create'" label="角色编码">
+          <el-input v-model="roleForm.code" required maxlength="64" />
+        </el-form-item>
+        <el-form-item label="角色名称">
+          <el-input v-model="roleForm.name" required maxlength="64" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="roleForm.description" maxlength="256" />
+        </el-form-item>
         <div class="dialog-actions">
-          <button class="btn" @click="showDeleteConfirm = false">取消</button>
-          <button class="btn btn-danger" @click="executeDeleteRole">删除</button>
+          <el-button class="btn" @click="showRoleDialog = false">取消</el-button>
+          <el-button class="btn btn-primary" native-type="submit">确定</el-button>
         </div>
-      </div>
-    </div>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="showDeleteConfirm" class="dialog" title="确认删除" width="420px">
+      <p>确定要删除该角色吗？此操作不可撤销。</p>
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button class="btn" @click="showDeleteConfirm = false">取消</el-button>
+          <el-button class="btn btn-danger" @click="executeDeleteRole">删除</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -421,4 +398,18 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
   gap: 0.5rem;
   margin-top: 1rem;
 }
+.data-table { width: 100%; }
+.data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
+.data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; }
+.data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
+.data-table :deep(.el-table__empty-text) { color: #888; }
+.pagination :deep(.btn-prev), .pagination :deep(.btn-next), .pagination :deep(.el-pager li) { font-size: 0.9rem; }
+.dialog :deep(.el-dialog) { border: 1px solid var(--color-line); border-radius: 8px; }
+.dialog :deep(.el-dialog__header) { margin: 0; padding: 1.5rem 1.5rem 1rem; }
+.dialog :deep(.el-dialog__title) { font-size: 1.1rem; font-weight: 600; }
+.dialog :deep(.el-dialog__body) { padding: 0 1.5rem 1rem; }
+.dialog :deep(.el-dialog__footer) { padding: 0 1.5rem 1.5rem; }
+.dialog :deep(.el-form-item) { margin-bottom: 0.75rem; }
+.dialog :deep(.el-form-item__label) { margin-bottom: 0.25rem; }
+.dialog-actions :deep(.el-button) { min-height: 32px; }
 </style>

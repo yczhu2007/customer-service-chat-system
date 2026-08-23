@@ -67,6 +67,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
         }
 
         StompCommand command = accessor.getCommand();
+        if (command == StompCommand.DISCONNECT) {
+            return message;
+        }
+
         WebSocketUserPrincipal principal = requireCurrentPrincipal(accessor.getUser());
         String userId = requireValidToken(accessor, principal);
         requireEnabledUser(userId);
