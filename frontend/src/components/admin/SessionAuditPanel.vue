@@ -29,15 +29,14 @@ const statusOptions = ['', 'ACTIVE', 'CLOSED']
 function normalizeDateTime(value) {
   const normalized = value.trim()
   if (!normalized) return ''
-  if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(normalized)) {
-    throw new Error('时间格式应为 YYYY-MM-DD HH:mm')
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(normalized)) {
+    throw new Error('请选择有效的开始时间和结束时间')
   }
-  const [datePart, timePart] = normalized.split(' ')
-  const parsed = new Date(`${datePart}T${timePart}:00`)
+  const parsed = new Date(`${normalized}:00`)
   if (Number.isNaN(parsed.getTime())) {
-    throw new Error('请输入有效的开始时间和结束时间')
+    throw new Error('请选择有效的开始时间和结束时间')
   }
-  return `${datePart}T${timePart}`
+  return normalized
 }
 
 async function loadSessions() {
@@ -114,9 +113,9 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
         <option value="">全部归档</option><option value="NONE">未归档</option>
         <option v-for="option in ARCHIVE_STATUS_OPTIONS" :key="option.code" :value="option.code">{{ option.label }}</option>
       </select>
-      <label class="date-field rating-field">评分<input v-model="filters.rating" type="number" min="1" max="5" placeholder="1–5" /></label>
-      <label class="date-field">开始时间<input v-model="filters.from" type="text" inputmode="numeric" maxlength="16" placeholder="YYYY-MM-DD HH:mm" /></label>
-      <label class="date-field">结束时间<input v-model="filters.to" type="text" inputmode="numeric" maxlength="16" placeholder="YYYY-MM-DD HH:mm" /></label>
+      <input v-model="filters.rating" class="rating-field" type="number" min="1" max="5" placeholder="评分 1–5" aria-label="评分" />
+      <input v-model="filters.from" class="date-field" type="datetime-local" aria-label="开始时间" title="开始时间" />
+      <input v-model="filters.to" class="date-field" type="datetime-local" aria-label="结束时间" title="结束时间" />
       <button class="btn btn-primary" @click="applyFilters">查询</button>
       <button class="btn" @click="clearFilters">清空</button>
     </div>
@@ -174,10 +173,17 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 }
 .filters {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
   align-items: center;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+}
+.filters input,
+.filters select,
+.filters button {
+  flex: 0 0 auto;
 }
 .filters input,
 .filters select {
@@ -186,16 +192,8 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   border-radius: 4px;
   font-size: 0.9rem;
 }
-.date-field {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-  color: #6a7280;
-  font-size: 0.72rem;
-  font-weight: 600;
-}
-.date-field input { min-width: 190px; }
-.rating-field input { min-width: 90px; }
+.date-field { min-width: 200px; }
+.rating-field { width: 92px; }
 .data-table {
   width: 100%;
   border-collapse: collapse;
