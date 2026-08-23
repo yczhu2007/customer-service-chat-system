@@ -182,14 +182,12 @@ describe('SessionAuditPanel', () => {
     await nextTick()
     request.mockClear()
 
-    const dateInputs = wrapper.findAll('.date-field input')
-    expect(dateInputs[1].attributes('type')).toBe('text')
-    expect(dateInputs[1].attributes('placeholder')).toBe('YYYY-MM-DD HH:mm')
-    expect(dateInputs[2].attributes('type')).toBe('text')
-    expect(dateInputs[2].attributes('placeholder')).toBe('YYYY-MM-DD HH:mm')
+    const dateInputs = wrapper.findAll('.date-field')
+    expect(dateInputs[0].attributes('type')).toBe('datetime-local')
+    expect(dateInputs[1].attributes('type')).toBe('datetime-local')
 
-    await dateInputs[1].setValue('2026-08-22 09:30')
-    await dateInputs[2].setValue('2026-08-22 18:45')
+    await dateInputs[0].setValue('2026-08-22T09:30')
+    await dateInputs[1].setValue('2026-08-22T18:45')
     await wrapper.find('.btn-primary').trigger('click')
 
     const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')

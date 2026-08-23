@@ -88,7 +88,9 @@ async function toggleTransferLogs(sessionId) {
 
 function formatDate(dt) {
   if (!dt) return '-'
-  return new Date(dt).toLocaleString('zh-CN')
+  const value = new Date(dt)
+  const pad = (number) => String(number).padStart(2, '0')
+  return `${value.getFullYear()}/${pad(value.getMonth() + 1)}/${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`
 }
 
 function ratingStars(rating) {
