@@ -131,6 +131,7 @@ import {
   findTransferLogs,
 } from '../api/chat-api'
 import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
+import AgentSessionList from '../components/session/AgentSessionList.vue'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -155,6 +156,63 @@ describe('Chat Store - Agent Workspace', () => {
     expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', { pageNo: 1, pageSize: 20 })
     expect(chat.sessions).toHaveLength(2)
     expect(chat.sessions[0].sessionId).toBe('s1')
+  })
+
+  it('loads every remaining page for the active agent view and removes duplicate sessions', async () => {
+    listAgentViewSessions
+      .mockResolvedValueOnce({
+        data: { current: 1, size: 20, total: 45, pages: 3, records: [{ sessionId: 's1' }, { sessionId: 's2' }] },
+      })
+      .mockResolvedValueOnce({
+        data: { current: 2, size: 20, total: 45, pages: 3, records: [{ sessionId: 's2' }, { sessionId: 's3' }] },
+      })
+      .mockResolvedValueOnce({
+        data: { current: 3, size: 20, total: 45, pages: 3, records: [{ sessionId: 's4' }] },
+      })
+    const chat = useChatStore()
+    await chat.loadAgentViewSessions('MY_ACTIVE')
+
+    await chat.loadAllRemainingAgentSessions()
+
+    expect(listAgentViewSessions).toHaveBeenNthCalledWith(2, 'MY_ACTIVE', { pageNo: 2, pageSize: 20 })
+    expect(listAgentViewSessions).toHaveBeenNthCalledWith(3, 'MY_ACTIVE', { pageNo: 3, pageSize: 20 })
+    expect(chat.sessions.map((session) => session.sessionId)).toEqual(['s1', 's2', 's3', 's4'])
+    expect(chat.sessionsHasMore).toBe(false)
+  })
+
+  it('keeps a newly selected agent view isolated from a delayed load-all response', async () => {
+    let releaseOldPage
+    listAgentViewSessions
+      .mockResolvedValueOnce({
+        data: { current: 1, size: 20, total: 21, pages: 2, records: [{ sessionId: 'active-1' }] },
+      })
+      .mockImplementationOnce(() => new Promise((resolve) => { releaseOldPage = resolve }))
+      .mockResolvedValueOnce({
+        data: { current: 1, size: 20, total: 1, pages: 1, records: [{ sessionId: 'unread-1' }] },
+      })
+    const chat = useChatStore()
+    await chat.loadAgentViewSessions('MY_ACTIVE')
+    const oldLoad = chat.loadAllRemainingAgentSessions()
+    await chat.switchAgentView('MY_UNREAD')
+    releaseOldPage({ data: { current: 2, size: 20, total: 21, pages: 2, records: [{ sessionId: 'active-2' }] } })
+    await oldLoad
+
+    expect(chat.activeAgentView).toBe('MY_UNREAD')
+    expect(chat.sessions.map((session) => session.sessionId)).toEqual(['unread-1'])
+  })
+
+  it('shows a load-more button that loads all remaining sessions without hiding the current list', async () => {
+    const chat = useChatStore()
+    chat.sessions = [{ sessionId: 's1', title: '当前会话' }]
+    chat.sessionsHasMore = true
+    chat.sessionsLoadingMore = false
+    chat.loadAllRemainingAgentSessions = vi.fn(() => Promise.resolve())
+    const wrapper = mount(AgentSessionList)
+
+    await wrapper.get('.load-more-btn').trigger('click')
+
+    expect(wrapper.text()).toContain('当前会话')
+    expect(chat.loadAllRemainingAgentSessions).toHaveBeenCalledOnce()
   })
 
   it('switches active agent view and refreshes sessions', async () => {

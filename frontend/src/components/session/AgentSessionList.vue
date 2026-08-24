@@ -37,11 +37,15 @@ function selectSession(sessionId) {
   chat.selectAgentSession(sessionId)
   emit('select', sessionId)
 }
+
+function loadMore() {
+  chat.loadAllRemainingAgentSessions()
+}
 </script>
 
 <template>
   <div class="agent-session-list">
-    <div v-if="chat.sessionsLoading" class="loading">加载中…</div>
+    <div v-if="chat.sessionsLoading && !sessions.length" class="loading">加载中…</div>
     <div v-else-if="!sessions.length" class="empty">暂无会话</div>
     <ul v-else class="session-items">
       <li
@@ -68,7 +72,14 @@ function selectSession(sessionId) {
         </div>
       </li>
     </ul>
-
+    <button
+      v-if="chat.sessionsHasMore"
+      class="load-more-btn"
+      :disabled="chat.sessionsLoadingMore"
+      @click="loadMore"
+    >
+      {{ chat.sessionsLoadingMore ? '正在加载全部会话…' : '加载更多会话' }}
+    </button>
   </div>
 </template>
 
@@ -169,5 +180,23 @@ function selectSession(sessionId) {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.load-more-btn {
+  display: block;
+  width: calc(100% - 2rem);
+  margin: 0.75rem 1rem;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+.load-more-btn:hover:not(:disabled) {
+  background: #f9fafb;
+}
+.load-more-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

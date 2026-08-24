@@ -41,6 +41,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -195,10 +196,14 @@ class ChatMessageServiceTest {
         service.pullOfflineMessages("U001");
 
         ArgumentCaptor<Object> payload = ArgumentCaptor.forClass(Object.class);
-        verify(messagingTemplate, org.mockito.Mockito.times(2)).convertAndSendToUser(
+        verify(messagingTemplate, org.mockito.Mockito.times(3)).convertAndSendToUser(
                 eq("U001"), eq("/queue/chat"), payload.capture()
         );
-        assertEquals(2, payload.getAllValues().size());
+        assertEquals(3, payload.getAllValues().size());
+        assertEquals(
+                Map.of("event", "OFFLINE_MESSAGES_REPLAYED", "count", 2),
+                payload.getAllValues().get(2)
+        );
         verify(listOperations, never()).trim(anyString(), anyLong(), anyLong());
     }
 

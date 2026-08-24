@@ -48,7 +48,7 @@ describe('AdminWorkspaceView', () => {
     setActivePinia(createPinia())
   })
 
-  it('switches tabs when clicking tab buttons', async () => {
+  it('renders vertical admin navigation and switches panels from the sidebar', async () => {
     const AdminWorkspaceView = (await import('../views/AdminWorkspaceView.vue')).default
     const wrapper = mount(AdminWorkspaceView, {
       global: {
@@ -65,22 +65,25 @@ describe('AdminWorkspaceView', () => {
       },
     })
 
-    // Default tab should be dashboard
+    const sidebar = wrapper.get('aside.admin-sidebar')
+    expect(sidebar.attributes('aria-label')).toBe('管理员功能导航')
+
+    // Default panel should be dashboard
     expect(wrapper.find('.stub-dashboard').exists()).toBe(true)
 
-    // Click "用户管理" tab
-    const tabs = wrapper.findAll('.tab')
-    await tabs[1].trigger('click')
+    // Click "用户管理" in the sidebar
+    const navigationItems = sidebar.findAll('.sidebar-item')
+    await navigationItems[1].trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-users').exists()).toBe(true)
 
     // Click "归档统计" tab
-    await tabs.find((tab) => tab.text() === '归档统计').trigger('click')
+    await navigationItems.find((item) => item.text() === '归档统计').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-archive').exists()).toBe(true)
 
     // Click "死信管理" tab
-    await tabs.find((tab) => tab.text() === '死信管理').trigger('click')
+    await navigationItems.find((item) => item.text() === '死信管理').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-deadletters').exists()).toBe(true)
   })

@@ -63,6 +63,7 @@ export const useChatStore = defineStore('chat', {
     sessionsTotal: 0,
     sessionsTotalPages: 0,
     sessionsHasMore: false,
+    sessionsLoadingMore: false,
     _sessionsRequestSequence: 0,
     _consultationTimeout: null,
     /** Loading state for messages */
@@ -152,14 +153,27 @@ export const useChatStore = defineStore('chat', {
         if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
         const records = page?.records || []
-        this.sessions = pageNo > 1 ? [...this.sessions, ...records] : records
+        const pageUnreadCounts = Object.fromEntries(records
+          .filter((session) => session.sessionId)
+          .map((session) => [session.sessionId, Math.max(0, Number(session.unreadCount) || 0)]))
+        if (pageNo > 1) {
+          const bySessionId = new Map(this.sessions.map((session) => [session.sessionId, session]))
+          records.forEach((session) => bySessionId.set(session.sessionId, session))
+          this.sessions = [...bySessionId.values()]
+          this.unreadCounts = { ...this.unreadCounts, ...pageUnreadCounts }
+        } else {
+          this.sessions = records
+          this.unreadCounts = pageUnreadCounts
+        }
         this.sessionsPageNo = page?.current || pageNo
         this.sessionsPageSize = page?.size || pageSize
         this.sessionsTotal = page?.total || 0
         this.sessionsTotalPages = page?.pages || (this.sessionsPageSize ? Math.ceil(this.sessionsTotal / this.sessionsPageSize) : 0)
         this.sessionsHasMore = this.sessionsPageNo < this.sessionsTotalPages
+        return true
       } catch (e) {
         if (requestSequence === this._sessionsRequestSequence) this.error = e.message
+        return false
       } finally {
         if (requestSequence === this._sessionsRequestSequence) this.sessionsLoading = false
       }
@@ -701,6 +715,7 @@ export const useChatStore = defineStore('chat', {
       this.unreadCounts = {}
       this._sentClientMsgIds.clear()
       this.sessionsLoading = false
+      this.sessionsLoadingMore = false
       this.messagesLoading = false
       this.historyCursor = null
       this.historyHasMore = false
@@ -770,14 +785,22 @@ export const useChatStore = defineStore('chat', {
         if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
         const records = page?.records || []
-        this.sessions = pageNo > 1 ? [...this.sessions, ...records] : records
+        if (pageNo > 1) {
+          const bySessionId = new Map(this.sessions.map((session) => [session.sessionId, session]))
+          records.forEach((session) => bySessionId.set(session.sessionId, session))
+          this.sessions = [...bySessionId.values()]
+        } else {
+          this.sessions = records
+        }
         this.sessionsPageNo = page?.current || pageNo
         this.sessionsPageSize = page?.size || pageSize
         this.sessionsTotal = page?.total || 0
         this.sessionsTotalPages = page?.pages || (this.sessionsPageSize ? Math.ceil(this.sessionsTotal / this.sessionsPageSize) : 0)
         this.sessionsHasMore = this.sessionsPageNo < this.sessionsTotalPages
+        return true
       } catch (e) {
         if (requestSequence === this._sessionsRequestSequence) this.error = e.message
+        return false
       } finally {
         if (requestSequence === this._sessionsRequestSequence) this.sessionsLoading = false
       }
@@ -786,6 +809,23 @@ export const useChatStore = defineStore('chat', {
     async loadNextAgentSessionsPage() {
       if (this.sessionsLoading || !this.sessionsHasMore) return
       return this.loadAgentViewSessions(this.activeAgentView, { pageNo: this.sessionsPageNo + 1, pageSize: this.sessionsPageSize })
+    },
+
+    async loadAllRemainingAgentSessions() {
+      if (this.sessionsLoading || this.sessionsLoadingMore || !this.sessionsHasMore) return
+      const viewCode = this.activeAgentView
+      this.sessionsLoadingMore = true
+      try {
+        while (viewCode === this.activeAgentView && this.sessionsHasMore) {
+          const loaded = await this.loadAgentViewSessions(viewCode, {
+            pageNo: this.sessionsPageNo + 1,
+            pageSize: this.sessionsPageSize,
+          })
+          if (!loaded || viewCode !== this.activeAgentView) break
+        }
+      } finally {
+        this.sessionsLoadingMore = false
+      }
     },
 
     /**
@@ -872,6 +912,13 @@ export const useChatStore = defineStore('chat', {
     _handleChatEvent(body) {
       const event = body.event
 
+      if (event === 'OFFLINE_MESSAGES_REPLAYED') {
+        const auth = useAuthStore()
+        if (auth.role === 'AGENT') this.refreshAgentViews()
+        else this.loadSessions()
+        return
+      }
+
       if (event === 'TYPING') {
         if (body.sessionId && body.senderId) {
           const previous = this.typingBySession[body.sessionId]
@@ -909,6 +956,10 @@ export const useChatStore = defineStore('chat', {
         // A new chat message
         const msg = body
         const auth = useAuthStore()
+        if (msg.id && msg.senderId !== auth.userId) {
+          // Transport delivery confirmation is independent from whether the user has read it.
+          this.sendAck(msg.id)
+        }
         if (msg.sessionId === this.activeSessionId) {
           // Deduplicate by clientMsgId
           if (msg.clientMsgId && this._sentClientMsgIds.has(msg.clientMsgId)) {
@@ -925,9 +976,8 @@ export const useChatStore = defineStore('chat', {
           } else {
             this.messages.push(msg)
           }
-          // Send ACK and mark read only while the conversation is visible.
+          // Mark read only while the conversation is visible.
           if (msg.id && msg.senderId !== auth.userId && document.visibilityState === 'visible') {
-            this.sendAck(msg.id)
             this.markRead(msg.sessionId, msg.id)
           } else if (msg.id && msg.senderId !== auth.userId) {
             const sid = msg.sessionId

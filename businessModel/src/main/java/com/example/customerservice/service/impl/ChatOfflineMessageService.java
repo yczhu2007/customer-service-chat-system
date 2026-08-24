@@ -11,6 +11,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 /** Redis based pending delivery, offline replay and receiver ACK handling. */
@@ -144,6 +145,8 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
                         messageJsonList.isEmpty()
         ) {
 
+            notifyReplayCompleted(userId, 0);
+
             log.info(
                     "待确认消息拉取完成，用户："
                             + userId
@@ -204,12 +207,25 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
             }
         }
 
+        notifyReplayCompleted(userId, pushedCount);
+
 
         log.info(
                 "待确认消息拉取完成，用户："
                         + userId
                         + "，数量："
                         + pushedCount
+        );
+    }
+
+    private void notifyReplayCompleted(String userId, int pushedCount) {
+        messagingTemplate.convertAndSendToUser(
+                userId,
+                "/queue/chat",
+                Map.of(
+                        "event", "OFFLINE_MESSAGES_REPLAYED",
+                        "count", pushedCount
+                )
         );
     }
 

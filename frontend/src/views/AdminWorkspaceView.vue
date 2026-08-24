@@ -29,18 +29,21 @@ function switchTab(key) {
 
 <template>
   <el-container class="admin-workspace">
-    <el-header class="tab-bar">
-      <button
-        v-for="tab in tabs"
-        :key="tab.key"
-        :class="['tab', { active: activeTab === tab.key }]"
-        @click="switchTab(tab.key)"
-      >
-        {{ tab.label }}
-      </button>
-    </el-header>
+    <aside class="admin-sidebar" aria-label="管理员功能导航">
+      <div class="sidebar-title">管理中心</div>
+      <nav class="sidebar-nav">
+        <button
+          v-for="tab in tabs"
+          :key="tab.key"
+          :class="['sidebar-item', { active: activeTab === tab.key }]"
+          @click="switchTab(tab.key)"
+        >
+          {{ tab.label }}
+        </button>
+      </nav>
+    </aside>
 
-    <el-main class="tab-content">
+    <section class="admin-content">
       <AdminDashboard v-if="activeTab === 'dashboard'" />
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
@@ -49,51 +52,62 @@ function switchTab(key) {
       <ArchiveStatsPanel v-if="activeTab === 'archive'" />
       <DeadLetterPanel v-if="activeTab === 'deadletters'" />
       <VipSkillPanel v-if="activeTab === 'vip'" />
-    </el-main>
+    </section>
   </el-container>
 </template>
 
 <style scoped>
 .admin-workspace {
-  --el-header-padding: 0;
-  --el-main-padding: 0;
+  display: flex;
+  flex-direction: row;
+  height: calc(100vh - 54px);
+  min-height: 0;
+  background: var(--color-bg);
+  overflow: hidden;
+}
+.admin-sidebar {
+  width: 210px;
+  flex: 0 0 210px;
+  background: var(--color-paper);
+  border-right: 1px solid var(--color-line);
+  padding: 18px 12px;
+  overflow-y: auto;
+}
+.sidebar-title {
+  padding: 0 12px 14px;
+  color: var(--color-ink);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.sidebar-nav {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 54px);
-  background: var(--color-bg);
+  gap: 4px;
 }
-.tab-bar {
-  height: auto;
-  line-height: normal;
-  display: flex;
-  gap: 0;
-  border-bottom: 1px solid var(--color-line);
-  background: var(--color-paper);
-  padding: 0 20px;
-  flex-shrink: 0;
-  overflow-x: auto;
-}
-.tab {
-  padding: 14px 16px;
+.sidebar-item {
+  width: 100%;
+  padding: 10px 12px;
   border: none;
   background: transparent;
+  border-radius: 7px;
   cursor: pointer;
-  font-size: 0.95rem;
+  text-align: left;
+  font-size: 0.9rem;
   color: var(--color-muted);
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   white-space: nowrap;
-  transition: color 0.2s, border-color 0.2s;
+  transition: color 0.15s, background 0.15s;
 }
-.tab:hover {
+.sidebar-item:hover {
   color: var(--color-ink);
+  background: var(--color-bg);
 }
-.tab.active {
+.sidebar-item.active {
   color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
+  background: #eef5ff;
   font-weight: 600;
 }
-.tab-content {
+.admin-content {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
@@ -109,4 +123,14 @@ function switchTab(key) {
 :deep(.btn-danger) { border-color: var(--color-danger); background: transparent; color: var(--color-danger); }
 :deep(.dialog) { border: 1px solid var(--color-line); border-radius: 10px; box-shadow: 0 12px 32px rgba(24, 29, 38, .14); }
 :deep(.filters input), :deep(.filters select) { border-color: var(--color-line-strong); border-radius: 8px; }
+@media (max-width: 820px) {
+  .admin-sidebar {
+    width: 154px;
+    flex-basis: 154px;
+    padding-inline: 8px;
+  }
+  .sidebar-title { padding-inline: 8px; }
+  .sidebar-item { padding-inline: 8px; font-size: 0.82rem; }
+  .admin-content { padding: 14px; }
+}
 </style>

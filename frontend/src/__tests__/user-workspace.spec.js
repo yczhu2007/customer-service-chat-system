@@ -72,8 +72,8 @@ describe('User Workspace', () => {
               pageSize: 20,
               total: 2,
               records: [
-                { sessionId: 's1', title: '会话一', status: 'ACTIVE', lastMessageContent: '你好' },
-                { sessionId: 's2', title: '会话二', status: 'CLOSED', lastMessageContent: '再见' },
+                { sessionId: 's1', title: '会话一', status: 'ACTIVE', lastMessageContent: '你好', unreadCount: 3 },
+                { sessionId: 's2', title: '会话二', status: 'CLOSED', lastMessageContent: '再见', unreadCount: 0 },
               ],
             },
           }),
@@ -83,6 +83,7 @@ describe('User Workspace', () => {
       expect(chat.sessions).toHaveLength(2)
       expect(chat.sessions[0].sessionId).toBe('s1')
       expect(chat.sessions[1].title).toBe('会话二')
+      expect(chat.unreadCounts).toEqual({ s1: 3, s2: 0 })
     })
 
     it('handles load error', async () => {
@@ -180,6 +181,30 @@ describe('User Workspace', () => {
     chat._handleChatEvent({ id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '我发出的消息' })
 
     expect(chat.unreadCounts.s1).toBeUndefined()
+  })
+
+  it('acknowledges an inactive-session delivery without marking it as read', () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat._stomp = { publish: vi.fn() }
+    chat.connected = true
+    chat.activeSessionId = 's2'
+
+    chat._handleChatEvent({ id: 'm1', sessionId: 's1', senderId: 'a1', type: 'TEXT', content: '新消息' })
+
+    expect(chat._stomp.publish).toHaveBeenCalledWith('/app/chat.ack', { messageId: 'm1' })
+    expect(chat._stomp.publish).not.toHaveBeenCalledWith('/app/chat.read', expect.anything())
+    expect(chat.unreadCounts.s1).toBe(1)
+  })
+
+  it('refreshes authoritative unread counts after offline replay completes', () => {
+    const chat = useChatStore()
+    chat.loadSessions = vi.fn()
+
+    chat._handleChatEvent({ event: 'OFFLINE_MESSAGES_REPLAYED', count: 2 })
+
+    expect(chat.loadSessions).toHaveBeenCalledOnce()
   })
 
   it('records queue events and automatically selects an assigned session', () => {
