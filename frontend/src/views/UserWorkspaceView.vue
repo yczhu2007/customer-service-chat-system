@@ -35,6 +35,11 @@ function refreshQueue() {
   chat.loadQueueStatus()
 }
 
+async function cancelQueue() {
+  if (!inQueue.value || !window.confirm('确认取消排队吗？')) return
+  await chat.cancelQueue()
+}
+
 onMounted(() => {
   // Connect STOMP
   chat.connectStomp()
@@ -85,6 +90,7 @@ onUnmounted(() => {
             {{ chat.consultationStarting ? '正在咨询…' : '重新咨询' }}
           </button>
           <button class="refresh-queue-btn" @click="refreshQueue">刷新</button>
+          <button v-if="inQueue" class="cancel-queue-btn" @click="cancelQueue">取消排队</button>
         </div>
         <p v-if="chat.queueNotice" class="queue-notice">{{ chat.queueNotice }}</p>
       </div>

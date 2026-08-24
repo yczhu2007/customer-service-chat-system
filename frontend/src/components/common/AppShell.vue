@@ -1,5 +1,6 @@
 <script setup>
 import { useRouter } from 'vue-router'
+import { onMounted, onUnmounted } from 'vue'
 import { logout as logoutRequest } from '../../api/auth-api'
 import { agentOffline } from '../../api/chat-api'
 import { useAuthStore } from '../../stores/auth'
@@ -8,6 +9,15 @@ import { useChatStore } from '../../stores/chat'
 const router = useRouter()
 const auth = useAuthStore()
 const chat = useChatStore()
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') chat.markActiveSessionRead()
+}
+
+onMounted(() => document.addEventListener('visibilitychange', handleVisibilityChange))
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+})
 
 async function signOut() {
   try {

@@ -7,7 +7,6 @@ const chat = useChatStore()
 /** Fixed agent views. */
 const VIEW_DEFS = [
   { code: 'MY_ACTIVE', label: '处理中' },
-  { code: 'MY_UNREAD', label: '未读' },
   { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
   { code: 'MY_UNARCHIVED', label: '未归档' },
   { code: 'MY_RECENT_CLOSED', label: '最近关闭' },

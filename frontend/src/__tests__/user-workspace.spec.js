@@ -220,6 +220,32 @@ describe('User Workspace', () => {
     expect(chat.error).toBe('connection closed')
   })
 
+  it('shows a labeled quote card in a closed session without mutation actions', () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'agent1', role: 'AGENT' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'm2',
+      sessionId: 's1',
+      senderId: 'u1',
+      senderRole: 'USER',
+      type: 'TEXT',
+      content: '回复内容',
+      replyToMessageId: 'm1',
+      replyPreview: '被引用的用户消息',
+      replyPreviewSenderRole: 'USER',
+    }]
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1', closed: true } })
+
+    expect(wrapper.find('.reply-preview').exists()).toBe(true)
+    expect(wrapper.text()).toContain('引用用户')
+    expect(wrapper.text()).toContain('被引用的用户消息')
+    expect(wrapper.text()).not.toContain('撤回')
+    expect(wrapper.text()).not.toContain('引用回复')
+  })
+
   it('does not render an edit action for an own text message', async () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
@@ -286,7 +312,7 @@ describe('User Workspace', () => {
       const attachment = await fetchAttachmentBlob('/chat/attachments/attachment-id/content')
 
       expect(attachment.name).toBe('guide.pdf')
-      expect(attachment.url).toBe('blob:mock')
+      expect(attachment.url).toMatch(/^blob:/)
     })
 
     it('sends the uploaded attachment content address instead of its opaque id', async () => {
@@ -304,6 +330,9 @@ describe('User Workspace', () => {
       Object.defineProperty(input.element, 'files', { value: [file] })
       await input.trigger('change')
       await Promise.resolve()
+      expect(chat.sendMessage).not.toHaveBeenCalled()
+      const sendAttachmentButton = wrapper.findAll('button').find((button) => button.text() === '发送附件')
+      await sendAttachmentButton.trigger('click')
 
       expect(chat.sendMessage).toHaveBeenCalledWith(
         's1',

@@ -151,6 +151,7 @@ CREATE TABLE IF NOT EXISTS chat_message
     type          VARCHAR(16) NOT NULL COMMENT '消息类型：TEXT、IMAGE、FILE',
     content       TEXT        NOT NULL COMMENT '消息内容',
     client_msg_id VARCHAR(64) NOT NULL COMMENT '客户端幂等消息ID',
+    reply_to_message_id VARCHAR(64) NULL COMMENT '被引用的消息ID',
     create_time   DATETIME(6) NOT NULL COMMENT '服务端接收时间',
     edited        TINYINT(1)  NOT NULL DEFAULT 0 COMMENT '是否编辑过',
     edited_at     DATETIME(6) NULL COMMENT '最后编辑时间',
@@ -162,6 +163,7 @@ CREATE TABLE IF NOT EXISTS chat_message
     UNIQUE KEY uk_chat_message_client (session_id, sender_id, client_msg_id),
     KEY idx_chat_message_session_time (session_id, create_time, id),
     KEY idx_chat_message_sender_time (sender_id, create_time),
+    KEY idx_chat_message_reply (reply_to_message_id),
 
     CONSTRAINT fk_chat_message_session
         FOREIGN KEY (session_id)

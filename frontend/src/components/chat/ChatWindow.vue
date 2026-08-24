@@ -46,7 +46,7 @@ const priorityClass = computed(() => {
 
     <template v-else>
       <!-- Message list -->
-      <MessageList :session-id="session.sessionId" />
+      <MessageList :session-id="session.sessionId" :closed="isClosed" />
 
       <!-- Composer (disabled when session is closed) -->
       <MessageComposer :session-id="session.sessionId" :disabled="!canSend" />

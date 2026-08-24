@@ -137,6 +137,10 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 java.util.concurrent.TimeUnit.SECONDS
         );
         try {
+            ChatSession session = chatSessionMapper.selectById(message.getSessionId());
+            if (session == null || !ChatConstants.SESSION_STATUS_ACTIVE.equals(session.getStatus())) {
+                throw new BusinessStateException("聊天会话已经结束，不能撤回消息");
+            }
             int updated = chatMessageMapper.recallOwnMessage(
                     messageId,
                     operatorId,
@@ -356,6 +360,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 ? records.get(records.size() - 1).getId()
                 : null;
         Collections.reverse(records);
+        enrichReplyPreviews(records, sessionId);
         long total = chatMessageMapper.selectCount(
                 Wrappers.<ChatMessage>lambdaQuery()
                         .eq(ChatMessage::getSessionId, sessionId)
@@ -376,6 +381,27 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 hasMore,
                 chatMessageReadMapper.countUnread(sessionId, operatorId)
         );
+    }
+
+    private void enrichReplyPreviews(List<ChatMessage> records, String sessionId) {
+        for (ChatMessage message : records) {
+            String replyToMessageId = message.getReplyToMessageId();
+            if (replyToMessageId == null || replyToMessageId.isBlank()) {
+                continue;
+            }
+            ChatMessage source = chatMessageMapper.selectById(replyToMessageId);
+            if (source == null || !sessionId.equals(source.getSessionId())) {
+                message.setReplyPreview("原消息不可用");
+                continue;
+            }
+            if (Boolean.TRUE.equals(source.getRecalled())) {
+                message.setReplyPreview("原消息已撤回");
+                continue;
+            }
+            message.setReplyPreview(source.getContent() == null || source.getContent().isBlank()
+                    ? "附件消息" : source.getContent());
+            message.setReplyPreviewSenderRole(source.getSenderRole());
+        }
     }
 
     private List<ChatMessage> loadHistoryPage(

@@ -65,6 +65,15 @@ public class ChatRedisRepository {
      *
      * <p>返回值：递增后的计数值
      */
+    private static final DefaultRedisScript<Long> CANCEL_QUEUE_SCRIPT =
+            new DefaultRedisScript<>(
+                    "local removed = redis.call('ZREM', KEYS[1], ARGV[1]); "
+                            + "redis.call('HDEL', KEYS[2], ARGV[1]); "
+                            + "redis.call('HDEL', KEYS[3], ARGV[1]); "
+                            + "redis.call('ZREM', KEYS[4], ARGV[1]); "
+                            + "return removed;",
+                    Long.class
+            );
     private static final DefaultRedisScript<Long> INCR_AND_EXPIRE_SCRIPT =
             new DefaultRedisScript<>(
                     "local current = redis.call('INCR', KEYS[1]); "
@@ -239,6 +248,19 @@ public class ChatRedisRepository {
 
     public Long sortedSetCardinality(String key) {
         return redisTemplate.opsForZSet().zCard(key);
+    }
+
+    public Long cancelQueueEntry(String userId) {
+        return execute(
+                CANCEL_QUEUE_SCRIPT,
+                List.of(
+                        RedisConstants.QUEUE_PENDING,
+                        RedisConstants.QUEUE_ENQUEUED_AT,
+                        RedisConstants.QUEUE_VIP_LEVEL,
+                        RedisConstants.VIP_CALLBACK_PENDING
+                ),
+                userId
+        );
     }
 
     public Boolean delete(String key) {

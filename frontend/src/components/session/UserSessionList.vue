@@ -46,6 +46,12 @@ function refresh() {
   chat.loadSessions(params)
 }
 
+function loadMore() {
+  const params = {}
+  if (archiveFilter.value) params.archiveStatus = archiveFilter.value
+  chat.loadNextSessionsPage(params)
+}
+
 /** Archive filter options */
 const archiveOptions = [
   { label: '全部', value: '' },
@@ -115,6 +121,14 @@ onMounted(() => {
         </div>
       </li>
     </ul>
+    <button
+      v-if="chat.sessionsHasMore"
+      class="load-more-btn"
+      :disabled="chat.sessionsLoading"
+      @click="loadMore"
+    >
+      {{ chat.sessionsLoading ? '加载中…' : '加载更多会话' }}
+    </button>
   </div>
 </template>
 
@@ -257,6 +271,17 @@ onMounted(() => {
   background: #f3f4f6;
   color: #6b7280;
 }
+.load-more-btn {
+  flex: 0 0 auto;
+  margin: 0.6rem 1rem;
+  padding: 0.45rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: white;
+  color: #374151;
+  cursor: pointer;
+}
+.load-more-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .unread-badge {
   background: #ef4444;
   color: white;

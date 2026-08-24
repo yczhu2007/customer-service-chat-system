@@ -2,6 +2,10 @@ package com.example.customerservice.controller;
 
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatMessage;
+import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.repository.ChatRedisRepository;
+import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.security.AuthRateLimiter;
@@ -19,6 +23,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.validation.ConstraintViolation;
@@ -33,6 +38,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 
 @RestController
@@ -74,6 +80,15 @@ public class ChatController {
     @Autowired
     private Validator validator;
 
+    @Autowired
+    private ChatSessionMapper chatSessionMapper;
+
+    @Autowired
+    private ChatRedisRepository chatRedisRepository;
+
+    @Autowired
+    private SimpMessagingTemplate messagingTemplate;
+
 
     @PostMapping("/login")
     public Result<LoginResponse> login(
@@ -114,6 +129,28 @@ public class ChatController {
      * 普通用户显式发起或恢复咨询。
      * 客户端发送地址：/app/chat.start
      */
+    @PostMapping("/queue/cancel")
+    public Result<Void> cancelQueue() {
+        currentUser.requireRole("USER");
+        currentUser.requirePermission("chat:user:access");
+        String userId = currentUser.getUserId();
+        Long removed = chatRedisRepository.cancelQueueEntry(userId);
+        boolean cancelled = removed != null && removed > 0;
+        try {
+            chatRoutingOperations.refreshWaitingPositions();
+        } catch (RuntimeException exception) {
+            log.warn("刷新排队位置通知失败，取消操作已完成，userId={}", userId, exception);
+        }
+        try {
+            Map<String, Object> event = new HashMap<>();
+            event.put("event", "QUEUE_CANCELLED");
+            messagingTemplate.convertAndSendToUser(userId, "/queue/chat", event);
+        } catch (RuntimeException exception) {
+            log.warn("发送取消排队通知失败，取消操作已完成，userId={}", userId, exception);
+        }
+        return Result.successMessage(cancelled ? "已取消排队" : "当前未在等待队列中");
+    }
+
     @MessageMapping("/chat.start")
     public void startConsultation(
             Principal principal
@@ -431,6 +468,36 @@ public class ChatController {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:archive:stats");
         return Result.success(chatSessionQueryService.findArchiveStats());
+    }
+
+    @MessageMapping("/chat.typing")
+    public void handleTyping(
+            @org.springframework.messaging.handler.annotation.Payload Map<String, Object> request,
+            Principal principal
+    ) {
+        if (principal == null) throw new IllegalArgumentException("当前STOMP连接没有用户身份");
+        String sessionId = request == null ? null : String.valueOf(request.get("sessionId"));
+        if (sessionId == null || sessionId.isBlank() || sessionId.length() > 64) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (session == null) throw new IllegalArgumentException("会话不存在");
+        String senderId = principal.getName();
+        String recipientId;
+        if (senderId.equals(session.getUserId())) recipientId = session.getAgentId();
+        else if (senderId.equals(session.getAgentId())) recipientId = session.getUserId();
+        else throw new IllegalArgumentException("无权操作该会话");
+        if (recipientId == null || recipientId.isBlank()) return;
+        boolean typing = Boolean.TRUE.equals(request.get("typing"));
+        String key = RedisConstants.SESSION_TYPING + sessionId + ":" + senderId;
+        if (typing) chatRedisRepository.setValue(key, "1", 5, TimeUnit.SECONDS);
+        else chatRedisRepository.delete(key);
+        Map<String, Object> event = new HashMap<>();
+        event.put("event", "TYPING");
+        event.put("sessionId", sessionId);
+        event.put("senderId", senderId);
+        event.put("typing", typing);
+        messagingTemplate.convertAndSendToUser(recipientId, "/queue/chat", event);
     }
 
     @MessageMapping("/chat.send")

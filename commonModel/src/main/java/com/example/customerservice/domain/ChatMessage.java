@@ -1,6 +1,7 @@
 package com.example.customerservice.domain;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 
@@ -20,6 +21,11 @@ public class ChatMessage implements Serializable {
     private String type;
     private String content;
     private String clientMsgId;
+    private String replyToMessageId;
+    @TableField(exist = false)
+    private String replyPreview;
+    @TableField(exist = false)
+    private String replyPreviewSenderRole;
     private LocalDateTime createTime;
     private String originalContent;
     private Boolean recalled;
@@ -79,6 +85,30 @@ public class ChatMessage implements Serializable {
 
     public void setClientMsgId(String clientMsgId) {
         this.clientMsgId = clientMsgId;
+    }
+
+    public String getReplyToMessageId() {
+        return replyToMessageId;
+    }
+
+    public void setReplyToMessageId(String replyToMessageId) {
+        this.replyToMessageId = replyToMessageId;
+    }
+
+    public String getReplyPreview() {
+        return replyPreview;
+    }
+
+    public void setReplyPreview(String replyPreview) {
+        this.replyPreview = replyPreview;
+    }
+
+    public String getReplyPreviewSenderRole() {
+        return replyPreviewSenderRole;
+    }
+
+    public void setReplyPreviewSenderRole(String replyPreviewSenderRole) {
+        this.replyPreviewSenderRole = replyPreviewSenderRole;
     }
 
     public LocalDateTime getCreateTime() {

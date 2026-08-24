@@ -40,6 +40,8 @@ public class RedisConstants {
     public static final String SESSION_FINALIZE_PENDING_PAYLOAD =
             "session:finalize:pending:payload";
     public static final String SESSION_MSG = "session:msg:";
+    /** Temporary typing indicator: typing:{sessionId}:{userId}. */
+    public static final String SESSION_TYPING = "typing:";
     /** 活动会话最后一次消息时间，供会话无活动超时转分配任务扫描。 */
     public static final String SESSION_LAST_ACTIVITY = "session:last-activity";
     public static final String CLIENT_MSG_DEDUP = "client:msg:dedup:";

@@ -142,10 +142,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             throw new IllegalArgumentException("无权查看该会话评价");
         }
         ChatSessionRating rating = ratingMapper.selectById(sessionId);
-        if (rating == null) {
-            throw new NotFoundException("该会话尚未评价");
-        }
-        return toRatingVO(rating);
+        return rating == null ? null : toRatingVO(rating);
     }
 
     @Override

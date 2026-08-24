@@ -5,6 +5,7 @@ import {
   listAgentViews,
   listAgentViewSessions,
   getQueueStatus,
+  cancelQueue,
   getSessionRating,
   submitRating,
   uploadAttachment,
@@ -33,6 +34,10 @@ export const useChatStore = defineStore('chat', {
     consultationStarting: false,
     /** Map of sessionId -> unread count */
     unreadCounts: {},
+    /** Currently selected message being quoted by the composer. */
+    replyingTo: null,
+    /** Map of session ID to the peer currently typing. */
+    typingBySession: {},
     /** Whether STOMP is connected */
     connected: false,
     connectionState: 'disconnected',
@@ -49,6 +54,8 @@ export const useChatStore = defineStore('chat', {
     _heartbeatTimer: null,
     /** Dedup set for client message IDs already rendered */
     _sentClientMsgIds: new Set(),
+    /** Map of client message IDs to optimistic-send timeout handles. */
+    _sendTimeouts: {},
     /** Loading state for sessions */
     sessionsLoading: false,
     sessionsPageNo: 1,
@@ -232,32 +239,104 @@ export const useChatStore = defineStore('chat', {
     },
 
     /**
-     * Send a chat message via STOMP.
+     * Send a chat message with a local SENDING → SENT / FAILED lifecycle.
      */
-    sendMessage(sessionId, type, content) {
-      if (!this._stomp || !this.connected) {
-        this.error = '未连接到服务器'
-        return
-      }
+    setReplyTarget(message) {
+      if (message?.id && !message.recalled) this.replyingTo = message
+    },
+
+    clearReplyTarget() {
+      this.replyingTo = null
+    },
+
+    sendMessage(sessionId, type, content, replyToMessageId = this.replyingTo?.id || null) {
       const clientMsgId = crypto.randomUUID()
-      this._sentClientMsgIds.add(clientMsgId)
-      // Optimistic local render
       const auth = useAuthStore()
-      this.messages.push({
+      const localMessage = {
         clientMsgId,
         sessionId,
         senderId: auth.userId,
         senderRole: auth.role,
         type,
         content,
+        replyToMessageId,
         createTime: new Date().toISOString(),
-      })
-      this._stomp.publish('/app/chat.send', {
-        sessionId,
-        type,
-        content,
-        clientMsgId,
-      })
+        sendState: 'SENDING',
+        failureReason: null,
+      }
+      this.messages.push(localMessage)
+      this._publishPendingMessage(localMessage)
+      return clientMsgId
+    },
+
+    retryMessage(clientMsgId) {
+      const message = this.messages.find((item) => item.clientMsgId === clientMsgId)
+      if (!message || message.sendState !== 'FAILED') return
+      const nextClientMsgId = crypto.randomUUID()
+      this._sentClientMsgIds.delete(message.clientMsgId)
+      this.messages = this.messages.map((item) => item.clientMsgId === clientMsgId
+        ? { ...item, clientMsgId: nextClientMsgId, id: null, sendState: 'SENDING', failureReason: null, createTime: new Date().toISOString() }
+        : item)
+      this._publishPendingMessage(this.messages.find((item) => item.clientMsgId === nextClientMsgId))
+    },
+
+    _publishPendingMessage(message) {
+      if (!message) return
+      if (!this._stomp || !this.connected) {
+        this._markMessageFailed(message.clientMsgId, 'WebSocket 未连接，请重连后重试')
+        return
+      }
+      this._sentClientMsgIds.add(message.clientMsgId)
+      try {
+        this._stomp.publish('/app/chat.send', {
+          sessionId: message.sessionId,
+          type: message.type,
+          content: message.content,
+          replyToMessageId: message.replyToMessageId,
+          clientMsgId: message.clientMsgId,
+        })
+        this._sendTimeouts[message.clientMsgId] = setTimeout(() => {
+          this._markMessageFailed(message.clientMsgId, '消息发送超时，请重试')
+        }, 15000)
+      } catch (exception) {
+        this._markMessageFailed(message.clientMsgId, exception.message || '消息发送失败，请重试')
+      }
+    },
+
+    _markMessageFailed(clientMsgId, reason) {
+      if (this._sendTimeouts[clientMsgId]) {
+        clearTimeout(this._sendTimeouts[clientMsgId])
+        delete this._sendTimeouts[clientMsgId]
+      }
+      const index = this.messages.findIndex((item) => item.clientMsgId === clientMsgId)
+      if (index !== -1 && this.messages[index].sendState === 'SENDING') {
+        this.messages[index] = { ...this.messages[index], sendState: 'FAILED', failureReason: reason }
+      }
+    },
+
+    _markLatestPendingMessageFailed(reason) {
+      const pending = [...this.messages].reverse().find((item) => item.sendState === 'SENDING')
+      if (pending) this._markMessageFailed(pending.clientMsgId, reason)
+    },
+
+    _markMessageSent(clientMsgId) {
+      if (this._sendTimeouts[clientMsgId]) {
+        clearTimeout(this._sendTimeouts[clientMsgId])
+        delete this._sendTimeouts[clientMsgId]
+      }
+      const index = this.messages.findIndex((item) => item.clientMsgId === clientMsgId)
+      if (index !== -1) {
+        this.messages[index] = { ...this.messages[index], sendState: 'SENT', failureReason: null }
+      }
+    },
+
+    sendTyping(sessionId, typing) {
+      if (!sessionId || !this._stomp || !this.connected) return
+      try {
+        this._stomp.publish('/app/chat.typing', { sessionId, typing })
+      } catch {
+        // Typing is ephemeral and must never interrupt message entry.
+      }
     },
 
     recallMessage(messageId) {
@@ -426,6 +505,18 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async cancelQueue() {
+      try {
+        await cancelQueue()
+        this.queueNotice = '已取消排队'
+        await Promise.all([this.loadQueueStatus(), this.loadSessions()])
+        return true
+      } catch (exception) {
+        this.error = exception.message || '取消排队失败'
+        return false
+      }
+    },
+
     async loadAgentDashboard() {
       try {
         const [dashboardResult, ratingResult] = await Promise.all([
@@ -525,7 +616,9 @@ export const useChatStore = defineStore('chat', {
               stomp.subscribe('/user/queue/errors', (frame) => {
                 try {
                   const body = JSON.parse(frame.body)
-                  this.error = body.message || body.error || '操作失败'
+                  const reason = body.message || body.error || '服务端拒绝了消息'
+                  this.error = reason
+                  this._markLatestPendingMessageFailed(reason)
                 } catch {
                   this.error = frame.body || '操作失败'
                 }
@@ -779,6 +872,22 @@ export const useChatStore = defineStore('chat', {
     _handleChatEvent(body) {
       const event = body.event
 
+      if (event === 'TYPING') {
+        if (body.sessionId && body.senderId) {
+          const previous = this.typingBySession[body.sessionId]
+          if (previous?.timeout) clearTimeout(previous.timeout)
+          if (body.typing) {
+            this.typingBySession[body.sessionId] = {
+              senderId: body.senderId,
+              timeout: setTimeout(() => { delete this.typingBySession[body.sessionId] }, 5000),
+            }
+          } else {
+            delete this.typingBySession[body.sessionId]
+          }
+        }
+        return
+      }
+
       if (event === 'CHAT_HISTORY') {
         // History response
         if (this._historyPendingRequestId && body.requestId !== this._historyPendingRequestId) return
@@ -808,17 +917,22 @@ export const useChatStore = defineStore('chat', {
               (m) => m.clientMsgId === msg.clientMsgId
             )
             if (idx !== -1) {
-              this.messages[idx] = { ...this.messages[idx], ...msg }
+              this.messages[idx] = { ...this.messages[idx], ...msg, sendState: 'SENT', failureReason: null }
+              this._markMessageSent(msg.clientMsgId)
             } else {
               this.messages.push(msg)
             }
           } else {
             this.messages.push(msg)
           }
-          // Send ACK
-          if (msg.id && msg.senderId !== auth.userId) this.sendAck(msg.id)
-          // Mark read if this session is active
-          if (msg.id && msg.senderId !== auth.userId) this.markRead(msg.sessionId, msg.id)
+          // Send ACK and mark read only while the conversation is visible.
+          if (msg.id && msg.senderId !== auth.userId && document.visibilityState === 'visible') {
+            this.sendAck(msg.id)
+            this.markRead(msg.sessionId, msg.id)
+          } else if (msg.id && msg.senderId !== auth.userId) {
+            const sid = msg.sessionId
+            this.unreadCounts[sid] = (this.unreadCounts[sid] || 0) + 1
+          }
         } else if (msg.senderId !== auth.userId) {
           // Increment unread count for other session
           const sid = msg.sessionId
@@ -827,6 +941,12 @@ export const useChatStore = defineStore('chat', {
         // Update session last message
         this._updateSessionLastMessage(msg)
         if (useAuthStore().role === 'AGENT') this.refreshAgentViews()
+        return
+      }
+
+      if (event === 'QUEUE_CANCELLED') {
+        this.queueStatus = null
+        this.queueNotice = '已取消排队'
         return
       }
 
@@ -841,6 +961,10 @@ export const useChatStore = defineStore('chat', {
       }
 
       if (event === 'ERROR') {
+        if (body.clientMsgId) {
+          this._markMessageFailed(body.clientMsgId, body.message || body.error || '服务端拒绝了消息')
+          return
+        }
         this.consultationStarting = false
         if (this._consultationTimeout) { clearTimeout(this._consultationTimeout); this._consultationTimeout = null }
         this.queueNotice = null

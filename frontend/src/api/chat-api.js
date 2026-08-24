@@ -29,6 +29,10 @@ export const listAgentViewSessions = (viewCode, params = {}) => {
  */
 export const getQueueStatus = () => request('/chat/queue-status')
 
+export const cancelQueue = () => request('/chat/queue/cancel', {
+  method: 'POST',
+})
+
 /**
  * Get the rating for a closed session (USER only).
  */

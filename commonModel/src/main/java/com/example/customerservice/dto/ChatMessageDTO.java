@@ -46,6 +46,15 @@ public class ChatMessageDTO implements Serializable {
     @Size(max = 64, message = "clientMsgId长度不能超过64个字符")
     private String clientMsgId;
 
+    @Size(max = 64, message = "replyToMessageId长度不能超过64个字符")
+    private String replyToMessageId;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String replyPreview;
+
+    @JsonProperty(access = JsonProperty.Access.READ_ONLY)
+    private String replyPreviewSenderRole;
+
     private LocalDateTime createTime;
     private boolean recalled;
     private LocalDateTime recalledAt;
@@ -63,6 +72,7 @@ public class ChatMessageDTO implements Serializable {
         message.setType(type);
         message.setContent(content);
         message.setClientMsgId(clientMsgId);
+        message.setReplyToMessageId(replyToMessageId);
         return message;
     }
 
@@ -77,6 +87,9 @@ public class ChatMessageDTO implements Serializable {
         dto.setType(message.getType());
         dto.setContent(Boolean.TRUE.equals(message.getRecalled()) ? null : message.getContent());
         dto.setClientMsgId(message.getClientMsgId());
+        dto.setReplyToMessageId(message.getReplyToMessageId());
+        dto.setReplyPreview(message.getReplyPreview());
+        dto.setReplyPreviewSenderRole(message.getReplyPreviewSenderRole());
         dto.setCreateTime(message.getCreateTime());
         dto.setRecalled(Boolean.TRUE.equals(message.getRecalled()));
         dto.setRecalledAt(message.getRecalledAt());
@@ -138,6 +151,13 @@ public class ChatMessageDTO implements Serializable {
     public void setClientMsgId(String clientMsgId) {
         this.clientMsgId = clientMsgId;
     }
+
+    public String getReplyToMessageId() { return replyToMessageId; }
+    public void setReplyToMessageId(String replyToMessageId) { this.replyToMessageId = replyToMessageId; }
+    public String getReplyPreview() { return replyPreview; }
+    public void setReplyPreview(String replyPreview) { this.replyPreview = replyPreview; }
+    public String getReplyPreviewSenderRole() { return replyPreviewSenderRole; }
+    public void setReplyPreviewSenderRole(String replyPreviewSenderRole) { this.replyPreviewSenderRole = replyPreviewSenderRole; }
 
     public LocalDateTime getCreateTime() {
         return createTime;

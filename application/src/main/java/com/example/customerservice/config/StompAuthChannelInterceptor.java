@@ -31,7 +31,7 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     static final String APPLICATION_PREFIX = "/app/";
     static final String USER_DESTINATION_PREFIX = "/user/queue/";
     static final Set<String> SEND_DESTINATIONS = Set.of(
-            "/app/chat.start", "/app/chat.send", "/app/chat.end",
+            "/app/chat.start", "/app/chat.send", "/app/chat.end", "/app/chat.typing",
             "/app/chat.transfer", "/app/chat.history", "/app/chat.offline.pull",
             "/app/chat.ack", "/app/chat.read", "/app/chat.message.edit",
             "/app/chat.message.recall", "/app/chat.heartbeat"

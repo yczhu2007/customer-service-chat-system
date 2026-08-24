@@ -141,7 +141,7 @@ watch(() => props.quickReplyContent, (content) => {
 
     <template v-else>
       <!-- Message list -->
-      <MessageList :session-id="session.sessionId" />
+      <MessageList :session-id="session.sessionId" :closed="isClosed" />
 
       <!-- Composer -->
       <MessageComposer

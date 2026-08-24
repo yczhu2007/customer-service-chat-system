@@ -8,7 +8,7 @@
     <select id="findByClientMessage"
             resultType="com.example.customerservice.domain.ChatMessage">
         SELECT id, session_id, sender_id, sender_role, type, content,
-               client_msg_id, create_time, original_content, recalled, recalled_at
+               client_msg_id, reply_to_message_id, create_time, original_content, recalled, recalled_at
         FROM chat_message
         WHERE session_id = #{sessionId}
           AND sender_id = #{senderId}
@@ -29,10 +29,10 @@
     <select id="selectLatestHistoryBySessionIds"
             resultType="com.example.customerservice.domain.ChatMessage">
         SELECT id, session_id, sender_id, sender_role, type, content,
-               client_msg_id, create_time, original_content, recalled, recalled_at
+               client_msg_id, reply_to_message_id, create_time, original_content, recalled, recalled_at
         FROM (
             SELECT id, session_id, sender_id, sender_role, type, content,
-                   client_msg_id, create_time, original_content, recalled, recalled_at,
+                   client_msg_id, reply_to_message_id, create_time, original_content, recalled, recalled_at,
                    ROW_NUMBER() OVER (PARTITION BY session_id ORDER BY create_time DESC, id DESC) AS row_num
             FROM chat_message
             WHERE session_id IN

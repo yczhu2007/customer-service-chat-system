@@ -1,6 +1,7 @@
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps({
   sessionId: { type: String, required: true },
@@ -12,10 +13,60 @@ const props = defineProps({
 const emit = defineEmits(['inserted'])
 
 const chat = useChatStore()
+const auth = useAuthStore()
 const text = ref('')
+const draftTimer = ref(null)
 const uploadRef = ref(null)
 const uploading = ref(false)
+const draggingImage = ref(false)
+const typingTimer = ref(null)
+const typingActive = ref(false)
+const pendingAttachment = ref(null)
 
+function draftKey(sessionId = props.sessionId) {
+  return `chat-draft:${auth.userId || 'anonymous'}:${auth.role || 'unknown'}:${sessionId}`
+}
+
+function restoreDraft(sessionId = props.sessionId) {
+  if (draftTimer.value) clearTimeout(draftTimer.value)
+  text.value = sessionId ? (localStorage.getItem(draftKey(sessionId)) || '') : ''
+}
+
+function saveDraft() {
+  if (!props.sessionId) return
+  if (draftTimer.value) clearTimeout(draftTimer.value)
+  draftTimer.value = setTimeout(() => {
+    const value = text.value
+    if (value) localStorage.setItem(draftKey(), value)
+    else localStorage.removeItem(draftKey())
+  }, 500)
+}
+
+function clearDraft() {
+  if (draftTimer.value) clearTimeout(draftTimer.value)
+  localStorage.removeItem(draftKey())
+}
+
+watch(() => props.sessionId, (sessionId, previousSessionId) => {
+  if (typingTimer.value) clearTimeout(typingTimer.value)
+  if (typingActive.value && previousSessionId) chat.sendTyping(previousSessionId, false)
+  typingActive.value = false
+  pendingAttachment.value = null
+  restoreDraft(sessionId)
+}, { immediate: true })
+watch(() => props.disabled, (disabled) => {
+  if (disabled) chat.clearReplyTarget()
+})
+
+watch(text, () => {
+  saveDraft()
+  notifyTyping()
+})
+
+onUnmounted(() => {
+  if (draftTimer.value) clearTimeout(draftTimer.value)
+  stopTyping()
+})
 watch(
   () => props.insertText,
   (val) => {
@@ -26,10 +77,66 @@ watch(
   }
 )
 
+function stopTyping() {
+  if (typingTimer.value) clearTimeout(typingTimer.value)
+  if (typingActive.value) chat.sendTyping(props.sessionId, false)
+  typingActive.value = false
+}
+
+function notifyTyping() {
+  if (!text.value.trim() || props.disabled) return stopTyping()
+  if (!typingActive.value) {
+    chat.sendTyping(props.sessionId, true)
+    typingActive.value = true
+  }
+  if (typingTimer.value) clearTimeout(typingTimer.value)
+  typingTimer.value = setTimeout(stopTyping, 3500)
+}
+
+async function uploadDroppedFile(file) {
+  if (!file || props.disabled || uploading.value) return
+  if (file.size <= 0) { chat.error = '文件不能为空'; return }
+  if (file.size > 10 * 1024 * 1024) { chat.error = '文件不能超过 10MB'; return }
+  await uploadFile({ file, onSuccess: () => {}, onError: () => {} })
+}
+
+function onPaste(event) {
+  const image = [...(event.clipboardData?.files || [])].find((file) => file.type.startsWith('image/'))
+  if (!image) return
+  event.preventDefault()
+  uploadDroppedFile(image)
+}
+
+function onDragOver(event) {
+  if ([...(event.dataTransfer?.types || [])].includes('Files')) { event.preventDefault(); draggingImage.value = true }
+}
+
+function onDrop(event) {
+  event.preventDefault()
+  draggingImage.value = false
+  const file = [...(event.dataTransfer?.files || [])][0]
+  if (file) uploadDroppedFile(file)
+  else chat.error = '请拖入文件'
+}
+
+function sendPendingAttachment() {
+  if (!pendingAttachment.value || props.disabled) return
+  const { type, contentUrl } = pendingAttachment.value
+  chat.sendMessage(props.sessionId, type, contentUrl)
+  pendingAttachment.value = null
+}
+
+function clearPendingAttachment() {
+  pendingAttachment.value = null
+}
+
 function sendText() {
   const content = text.value.trim()
   if (!content || props.disabled) return
   chat.sendMessage(props.sessionId, 'TEXT', content)
+  chat.clearReplyTarget()
+  stopTyping()
+  clearDraft()
   text.value = ''
 }
 
@@ -47,7 +154,7 @@ async function uploadFile(options) {
   try {
     const result = await chat.uploadAttachment(props.sessionId, file)
     const type = result?.messageType || (file.type.startsWith('image/') ? 'IMAGE' : 'FILE')
-    chat.sendMessage(props.sessionId, type, result?.contentUrl)
+    pendingAttachment.value = { type, contentUrl: result?.contentUrl, name: file.name }
     options.onSuccess?.(result)
   } catch (e) {
     chat.error = e.message || '附件上传失败，请稍后重试'
@@ -61,7 +168,19 @@ async function uploadFile(options) {
 </script>
 
 <template>
-  <div class="composer">
+  <div
+    class="composer"
+    :class="{ 'is-dragging': draggingImage }"
+    @paste="onPaste"
+    @dragover="onDragOver"
+    @dragleave="draggingImage = false"
+    @drop="onDrop"
+  >
+    <div v-if="chat.replyingTo" class="reply-card">
+      <div><strong>回复：{{ chat.replyingTo.senderRole === 'AGENT' ? '客服' : '用户' }}</strong></div>
+      <span>{{ chat.replyingTo.recalled ? '原消息已撤回' : (chat.replyingTo.content || '附件消息') }}</span>
+      <button type="button" @click="chat.clearReplyTarget()">取消引用</button>
+    </div>
     <div class="text-row">
       <el-input
         v-model="text"
@@ -94,6 +213,11 @@ async function uploadFile(options) {
         <el-button size="small" :loading="uploading" :disabled="disabled || uploading">选择附件</el-button>
       </el-upload>
       <span v-if="uploading" class="upload-hint">上传中…</span>
+      <template v-else-if="pendingAttachment">
+        <span class="upload-hint">已选择：{{ pendingAttachment.name }}</span>
+        <el-button size="small" type="primary" :disabled="disabled" @click="sendPendingAttachment">发送附件</el-button>
+        <el-button size="small" :disabled="disabled" @click="clearPendingAttachment">取消</el-button>
+      </template>
     </div>
   </div>
 </template>
@@ -106,6 +230,10 @@ async function uploadFile(options) {
   padding: 0.75rem;
   background: white;
 }
+.composer.is-dragging { background: #eff6ff; outline: 2px dashed #3b82f6; outline-offset: -4px; }
+.reply-card { display: flex; align-items: center; gap: .5rem; margin-bottom: .5rem; padding: .4rem .6rem; border-left: 3px solid #3b82f6; background: #f3f4f6; color: #4b5563; font-size: .8rem; }
+.reply-card span { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.reply-card button { border: 0; background: transparent; color: #2563eb; cursor: pointer; font-size: .75rem; }
 .text-row {
   display: flex;
   gap: 0.5rem;

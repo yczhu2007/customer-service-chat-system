@@ -248,6 +248,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                     "当前用户不属于这个聊天会话"
             );
         }
+        validateReplyTarget(message, session.getId());
         validateAttachmentOwnership(messageType, message.getContent(), session.getId());
         message.setCreateTime(
                 LocalDateTime.now()
@@ -307,6 +308,23 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         } catch (RuntimeException cleanupException) {
             log.warn("清理消息去重Key失败，dedupKey={}", dedupKey, cleanupException);
         }
+    }
+
+    private void validateReplyTarget(ChatMessage message, String sessionId) {
+        String replyToMessageId = message.getReplyToMessageId();
+        if (replyToMessageId == null || replyToMessageId.isBlank()) {
+            message.setReplyToMessageId(null);
+            return;
+        }
+        ChatMessage target = chatMessageMapper.selectById(replyToMessageId);
+        if (target == null || !sessionId.equals(target.getSessionId())) {
+            throw new IllegalArgumentException("引用消息不存在或不属于当前会话");
+        }
+        if (Boolean.TRUE.equals(target.getRecalled())) {
+            throw new IllegalArgumentException("不能引用已撤回的消息");
+        }
+        message.setReplyPreview(target.getContent() == null || target.getContent().isBlank() ? "附件消息" : target.getContent());
+        message.setReplyPreviewSenderRole(target.getSenderRole());
     }
 
     private void validateAttachmentOwnership(ChatMessageType type, String content, String sessionId) {
