@@ -7,6 +7,7 @@ import SessionAuditPanel from '../components/admin/SessionAuditPanel.vue'
 import ArchiveStatsPanel from '../components/admin/ArchiveStatsPanel.vue'
 import DeadLetterPanel from '../components/admin/DeadLetterPanel.vue'
 import VipSkillPanel from '../components/admin/VipSkillPanel.vue'
+import AdminMessageSearchPanel from '../components/admin/AdminMessageSearchPanel.vue'
 
 const activeTab = ref('dashboard')
 
@@ -15,6 +16,7 @@ const tabs = [
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
   { key: 'sessions', label: '会话审计' },
+  { key: 'messages', label: '消息搜索' },
   { key: 'archive', label: '归档统计' },
   { key: 'deadletters', label: '死信管理' },
   { key: 'vip', label: 'VIP 技能组' },
@@ -43,6 +45,7 @@ function switchTab(key) {
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
       <SessionAuditPanel v-if="activeTab === 'sessions'" />
+      <AdminMessageSearchPanel v-if="activeTab === 'messages'" />
       <ArchiveStatsPanel v-if="activeTab === 'archive'" />
       <DeadLetterPanel v-if="activeTab === 'deadletters'" />
       <VipSkillPanel v-if="activeTab === 'vip'" />

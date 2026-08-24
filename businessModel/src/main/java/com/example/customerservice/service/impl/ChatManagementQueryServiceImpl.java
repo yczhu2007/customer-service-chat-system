@@ -10,6 +10,7 @@ import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentLoadVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.ChatMessageSearchVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -241,6 +242,18 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         );
     }
 
+    @Override
+    public PageResult<ChatMessageSearchVO> searchMessages(String keyword, String agentId, long pageNo, long pageSize) {
+        String normalizedKeyword = normalize(keyword);
+        if (normalizedKeyword == null) throw new IllegalArgumentException("Search keyword cannot be empty");
+        if (normalizedKeyword.length() > 100) throw new IllegalArgumentException("Search keyword cannot exceed 100 characters");
+        long normalizedPageNo = Math.max(1L, pageNo);
+        long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
+        String normalizedAgentId = normalize(agentId);
+        long total = managementMapper.countMessageSearch(normalizedKeyword, normalizedAgentId);
+        List<ChatMessageSearchVO> records = total == 0 ? List.of() : managementMapper.findMessageSearch(normalizedKeyword, normalizedAgentId, (normalizedPageNo - 1) * normalizedPageSize, normalizedPageSize);
+        return new PageResult<>(normalizedPageNo, normalizedPageSize, total, total == 0 ? 0 : (total + normalizedPageSize - 1) / normalizedPageSize, records == null ? List.of() : List.copyOf(records));
+    }
     @Override
     public List<SessionTransferLogVO> findTransferLogs(
             String requesterId,

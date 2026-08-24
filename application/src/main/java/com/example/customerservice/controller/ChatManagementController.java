@@ -6,6 +6,7 @@ import com.example.customerservice.dto.AdminDashboardVO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.ChatMessageSearchVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -160,6 +161,19 @@ public class ChatManagementController {
         );
     }
 
+    @GetMapping("/admin/messages/search")
+    public Result<PageResult<ChatMessageSearchVO>> searchAdminMessages(@RequestParam @NotBlank @Size(max = 100) String keyword, @RequestParam(required = false) String agentId, @RequestParam(defaultValue = "1") @Min(1) long pageNo, @RequestParam(defaultValue = "20") @Min(1) @Max(100) long pageSize) {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:session:audit:view");
+        return Result.success(managementQueryService.searchMessages(keyword, agentId, pageNo, pageSize));
+    }
+
+    @GetMapping("/agent/messages/search")
+    public Result<PageResult<ChatMessageSearchVO>> searchAgentMessages(@RequestParam @NotBlank @Size(max = 100) String keyword, @RequestParam(defaultValue = "1") @Min(1) long pageNo, @RequestParam(defaultValue = "20") @Min(1) @Max(100) long pageSize) {
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:view-own");
+        return Result.success(managementQueryService.searchMessages(keyword, currentUser.getUserId(), pageNo, pageSize));
+    }
     @GetMapping("/sessions/{sessionId}/transfers")
     public Result<List<SessionTransferLogVO>> findTransferLogs(
             @PathVariable

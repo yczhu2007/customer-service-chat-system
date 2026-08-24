@@ -12,6 +12,7 @@ import UserProfileSidebar from '../components/agent/UserProfileSidebar.vue'
 import QuickReplyPanel from '../components/agent/QuickReplyPanel.vue'
 import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 import AgentOverviewPanel from '../components/agent/AgentOverviewPanel.vue'
+import AgentMessageSearchPanel from '../components/agent/AgentMessageSearchPanel.vue'
 import TransferLogPanel from '../components/session/TransferLogPanel.vue'
 
 const chat = useChatStore()
@@ -19,6 +20,7 @@ const auth = useAuthStore()
 const pendingQuickReply = ref('')
 const presenceError = ref('')
 const presencePending = ref(false)
+const showMessageSearch = ref(false)
 
 const QUICK_REPLY_LABELS = {
   MY_ACTIVE: '处理中',
@@ -94,10 +96,13 @@ onUnmounted(() => {
         </span>
         <button v-if="!chat.agentOnline" class="online-btn" @click="goOnline">上线</button>
         <button v-else class="offline-btn" @click="goOffline">下线</button>
+        <el-button size="small" @click="showMessageSearch = true">消息搜索</el-button>
         <ConnectionStatus />
       </div>
       <p v-if="presenceError" class="presence-error">{{ presenceError }}</p>
     </el-header>
+
+    <el-dialog v-model="showMessageSearch" title="消息搜索" width="680px" append-to-body><AgentMessageSearchPanel @selected="showMessageSearch = false" /></el-dialog>
 
     <el-container class="workspace-body">
       <!-- Left sidebar: view nav + session list -->

@@ -3,6 +3,7 @@ package com.example.customerservice.mapper;
 import com.example.customerservice.dto.AgentLoadVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.ChatMessageSearchVO;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
@@ -75,4 +76,8 @@ public interface ChatManagementMapper {
     );
 
     List<SessionTransferLogVO> findTransferLogs(@Param("sessionId") String sessionId);
+
+    long countMessageSearch(@Param("keyword") String keyword, @Param("agentId") String agentId);
+
+    List<ChatMessageSearchVO> findMessageSearch(@Param("keyword") String keyword, @Param("agentId") String agentId, @Param("offset") long offset, @Param("pageSize") long pageSize);
 }

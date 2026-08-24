@@ -1,7 +1,9 @@
 package com.example.customerservice.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.servlet.view.RedirectView;
 
 /**
  * SPA 转发：将 /user、/agent、/admin 页面路由统一转发到 Vue index.html，
@@ -10,18 +12,37 @@ import org.springframework.web.bind.annotation.GetMapping;
 @Controller
 public class FrontendForwardingController {
 
-    @GetMapping({"/frontend", "/frontend/", "/frontend/login", "/frontend/user", "/frontend/user/**", "/user", "/user/**"})
-    public String userWorkspace() {
+    private final String developmentServerUrl;
+
+    public FrontendForwardingController() {
+        this("");
+    }
+
+    public FrontendForwardingController(
+            @Value("${app.frontend.dev-server-url:}") String developmentServerUrl
+    ) {
+        this.developmentServerUrl = developmentServerUrl == null ? "" : developmentServerUrl.trim();
+    }
+
+    private Object spaEntry() {
+        if (!developmentServerUrl.isBlank()) {
+            return new RedirectView(developmentServerUrl + "/login");
+        }
         return "forward:/frontend/index.html";
+    }
+
+    @GetMapping({"/frontend", "/frontend/", "/frontend/login", "/frontend/user", "/frontend/user/**", "/user", "/user/**"})
+    public Object userWorkspace() {
+        return spaEntry();
     }
 
     @GetMapping({"/frontend/agent", "/frontend/agent/**", "/agent", "/agent/**"})
-    public String agentWorkspace() {
-        return "forward:/frontend/index.html";
+    public Object agentWorkspace() {
+        return spaEntry();
     }
 
     @GetMapping({"/frontend/admin", "/frontend/admin/**", "/admin", "/admin/**"})
-    public String adminWorkspace() {
-        return "forward:/frontend/index.html";
+    public Object adminWorkspace() {
+        return spaEntry();
     }
 }

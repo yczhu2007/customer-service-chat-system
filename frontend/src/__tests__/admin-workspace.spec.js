@@ -57,6 +57,7 @@ describe('AdminWorkspaceView', () => {
           UserManagementPanel: { template: '<div class="stub-users">用户管理</div>' },
           RoleManagementPanel: { template: '<div class="stub-roles">角色管理</div>' },
           SessionAuditPanel: { template: '<div class="stub-sessions">会话审计</div>' },
+          AdminMessageSearchPanel: { template: '<div class="stub-message-search">消息搜索</div>' },
           ArchiveStatsPanel: { template: '<div class="stub-archive">归档统计</div>' },
           DeadLetterPanel: { template: '<div class="stub-deadletters">死信管理</div>' },
           VipSkillPanel: { template: '<div class="stub-vip">VIP技能组</div>' },
@@ -74,12 +75,12 @@ describe('AdminWorkspaceView', () => {
     expect(wrapper.find('.stub-users').exists()).toBe(true)
 
     // Click "归档统计" tab
-    await tabs[4].trigger('click')
+    await tabs.find((tab) => tab.text() === '归档统计').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-archive').exists()).toBe(true)
 
     // Click "死信管理" tab
-    await tabs[5].trigger('click')
+    await tabs.find((tab) => tab.text() === '死信管理').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-deadletters').exists()).toBe(true)
   })

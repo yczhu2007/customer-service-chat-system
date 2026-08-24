@@ -5,6 +5,7 @@ import com.example.customerservice.dto.AdminDashboardVO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
+import com.example.customerservice.dto.ChatMessageSearchVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -46,6 +47,8 @@ public interface ChatManagementQueryService {
             long pageNo,
             long pageSize
     );
+
+    PageResult<ChatMessageSearchVO> searchMessages(String keyword, String agentId, long pageNo, long pageSize);
 
     List<SessionTransferLogVO> findTransferLogs(
             String requesterId,

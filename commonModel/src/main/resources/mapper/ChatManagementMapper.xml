@@ -58,6 +58,15 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="chatMessageSearchResult" type="com.example.customerservice.dto.ChatMessageSearchVO">
+        <constructor>
+            <arg column="message_id" javaType="java.lang.String"/><arg column="session_id" javaType="java.lang.String"/>
+            <arg column="user_id" javaType="java.lang.String"/><arg column="agent_id" javaType="java.lang.String"/>
+            <arg column="sender_id" javaType="java.lang.String"/><arg column="sender_role" javaType="java.lang.String"/>
+            <arg column="type" javaType="java.lang.String"/><arg column="content" javaType="java.lang.String"/>
+            <arg column="create_time" javaType="java.time.LocalDateTime"/><arg column="session_status" javaType="java.lang.String"/><arg column="session_title" javaType="java.lang.String"/>
+        </constructor>
+    </resultMap>
     <resultMap id="ratingSummaryResult" type="com.example.customerservice.dto.RatingSummaryVO">
         <constructor>
             <arg column="agent_id" javaType="java.lang.String"/>
@@ -423,4 +432,17 @@
         ORDER BY transfer_log.create_time ASC, transfer_log.id ASC
     </select>
 
+    <sql id="messageSearchPredicate">
+        message.recalled = 0 AND message.content LIKE CONCAT('%', #{keyword}, '%')
+        <if test="agentId != null and agentId != ''">
+            AND (session.agent_id = #{agentId} OR EXISTS (SELECT 1 FROM chat_session_transfer_log transfer_log WHERE transfer_log.session_id = session.id AND (transfer_log.source_agent_id = #{agentId} OR transfer_log.target_agent_id = #{agentId})))
+        </if>
+    </sql>
+    <select id="countMessageSearch" resultType="long">
+        SELECT COUNT(*) FROM chat_message message INNER JOIN chat_session session ON session.id = message.session_id WHERE <include refid="messageSearchPredicate"/>
+    </select>
+    <select id="findMessageSearch" resultMap="chatMessageSearchResult">
+        SELECT message.id AS message_id, message.session_id, session.user_id, session.agent_id, message.sender_id, message.sender_role, message.type, message.content, message.create_time, session.status AS session_status, session.title AS session_title
+        FROM chat_message message INNER JOIN chat_session session ON session.id = message.session_id WHERE <include refid="messageSearchPredicate"/> ORDER BY message.create_time DESC, message.id DESC LIMIT #{offset}, #{pageSize}
+    </select>
 </mapper>

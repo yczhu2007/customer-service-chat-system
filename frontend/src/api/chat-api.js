@@ -192,3 +192,8 @@ export const updateQuickReply = (id, data) =>
  */
 export const deleteQuickReply = (id) =>
   request(`/chat/quick-replies/${id}`, { method: 'DELETE' })
+
+export const searchAgentMessages = (params = {}) => {
+  const qs = new URLSearchParams(params).toString()
+  return request(`/chat/agent/messages/search?${qs}`)
+}

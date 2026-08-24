@@ -137,3 +137,8 @@ export function removeVipSkill(agentId) {
     method: 'DELETE',
   })
 }
+
+export function searchAdminMessages(params = {}) {
+  const qs = new URLSearchParams(params).toString()
+  return request(`/chat/admin/messages/search?${qs}`)
+}

@@ -38,6 +38,8 @@ app:
       window-seconds: ${AUTH_REGISTRATION_RATE_LIMIT_WINDOW_SECONDS:60}
       # 仅当应用只允许可信反向代理访问时开启，防止客户端伪造X-Forwarded-For。
       trust-forwarded-headers: ${AUTH_TRUST_FORWARDED_HEADERS:false}
+  frontend:
+    dev-server-url: ${FRONTEND_DEV_SERVER_URL:}
   websocket:
     allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS:http://localhost:*,http://127.0.0.1:*}
   bootstrap:

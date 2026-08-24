@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
 import { findTransferLogs } from '../../api/admin-api'
 import { ARCHIVE_STATUS_OPTIONS } from '../../constants/session-ui'
+import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
 const loading = ref(false)
 const error = ref(null)
