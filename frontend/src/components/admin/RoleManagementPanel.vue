@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { computed, ref, onMounted, watch } from 'vue'
 import {
   listRoles,
   createRole,
@@ -19,8 +19,7 @@ const loading = ref(false)
 const error = ref(null)
 const roles = ref([])
 const totalRoles = ref(0)
-const rolePageNo = ref(1)
-const rolePageSize = ref(20)
+const rolePageSize = 100
 
 // ─── Permissions ────────────────────────────────────────────
 const permissionsLoading = ref(false)
@@ -39,6 +38,7 @@ const deletePermissionId = ref(null)
 const selectedRoleId = ref(null)
 const selectedRolePerms = ref(new Set())
 const permAssignLoading = ref(false)
+const selectedRole = computed(() => roles.value.find((role) => role.id === selectedRoleId.value) ?? null)
 
 function emptyPermissionForm() {
   return {
@@ -64,9 +64,13 @@ async function loadRoles() {
   loading.value = true
   error.value = null
   try {
-    const res = await listRoles({ pageNo: rolePageNo.value, pageSize: rolePageSize.value })
+    const res = await listRoles({ pageNo: 1, pageSize: rolePageSize })
     roles.value = res.data?.records ?? []
     totalRoles.value = res.data?.total ?? 0
+    if (selectedRoleId.value && !selectedRole.value) {
+      selectedRoleId.value = null
+      selectedRolePerms.value = new Set()
+    }
   } catch (e) {
     error.value = e.message
   } finally {
@@ -88,7 +92,11 @@ async function loadPermissions() {
 }
 
 async function loadRolePermissions(roleId) {
-  selectedRoleId.value = roleId
+  selectedRoleId.value = roleId || null
+  if (!roleId) {
+    selectedRolePerms.value = new Set()
+    return
+  }
   try {
     const res = await findRolePermissions(roleId)
     selectedRolePerms.value = new Set(res.data ?? [])
@@ -161,12 +169,12 @@ async function executeDeletePermission() {
 
 async function refreshManagement() {
   await Promise.all([loadRoles(), loadPermissions()])
+  if (selectedRoleId.value) await loadRolePermissions(selectedRoleId.value)
 }
 
 onMounted(async () => {
   await Promise.all([loadRoles(), loadPermissions()])
 })
-watch(rolePageNo, loadRoles)
 watch(permPageNo, loadPermissions)
 
 function openCreateRole() {
@@ -188,12 +196,16 @@ async function submitRoleForm() {
   roleFormError.value = null
   try {
     if (roleDialogMode.value === 'create') {
+      const roleCode = roleForm.value.code
       await createRole({ roleCode: roleForm.value.code, roleName: roleForm.value.name, description: roleForm.value.description })
+      await loadRoles()
+      const createdRole = roles.value.find((role) => role.roleCode === roleCode)
+      if (createdRole) await loadRolePermissions(createdRole.id)
     } else {
       await updateRole(roleForm.value._id, { roleName: roleForm.value.name, description: roleForm.value.description })
+      await loadRoles()
     }
     showRoleDialog.value = false
-    await loadRoles()
   } catch (e) {
     roleFormError.value = e.message
   }
@@ -238,7 +250,6 @@ async function togglePermission(permId) {
   }
 }
 
-const roleTotalPages = () => Math.max(1, Math.ceil(totalRoles.value / rolePageSize.value))
 const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / permPageSize.value))
 </script>
 
@@ -248,89 +259,86 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
       <h2>角色管理</h2>
       <div class="panel-actions">
         <button class="btn refresh-roles" :disabled="loading || permissionsLoading" @click="refreshManagement">刷新</button>
-        <button class="btn btn-primary" @click="openCreateRole">+ 新增角色</button>
       </div>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
 
-    <div class="two-col">
-      <!-- Role List -->
-      <div class="col">
-        <h3>角色列表</h3>
-        <div v-if="loading" class="loading">加载中...</div>
-        <el-table v-else class="data-table" :data="roles" row-key="id" highlight-current-row :current-row-key="selectedRoleId" @row-click="(row) => loadRolePermissions(row.id)">
-          <el-table-column prop="roleCode" label="编码" />
-          <el-table-column prop="roleName" label="名称" />
-          <el-table-column label="操作" width="130">
-            <template #default="{ row }">
-              <div class="actions">
-                <el-button class="btn btn-sm" size="small" @click.stop="openEditRole(row)">编辑</el-button>
-                <el-button class="btn btn-sm btn-danger" size="small" @click.stop="confirmDeleteRole(row.id)">删除</el-button>
-              </div>
-            </template>
-          </el-table-column>
-          <template #empty><div class="empty">暂无数据</div></template>
-        </el-table>
-        <el-pagination
-          class="pagination"
-          layout="prev, slot, next"
-          :current-page="rolePageNo"
-          :page-size="rolePageSize"
-          :total="totalRoles"
-          :disabled="loading"
-          @current-change="rolePageNo = $event"
-        >
-          <span>{{ rolePageNo }} / {{ roleTotalPages() }}</span>
-        </el-pagination>
-      </div>
-
-      <!-- Permission List / Assignment -->
-      <div class="col">
-        <div class="sub-panel-header">
-          <h3>权限管理</h3>
-          <button class="btn btn-primary btn-sm" @click="openCreatePermission">+ 新增权限</button>
+    <section class="role-management-section">
+      <h3>选择角色</h3>
+      <div v-if="loading" class="loading">加载中...</div>
+      <template v-else>
+        <div class="role-management-toolbar">
+          <el-select
+            v-model="selectedRoleId"
+            class="role-selector"
+            aria-label="选择角色"
+            clearable
+            placeholder="请选择角色"
+            @change="loadRolePermissions"
+          >
+            <el-option
+              v-for="role in roles"
+              :key="role.id"
+              :label="`${role.roleName}（${role.roleCode}）`"
+              :value="role.id"
+            />
+          </el-select>
+          <div class="actions role-actions">
+            <el-button class="btn btn-primary btn-sm" size="small" @click="openCreateRole">新增角色</el-button>
+            <el-button class="btn btn-sm" size="small" :disabled="!selectedRole" @click="openEditRole(selectedRole)">编辑角色</el-button>
+            <el-button class="btn btn-sm btn-danger" size="small" :disabled="!selectedRole" @click="confirmDeleteRole(selectedRole.id)">删除角色</el-button>
+          </div>
         </div>
-        <p v-if="selectedRoleId" class="hint">
-          点击勾选为选中角色分配权限（当前角色: {{ roles.find(r => r.id === selectedRoleId)?.roleCode }})
-        </p>
-        <p v-else class="hint">请先点击左侧角色以查看/编辑其权限</p>
-        <div v-if="permissionsLoading" class="loading">加载中...</div>
-        <el-table v-else class="data-table" :data="permissions" row-key="id">
-          <el-table-column label="✓" width="52">
-            <template #default="{ row }">
-              <el-checkbox
-                :model-value="selectedRolePerms.has(row.permissionCode)"
-                :disabled="!selectedRoleId || permAssignLoading"
-                @change="togglePermission(row.id)"
-              />
-            </template>
-          </el-table-column>
-          <el-table-column prop="permissionCode" label="编码" />
-          <el-table-column prop="permissionName" label="名称" />
-          <el-table-column label="操作" width="130">
-            <template #default="{ row }">
-              <div class="actions">
-                <el-button class="btn btn-sm" size="small" @click.stop="openEditPermission(row)">编辑</el-button>
-                <el-button class="btn btn-sm btn-danger" size="small" @click.stop="confirmDeletePermission(row.id)">删除</el-button>
-              </div>
-            </template>
-          </el-table-column>
-          <template #empty><div class="empty">暂无数据</div></template>
-        </el-table>
-        <el-pagination
-          class="pagination"
-          layout="prev, slot, next"
-          :current-page="permPageNo"
-          :page-size="permPageSize"
-          :total="totalPermissions"
-          :disabled="permissionsLoading"
-          @current-change="permPageNo = $event"
-        >
-          <span>{{ permPageNo }} / {{ permTotalPages() }}</span>
-        </el-pagination>
+        <p v-if="!selectedRole" class="hint">请选择需要维护的角色</p>
+      </template>
+    </section>
+
+    <!-- Permission List / Assignment -->
+    <section class="permission-management-section">
+      <div class="sub-panel-header">
+        <h3>权限管理</h3>
+        <button class="btn btn-primary btn-sm" @click="openCreatePermission">+ 新增权限</button>
       </div>
-    </div>
+      <p v-if="selectedRoleId" class="hint">
+        点击勾选为所选角色分配权限
+      </p>
+      <p v-else class="hint">请先选择角色以查看/编辑其权限</p>
+      <div v-if="permissionsLoading" class="loading">加载中...</div>
+      <el-table v-else class="data-table" :data="permissions" row-key="id">
+        <el-table-column label="✓" width="52">
+          <template #default="{ row }">
+            <el-checkbox
+              :model-value="selectedRolePerms.has(row.permissionCode)"
+              :disabled="!selectedRoleId || permAssignLoading"
+              @change="togglePermission(row.id)"
+            />
+          </template>
+        </el-table-column>
+        <el-table-column prop="permissionCode" label="编码" />
+        <el-table-column prop="permissionName" label="名称" />
+        <el-table-column label="操作" width="130">
+          <template #default="{ row }">
+            <div class="actions">
+              <el-button class="btn btn-sm" size="small" @click.stop="openEditPermission(row)">编辑</el-button>
+              <el-button class="btn btn-sm btn-danger" size="small" @click.stop="confirmDeletePermission(row.id)">删除</el-button>
+            </div>
+          </template>
+        </el-table-column>
+        <template #empty><div class="empty">暂无数据</div></template>
+      </el-table>
+      <el-pagination
+        class="pagination"
+        layout="prev, slot, next"
+        :current-page="permPageNo"
+        :page-size="permPageSize"
+        :total="totalPermissions"
+        :disabled="permissionsLoading"
+        @current-change="permPageNo = $event"
+      >
+        <span>{{ permPageNo }} / {{ permTotalPages() }}</span>
+      </el-pagination>
+    </section>
 
     <el-dialog v-model="showPermissionDialog" class="dialog" :title="permissionDialogMode === 'create' ? '新增权限' : '编辑权限'" width="500px">
       <div v-if="permissionFormError" class="error">{{ permissionFormError }}</div>
@@ -397,16 +405,33 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
   margin-bottom: 1rem;
 }
 .panel-actions { display: flex; gap: 0.5rem; }
-.two-col {
-  display: flex;
-  gap: 1.5rem;
+.role-management-section,
+.permission-management-section {
+  min-width: 0;
 }
-.col {
+.role-management-section h3,
+.permission-management-section h3 {
+  margin-top: 0;
+}
+.role-management-section {
+  margin-bottom: 1.5rem;
+}
+.role-management-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+.role-selector {
   flex: 1;
   min-width: 0;
 }
-.col h3 {
-  margin-top: 0;
+.role-selector :deep(.el-select__selected-item),
+.role-selector :deep(.el-select__placeholder) {
+  color: var(--color-ink);
+  opacity: 1;
+}
+.role-actions {
+  flex: 0 0 auto;
 }
 .sub-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
 .sub-panel-header h3 { margin: 0; }

@@ -75,6 +75,6 @@ button:not(.el-button), input:not(.el-input__inner), select, textarea:not(.el-te
 button:not(.el-button) { border: 1px solid var(--color-line-strong); border-radius: 8px; background: transparent; color: var(--color-ink); cursor: pointer; }
 button:not(.el-button):hover:not(:disabled) { border-color: var(--color-primary); color: var(--color-primary); }
 button:not(.el-button):disabled { cursor: not-allowed; opacity: .45; }
-input:not(.el-input__inner), select, textarea:not(.el-textarea__inner) { border: 1px solid var(--color-line-strong); border-radius: 8px; background: var(--color-paper); color: var(--color-ink); }
-input:not(.el-input__inner):focus, select:focus, textarea:not(.el-textarea__inner):focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(77, 107, 254, .14); outline: none; }
+input:not(.el-input__inner):not(.el-select__input), select, textarea:not(.el-textarea__inner) { border: 1px solid var(--color-line-strong); border-radius: 8px; background: var(--color-paper); color: var(--color-ink); }
+input:not(.el-input__inner):not(.el-select__input):focus, select:focus, textarea:not(.el-textarea__inner):focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(77, 107, 254, .14); outline: none; }
 </style>

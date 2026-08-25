@@ -333,6 +333,71 @@ describe('RoleManagementPanel', () => {
 
     expect(wrapper.text()).toContain('新增权限')
   })
+
+  it('selects a role from the dropdown and loads its permissions', async () => {
+    const { listRoles, findRolePermissions } = await import('../api/admin-api')
+    listRoles.mockResolvedValueOnce({
+      data: { records: [{ id: 'role-agent', roleCode: 'AGENT', roleName: '客服' }], total: 1 },
+    })
+    findRolePermissions.mockResolvedValueOnce({ data: [] })
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    const roleSelect = wrapper.findComponent({ name: 'ElSelect' })
+    expect(roleSelect.classes()).toContain('role-selector')
+    expect(roleSelect.props('filterable')).toBe(false)
+
+    roleSelect.vm.$emit('update:modelValue', 'role-agent')
+    await nextTick()
+    roleSelect.vm.$emit('change', 'role-agent')
+    await nextTick()
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    expect(findRolePermissions).toHaveBeenCalledWith('role-agent')
+    expect(roleSelect.props('modelValue')).toBe('role-agent')
+    expect(roleSelect.find('.el-select__placeholder').text()).toBe('客服（AGENT）')
+    expect(wrapper.text()).not.toContain('当前角色: AGENT')
+  })
+
+  it('clears the selected role without requesting permissions for an empty value', async () => {
+    const { listRoles, findRolePermissions } = await import('../api/admin-api')
+    listRoles.mockResolvedValueOnce({
+      data: { records: [{ id: 'role-agent', roleCode: 'AGENT', roleName: '客服' }], total: 1 },
+    })
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    const roleSelect = wrapper.findComponent({ name: 'ElSelect' })
+    roleSelect.vm.$emit('change', undefined)
+    await nextTick()
+
+    expect(findRolePermissions).not.toHaveBeenCalled()
+    expect(wrapper.text()).toContain('请选择需要维护的角色')
+  })
+
+  it('places role CRUD controls beside the selector and leaves only refresh in the header', async () => {
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    expect(wrapper.get('.panel-actions').text()).toBe('刷新')
+
+    const roleToolbar = wrapper.get('.role-management-toolbar')
+    expect(roleToolbar.findComponent({ name: 'ElSelect' }).exists()).toBe(true)
+    expect(roleToolbar.text()).toContain('新增角色')
+    expect(roleToolbar.text()).toContain('编辑角色')
+    expect(roleToolbar.text()).toContain('删除角色')
+    expect(roleToolbar.findAll('button').filter((button) => button.text() === '编辑角色')[0].attributes('disabled')).toBeDefined()
+    expect(roleToolbar.findAll('button').filter((button) => button.text() === '删除角色')[0].attributes('disabled')).toBeDefined()
+  })
 })
 
 describe('AdminMessageSearchPanel', () => {
@@ -389,7 +454,7 @@ describe('RoleManagementPanel', () => {
     setActivePinia(createPinia())
   })
 
-  it('renders roleCode and roleName returned by the role API', async () => {
+  it('loads roleCode and roleName into the role selector', async () => {
     const { listRoles } = await import('../api/admin-api')
     listRoles.mockResolvedValueOnce({
       data: { records: [{ id: 'role-agent', roleCode: 'AGENT', roleName: '客服' }], total: 1 },
@@ -400,8 +465,11 @@ describe('RoleManagementPanel', () => {
     await vi.dynamicImportSettled()
     await nextTick()
 
-    expect(wrapper.text()).toContain('AGENT')
-    expect(wrapper.text()).toContain('客服')
+    const roleSelect = wrapper.findComponent({ name: 'ElSelect' })
+    const options = roleSelect.findAllComponents({ name: 'ElOption' })
+    expect(options).toHaveLength(1)
+    expect(options[0].props('label')).toBe('客服（AGENT）')
+    expect(options[0].props('value')).toBe('role-agent')
   })
 
   it('renders permissionCode and permissionName returned by the permission API', async () => {
