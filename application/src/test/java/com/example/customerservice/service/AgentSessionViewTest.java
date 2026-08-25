@@ -79,14 +79,22 @@ class AgentSessionViewTest {
                         "MY_UNREAD",
                         "MY_HIGH_PRIORITY",
                         "MY_UNARCHIVED",
-                        "MY_RECENT_CLOSED"
+                        "MY_RECENT_CLOSED",
+                        "MY_ARCHIVED_COMPLETED",
+                        "MY_ARCHIVED_PENDING",
+                        "MY_ARCHIVED_ON_HOLD",
+                        "MY_ARCHIVED_OTHER"
                 ),
                 List.of(
                         AgentSessionView.MY_ACTIVE.getCode(),
                         AgentSessionView.MY_UNREAD.getCode(),
                         AgentSessionView.MY_HIGH_PRIORITY.getCode(),
                         AgentSessionView.MY_UNARCHIVED.getCode(),
-                        AgentSessionView.MY_RECENT_CLOSED.getCode()
+                        AgentSessionView.MY_RECENT_CLOSED.getCode(),
+                        AgentSessionView.MY_ARCHIVED_COMPLETED.getCode(),
+                        AgentSessionView.MY_ARCHIVED_PENDING.getCode(),
+                        AgentSessionView.MY_ARCHIVED_ON_HOLD.getCode(),
+                        AgentSessionView.MY_ARCHIVED_OTHER.getCode()
                 )
         );
         assertEquals("我的处理中", AgentSessionView.MY_ACTIVE.getLabel());
@@ -94,6 +102,10 @@ class AgentSessionViewTest {
         assertEquals("我的高优先级", AgentSessionView.MY_HIGH_PRIORITY.getLabel());
         assertEquals("我的未归档", AgentSessionView.MY_UNARCHIVED.getLabel());
         assertEquals("我最近关闭", AgentSessionView.MY_RECENT_CLOSED.getLabel());
+        assertEquals("我的已解决", AgentSessionView.MY_ARCHIVED_COMPLETED.getLabel());
+        assertEquals("我的待处理", AgentSessionView.MY_ARCHIVED_PENDING.getLabel());
+        assertEquals("我的暂停", AgentSessionView.MY_ARCHIVED_ON_HOLD.getLabel());
+        assertEquals("我的其他", AgentSessionView.MY_ARCHIVED_OTHER.getLabel());
     }
 
     @Test
@@ -112,7 +124,7 @@ class AgentSessionViewTest {
         );
 
         assertEquals(
-                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED",
+                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED、MY_ARCHIVED_COMPLETED、MY_ARCHIVED_PENDING、MY_ARCHIVED_ON_HOLD、MY_ARCHIVED_OTHER",
                 error.getMessage()
         );
     }
@@ -182,12 +194,16 @@ class AgentSessionViewTest {
                         "MY_UNREAD",
                         "MY_HIGH_PRIORITY",
                         "MY_UNARCHIVED",
-                        "MY_RECENT_CLOSED"
+                        "MY_RECENT_CLOSED",
+                        "MY_ARCHIVED_COMPLETED",
+                        "MY_ARCHIVED_PENDING",
+                        "MY_ARCHIVED_ON_HOLD",
+                        "MY_ARCHIVED_OTHER"
                 ),
                 result.stream().map(AgentSessionViewCountVO::code).toList()
         );
         assertEquals(
-                List.of(2L, 3L, 0L, 0L, 1L),
+                List.of(2L, 3L, 0L, 0L, 1L, 0L, 0L, 0L, 0L),
                 result.stream().map(AgentSessionViewCountVO::count).toList()
         );
         verify(managementMapper).countAgentSessionViews("A001");
@@ -385,7 +401,7 @@ class AgentSessionViewTest {
                 ),
                 Arguments.of(
                         AgentSessionView.MY_HIGH_PRIORITY,
-                        "SESSION.STATUS = 'ACTIVE' AND SESSION.PRIORITY IN ('HIGH', 'URGENT')"
+                        "SESSION.PRIORITY IN ('HIGH', 'URGENT')"
                 ),
                 Arguments.of(
                         AgentSessionView.MY_UNARCHIVED,
@@ -394,6 +410,22 @@ class AgentSessionViewTest {
                 Arguments.of(
                         AgentSessionView.MY_RECENT_CLOSED,
                         "SESSION.STATUS = 'CLOSED' AND SESSION.END_TIME >= NOW() - INTERVAL 7 DAY"
+                ),
+                Arguments.of(
+                        AgentSessionView.MY_ARCHIVED_COMPLETED,
+                        "SESSION.STATUS = 'CLOSED' AND SESSION.ARCHIVE_STATUS = 'COMPLETED'"
+                ),
+                Arguments.of(
+                        AgentSessionView.MY_ARCHIVED_PENDING,
+                        "SESSION.STATUS = 'CLOSED' AND SESSION.ARCHIVE_STATUS = 'PENDING'"
+                ),
+                Arguments.of(
+                        AgentSessionView.MY_ARCHIVED_ON_HOLD,
+                        "SESSION.STATUS = 'CLOSED' AND SESSION.ARCHIVE_STATUS = 'ON_HOLD'"
+                ),
+                Arguments.of(
+                        AgentSessionView.MY_ARCHIVED_OTHER,
+                        "SESSION.STATUS = 'CLOSED' AND SESSION.ARCHIVE_STATUS = 'OTHER'"
                 )
         );
     }

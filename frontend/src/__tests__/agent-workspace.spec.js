@@ -14,6 +14,10 @@ vi.mock('../api/chat-api', () => ({
         { code: 'MY_HIGH_PRIORITY', label: '高优先级', count: 0 },
         { code: 'MY_UNARCHIVED', label: '未归档', count: 2 },
         { code: 'MY_RECENT_CLOSED', label: '最近关闭', count: 5 },
+        { code: 'MY_ARCHIVED_COMPLETED', label: '已解决', count: 1 },
+        { code: 'MY_ARCHIVED_PENDING', label: '待处理', count: 1 },
+        { code: 'MY_ARCHIVED_ON_HOLD', label: '暂停', count: 1 },
+        { code: 'MY_ARCHIVED_OTHER', label: '其他', count: 1 },
       ],
     })
   ),
@@ -101,6 +105,7 @@ vi.mock('../api/chat-api', () => ({
   agentOnline: vi.fn(() => Promise.resolve(null)),
   agentOffline: vi.fn(() => Promise.resolve(null)),
   fetchAttachmentBlob: vi.fn(() => Promise.resolve('blob:test')),
+  searchAgentMessages: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
 }))
 
 vi.mock('../services/stomp-client', () => ({
@@ -131,10 +136,14 @@ import {
   findAgentDashboard,
   findAgentRatingSummary,
   findTransferLogs,
+  searchAgentMessages,
 } from '../api/chat-api'
 import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
 import AgentSessionList from '../components/session/AgentSessionList.vue'
 import SessionArchiveActions from '../components/session/SessionArchiveActions.vue'
+import AgentViewNav from '../components/session/AgentViewNav.vue'
+import AgentMessageSearchPanel from '../components/agent/AgentMessageSearchPanel.vue'
+import MessageList from '../components/chat/MessageList.vue'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -148,7 +157,7 @@ describe('Chat Store - Agent Workspace', () => {
   it('loads agent view counts', async () => {
     const chat = useChatStore()
     await chat.loadAgentViewCounts()
-    expect(chat.agentViewCounts).toHaveLength(5)
+    expect(chat.agentViewCounts).toHaveLength(9)
     expect(chat.agentViewCounts[0].code).toBe('MY_ACTIVE')
     expect(chat.agentViewCounts[0].count).toBe(3)
   })
@@ -159,6 +168,87 @@ describe('Chat Store - Agent Workspace', () => {
     expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', { pageNo: 1, pageSize: 20 })
     expect(chat.sessions).toHaveLength(2)
     expect(chat.sessions[0].sessionId).toBe('s1')
+  })
+
+  it('opens a searched message in its session and records the message to focus', async () => {
+    const chat = useChatStore()
+
+    await chat.openAgentSearchResult({
+      messageId: 'message-7',
+      sessionId: 'closed-session',
+      sessionTitle: '已结束的支付咨询',
+      sessionStatus: 'CLOSED',
+      userId: 'user-7',
+      agentId: 'agent-1',
+    })
+
+    expect(chat.activeSessionId).toBe('closed-session')
+    expect(chat.focusedMessageId).toBe('message-7')
+    expect(chat.sessions[0].sessionId).toBe('closed-session')
+  })
+
+  it('keeps the searched session selected when the current view refresh excludes it', async () => {
+    const chat = useChatStore()
+    await chat.openAgentSearchResult({
+      messageId: 'message-7',
+      sessionId: 'closed-session',
+      sessionTitle: '已结束的支付咨询',
+      sessionStatus: 'CLOSED',
+      userId: 'user-7',
+      agentId: 'agent-1',
+    })
+    listAgentViewSessions.mockResolvedValueOnce({
+      data: { current: 1, size: 20, total: 1, pages: 1, records: [{ sessionId: 'active-session', status: 'ACTIVE' }] },
+    })
+
+    await chat.loadAgentViewSessions('MY_ACTIVE')
+
+    expect(chat.activeSessionId).toBe('closed-session')
+    expect(chat.sessions.map((session) => session.sessionId)).toContain('closed-session')
+  })
+
+  it('shows all four archive states in the fixed agent view navigation', async () => {
+    const wrapper = mount(AgentViewNav)
+
+    expect(wrapper.text()).toContain('已解决')
+    expect(wrapper.text()).toContain('待处理')
+    expect(wrapper.text()).toContain('暂停')
+    expect(wrapper.text()).toContain('其他')
+  })
+
+  it('opens a clicked search result through the store navigation action', async () => {
+    const chat = useChatStore()
+    chat.openAgentSearchResult = vi.fn(() => Promise.resolve())
+    searchAgentMessages.mockResolvedValueOnce({
+      data: { records: [{ messageId: 'message-7', sessionId: 'closed-session', content: '支付失败' }], total: 1 },
+    })
+    const wrapper = mount(AgentMessageSearchPanel)
+
+    await wrapper.get('input').setValue('支付失败')
+    await wrapper.find('.el-button--primary').trigger('click')
+    await nextTick()
+    await wrapper.get('.search-result').trigger('click')
+
+    expect(chat.openAgentSearchResult).toHaveBeenCalledWith(expect.objectContaining({
+      messageId: 'message-7', sessionId: 'closed-session',
+    }))
+  })
+
+  it('scrolls to and highlights the searched message after its session loads', async () => {
+    const chat = useChatStore()
+    const scrollIntoView = vi.fn()
+    HTMLElement.prototype.scrollIntoView = scrollIntoView
+    chat.activeSessionId = 's1'
+    chat.focusedMessageId = 'message-7'
+    chat.messages = [{ id: 'message-7', sessionId: 's1', senderId: 'user-7', senderRole: 'USER', type: 'TEXT', content: '支付失败' }]
+
+    const wrapper = mount(MessageList, { attachTo: document.body, props: { sessionId: 's1' } })
+    await nextTick()
+    await nextTick()
+
+    expect(scrollIntoView).toHaveBeenCalled()
+    expect(wrapper.get('#message-message-7').classes()).toContain('is-focused')
+    wrapper.unmount()
   })
 
   it('loads every remaining page for the active agent view and removes duplicate sessions', async () => {
@@ -216,6 +306,20 @@ describe('Chat Store - Agent Workspace', () => {
 
     expect(wrapper.text()).toContain('当前会话')
     expect(chat.loadAllRemainingAgentSessions).toHaveBeenCalledOnce()
+  })
+
+  it('refreshes both the current view sessions and all view counts from the sidebar button', async () => {
+    const chat = useChatStore()
+    chat.refreshAgentViews = vi.fn()
+    const wrapper = mount(AgentWorkspaceView, { global: { stubs: {
+      AgentViewNav: true, AgentSessionList: true, AgentChatWindow: true, SessionMetadataEditor: true,
+      SessionArchiveActions: true, UserProfileSidebar: true, QuickReplyPanel: true, ConnectionStatus: true,
+      AgentOverviewPanel: true, TransferLogPanel: true,
+    } } })
+
+    await wrapper.get('.refresh-btn').trigger('click')
+
+    expect(chat.refreshAgentViews).toHaveBeenCalledOnce()
   })
 
   it('switches active agent view and refreshes sessions', async () => {

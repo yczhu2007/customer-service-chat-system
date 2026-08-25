@@ -203,8 +203,7 @@
                 COALESCE(unread.unread_count, 0) &gt; 0
             </when>
             <when test="viewCode == 'MY_HIGH_PRIORITY'">
-                session.status = 'ACTIVE'
-                AND session.priority IN ('HIGH', 'URGENT')
+                session.priority IN ('HIGH', 'URGENT')
             </when>
             <when test="viewCode == 'MY_UNARCHIVED'">
                 session.status = 'CLOSED'
@@ -213,6 +212,22 @@
             <when test="viewCode == 'MY_RECENT_CLOSED'">
                 session.status = 'CLOSED'
                 AND session.end_time &gt;= NOW() - INTERVAL 7 DAY
+            </when>
+            <when test="viewCode == 'MY_ARCHIVED_COMPLETED'">
+                session.status = 'CLOSED'
+                AND session.archive_status = 'COMPLETED'
+            </when>
+            <when test="viewCode == 'MY_ARCHIVED_PENDING'">
+                session.status = 'CLOSED'
+                AND session.archive_status = 'PENDING'
+            </when>
+            <when test="viewCode == 'MY_ARCHIVED_ON_HOLD'">
+                session.status = 'CLOSED'
+                AND session.archive_status = 'ON_HOLD'
+            </when>
+            <when test="viewCode == 'MY_ARCHIVED_OTHER'">
+                session.status = 'CLOSED'
+                AND session.archive_status = 'OTHER'
             </when>
             <otherwise>
                 1 = 0
@@ -266,8 +281,7 @@
                COUNT(*) AS count
         FROM scoped_sessions session
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
-        WHERE session.status = 'ACTIVE'
-          AND session.priority IN ('HIGH', 'URGENT')
+        WHERE session.priority IN ('HIGH', 'URGENT')
         UNION ALL
         SELECT 'MY_UNARCHIVED' AS code,
                '我的未归档' AS label,
@@ -284,6 +298,38 @@
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
         WHERE session.status = 'CLOSED'
           AND session.end_time &gt;= NOW() - INTERVAL 7 DAY
+        UNION ALL
+        SELECT 'MY_ARCHIVED_COMPLETED' AS code,
+               '我的已解决' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.archive_status = 'COMPLETED'
+        UNION ALL
+        SELECT 'MY_ARCHIVED_PENDING' AS code,
+               '我的待处理' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.archive_status = 'PENDING'
+        UNION ALL
+        SELECT 'MY_ARCHIVED_ON_HOLD' AS code,
+               '我的暂停' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.archive_status = 'ON_HOLD'
+        UNION ALL
+        SELECT 'MY_ARCHIVED_OTHER' AS code,
+               '我的其他' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        WHERE session.status = 'CLOSED'
+          AND session.archive_status = 'OTHER'
     </select>
 
     <select id="countAgentViewSessions" resultType="long">

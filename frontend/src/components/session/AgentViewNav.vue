@@ -10,6 +10,10 @@ const VIEW_DEFS = [
   { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
   { code: 'MY_UNARCHIVED', label: '未归档' },
   { code: 'MY_RECENT_CLOSED', label: '最近关闭' },
+  { code: 'MY_ARCHIVED_COMPLETED', label: '已解决' },
+  { code: 'MY_ARCHIVED_PENDING', label: '待处理' },
+  { code: 'MY_ARCHIVED_ON_HOLD', label: '暂停' },
+  { code: 'MY_ARCHIVED_OTHER', label: '其他' },
 ]
 
 /** Build a map of code -> count for quick lookup */

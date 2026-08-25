@@ -10,7 +10,11 @@ public enum AgentSessionView {
     MY_UNREAD("MY_UNREAD", "我的未读"),
     MY_HIGH_PRIORITY("MY_HIGH_PRIORITY", "我的高优先级"),
     MY_UNARCHIVED("MY_UNARCHIVED", "我的未归档"),
-    MY_RECENT_CLOSED("MY_RECENT_CLOSED", "我最近关闭");
+    MY_RECENT_CLOSED("MY_RECENT_CLOSED", "我最近关闭"),
+    MY_ARCHIVED_COMPLETED("MY_ARCHIVED_COMPLETED", "我的已解决"),
+    MY_ARCHIVED_PENDING("MY_ARCHIVED_PENDING", "我的待处理"),
+    MY_ARCHIVED_ON_HOLD("MY_ARCHIVED_ON_HOLD", "我的暂停"),
+    MY_ARCHIVED_OTHER("MY_ARCHIVED_OTHER", "我的其他");
 
     private final String code;
     private final String label;
@@ -36,7 +40,7 @@ public enum AgentSessionView {
             return valueOf(rawCode.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException exception) {
             throw new IllegalArgumentException(
-                    "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED"
+                    "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED、MY_ARCHIVED_COMPLETED、MY_ARCHIVED_PENDING、MY_ARCHIVED_ON_HOLD、MY_ARCHIVED_OTHER"
             );
         }
     }

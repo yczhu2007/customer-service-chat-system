@@ -89,6 +89,10 @@ export const useChatStore = defineStore('chat', {
     agentViewCounts: [],
     /** Active agent view code */
     activeAgentView: 'MY_ACTIVE',
+    /** Message ID to locate after a result is opened from agent message search. */
+    focusedMessageId: null,
+    /** Session kept visible while an agent locates a search result outside the current view. */
+    pinnedAgentSearchSession: null,
     /** Metadata for the active session */
     activeMetadata: null,
     /** User profile for the active session */
@@ -797,6 +801,27 @@ export const useChatStore = defineStore('chat', {
       this.loadAgentViewSessions(this.activeAgentView)
     },
 
+    async openAgentSearchResult(result) {
+      if (!result?.sessionId) return false
+      if (!this.sessions.some((session) => session.sessionId === result.sessionId)) {
+        this.sessions.unshift({
+          sessionId: result.sessionId,
+          title: result.sessionTitle || '新咨询',
+          status: result.sessionStatus || 'CLOSED',
+          userId: result.userId,
+          agentId: result.agentId,
+        })
+      }
+      this.pinnedAgentSearchSession = this.sessions.find((session) => session.sessionId === result.sessionId) || null
+      this.focusedMessageId = result.messageId || null
+      await this.selectAgentSession(result.sessionId)
+      return true
+    },
+
+    clearFocusedMessage(messageId) {
+      if (!messageId || this.focusedMessageId === messageId) this.focusedMessageId = null
+    },
+
     /** Send the business heartbeat expected by the backend presence tracker. */
     startHeartbeat() {
       this.stopHeartbeat()
@@ -849,6 +874,11 @@ export const useChatStore = defineStore('chat', {
         } else {
           this.sessions = records
         }
+        const pinned = this.pinnedAgentSearchSession
+        if (pinned && this.activeSessionId === pinned.sessionId
+          && !this.sessions.some((session) => session.sessionId === pinned.sessionId)) {
+          this.sessions = [pinned, ...this.sessions]
+        }
         this.sessionsPageNo = page?.current || pageNo
         this.sessionsPageSize = page?.size || pageSize
         this.sessionsTotal = page?.total || 0
@@ -889,6 +919,7 @@ export const useChatStore = defineStore('chat', {
      * Switch active agent view and refresh sessions.
      */
     async switchAgentView(viewCode) {
+      this.pinnedAgentSearchSession = null
       this.activeAgentView = viewCode
       await this.loadAgentViewSessions(viewCode)
     },
@@ -970,6 +1001,9 @@ export const useChatStore = defineStore('chat', {
      * Select session for agent workspace: loads messages, metadata, and user profile.
      */
     async selectAgentSession(sessionId) {
+      if (this.pinnedAgentSearchSession && this.pinnedAgentSearchSession.sessionId !== sessionId) {
+        this.pinnedAgentSearchSession = null
+      }
       await this.selectSession(sessionId)
       await Promise.all([
         this.loadSessionMetadata(sessionId),

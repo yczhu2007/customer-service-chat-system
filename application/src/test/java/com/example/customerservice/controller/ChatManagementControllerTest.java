@@ -83,7 +83,7 @@ class ChatManagementControllerTest {
         );
 
         assertEquals(
-                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED",
+                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED、MY_ARCHIVED_COMPLETED、MY_ARCHIVED_PENDING、MY_ARCHIVED_ON_HOLD、MY_ARCHIVED_OTHER",
                 exception.getMessage()
         );
         verify(currentUser).requireRole("AGENT");

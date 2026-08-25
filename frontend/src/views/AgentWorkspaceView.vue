@@ -28,6 +28,10 @@ const QUICK_REPLY_LABELS = {
   MY_HIGH_PRIORITY: '高优先级',
   MY_UNARCHIVED: '未归档',
   MY_RECENT_CLOSED: '最近关闭',
+  MY_ARCHIVED_COMPLETED: '已解决',
+  MY_ARCHIVED_PENDING: '待处理',
+  MY_ARCHIVED_ON_HOLD: '暂停',
+  MY_ARCHIVED_OTHER: '其他',
 }
 
 /** Set agent online and connect STOMP */
@@ -111,7 +115,7 @@ onUnmounted(() => {
         <div class="sidebar-divider" />
         <div class="session-list-header">
           <span class="list-title">{{ QUICK_REPLY_LABELS[chat.activeAgentView] || '会话' }}</span>
-          <button class="refresh-btn" @click="chat.loadAgentViewSessions(chat.activeAgentView)">刷新</button>
+          <button class="refresh-btn" @click="chat.refreshAgentViews()">刷新</button>
         </div>
         <AgentSessionList />
       </el-aside>

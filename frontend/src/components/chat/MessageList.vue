@@ -14,6 +14,8 @@ const auth = useAuthStore()
 const listEl = ref(null)
 const blobCache = ref({})
 const unavailableAttachmentUrls = new Set()
+const highlightedMessageId = ref(null)
+let highlightTimeout = null
 
 function replyMessageId(message) {
   return message.replyToMessageId || message.reply_to_message_id || null
@@ -122,6 +124,22 @@ function scrollToBottom() {
   })
 }
 
+function focusMessage(messageId) {
+  if (!messageId || props.sessionId !== chat.activeSessionId) return
+  const target = document.getElementById(`message-${messageId}`)
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    highlightedMessageId.value = messageId
+    if (highlightTimeout) clearTimeout(highlightTimeout)
+    highlightTimeout = setTimeout(() => { highlightedMessageId.value = null }, 2000)
+    chat.clearFocusedMessage(messageId)
+    return
+  }
+  if (!chat.messagesLoading && chat.historyHasMore && !chat.historyLoadingMore) {
+    chat.loadMoreHistory(props.sessionId)
+  }
+}
+
 watch(
   () => [props.sessionId, ...chat.messages.map((msg) => msg.id || msg.clientMsgId)],
   () => {
@@ -129,7 +147,8 @@ watch(
     Object.keys(blobCache.value)
       .filter((messageId) => !messageIds.has(messageId))
       .forEach((messageId) => releaseBlob(messageId))
-    scrollToBottom()
+    if (chat.focusedMessageId) nextTick(() => focusMessage(chat.focusedMessageId))
+    else scrollToBottom()
     chat.messages
       .filter((msg) => (msg.type === 'IMAGE' || msg.type === 'FILE') && !msg.recalled)
       .forEach((msg) => loadBlob(msg))
@@ -138,7 +157,10 @@ watch(
 )
 
 onMounted(() => scrollToBottom())
-onUnmounted(releaseAllBlobs)
+onUnmounted(() => {
+  if (highlightTimeout) clearTimeout(highlightTimeout)
+  releaseAllBlobs()
+})
 </script>
 
 <template>
@@ -154,14 +176,14 @@ onUnmounted(releaseAllBlobs)
     <div v-if="chat.messagesLoading" class="loading-hint">加载历史消息中…</div>
     <template v-for="msg in chat.messages" :key="msg.clientMsgId || msg.id">
       <!-- System messages -->
-      <div v-if="isSystem(msg)" class="message-row system">
+      <div v-if="isSystem(msg)" :id="msg.id ? `message-${msg.id}` : null" class="message-row system" :class="{ 'is-focused': highlightedMessageId === msg.id }">
         <div class="message-bubble system-bubble">
           <span>{{ msg.content }}</span>
         </div>
       </div>
 
       <!-- Regular messages -->
-      <div v-else :id="msg.id ? `message-${msg.id}` : null" class="message-row" :class="{ mine: isMine(msg), other: !isMine(msg) }">
+      <div v-else :id="msg.id ? `message-${msg.id}` : null" class="message-row" :class="{ mine: isMine(msg), other: !isMine(msg), 'is-focused': highlightedMessageId === msg.id }">
         <div class="message-meta">
           <span class="sender">{{ isMine(msg) ? '我' : (msg.senderRole === 'AGENT' ? '客服' : '用户') }}</span>
           <span class="time">{{ formatTime(msg.createTime) }}</span>
@@ -287,6 +309,7 @@ onUnmounted(releaseAllBlobs)
   align-self: center;
   max-width: 100%;
 }
+.message-row.is-focused .message-bubble { box-shadow: 0 0 0 3px rgba(77, 107, 254, .32); }
 .message-meta {
   font-size: 0.75rem;
   color: #6b7280;
