@@ -15,7 +15,7 @@ const tabs = [
   { key: 'dashboard', label: '管理仪表盘' },
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
-  { key: 'sessions', label: '会话审计' },
+  { key: 'sessions', label: '会话管理' },
   { key: 'messages', label: '消息搜索' },
   { key: 'archive', label: '归档统计' },
   { key: 'deadletters', label: '死信管理' },

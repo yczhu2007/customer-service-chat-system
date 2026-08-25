@@ -16,6 +16,8 @@ public interface MessagePersistService {
 
     void replayDeadLetter(String messageId);
 
+    void deleteDeadLetter(String messageId);
+
     int cleanupExpiredDeadLetters(long cutoffEpochMillis, int batchSize);
 
 }

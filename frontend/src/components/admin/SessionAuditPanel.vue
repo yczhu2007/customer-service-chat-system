@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
-import { findTransferLogs } from '../../api/admin-api'
+import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
 import { ARCHIVE_STATUS_OPTIONS } from '../../constants/session-ui'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
@@ -13,6 +13,13 @@ const pageNo = ref(1)
 const pageSize = ref(20)
 const expandedSessionId = ref(null)
 const transferLogs = ref({})
+const showCreateDialog = ref(false)
+const showEditDialog = ref(false)
+const saving = ref(false)
+const editingSession = ref(null)
+const formError = ref(null)
+const createForm = ref({ userLoginNumber: '', agentLoginNumber: '' })
+const editForm = ref({ title: '', priority: 'NORMAL', category: 'OTHER', tags: '' })
 
 // Filters
 const filters = ref({
@@ -105,11 +112,69 @@ function ratingStars(rating) {
   return '★'.repeat(rating) + '☆'.repeat(5 - rating)
 }
 
+function openCreateDialog() {
+  createForm.value = { userLoginNumber: '', agentLoginNumber: '' }
+  formError.value = null
+  showCreateDialog.value = true
+}
+
+async function createSession() {
+  saving.value = true
+  formError.value = null
+  try {
+    await createAdminSession(createForm.value)
+    showCreateDialog.value = false
+    await loadSessions()
+  } catch (e) { formError.value = e.message } finally { saving.value = false }
+}
+
+async function openEditDialog(row) {
+  formError.value = null
+  editingSession.value = row
+  try {
+    const result = await request(`/chat/sessions/${encodeURIComponent(row.sessionId)}/metadata`)
+    const metadata = result.data || {}
+    editForm.value = {
+      title: metadata.title || '',
+      priority: metadata.priority || 'NORMAL',
+      category: metadata.category || 'OTHER',
+      tags: (metadata.tags || []).join(', '),
+    }
+    showEditDialog.value = true
+  } catch (e) { formError.value = e.message }
+}
+
+async function saveSessionMetadata() {
+  saving.value = true
+  formError.value = null
+  try {
+    await updateAdminSession(editingSession.value.sessionId, {
+      title: editForm.value.title,
+      priority: editForm.value.priority,
+      category: editForm.value.category,
+      tags: editForm.value.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+    })
+    showEditDialog.value = false
+    await loadSessions()
+  } catch (e) { formError.value = e.message } finally { saving.value = false }
+}
+
+async function endSession(row) {
+  if (!window.confirm(`确定结束会话 ${row.sessionId} 吗？`)) return
+  try {
+    await deleteAdminSession(row.sessionId)
+    await loadSessions()
+  } catch (e) { error.value = e.message }
+}
+
 </script>
 
 <template>
   <section class="session-audit">
-    <h2>会话审计</h2>
+    <div class="panel-header">
+      <h2>会话管理</h2>
+      <button class="btn btn-create" @click="openCreateDialog">新建会话</button>
+    </div>
 
     <div class="filters">
       <input v-model="filters.userLoginNumber" class="user-login-number" placeholder="用户登录编号" />
@@ -166,6 +231,12 @@ function ratingStars(rating) {
             </div>
           </template>
         </el-table-column>
+        <el-table-column label="操作" min-width="180" fixed="right">
+          <template #default="{ row }">
+            <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
+            <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="endSession(row)">结束会话</el-button>
+          </template>
+        </el-table-column>
         <template #empty><div class="empty">暂无数据</div></template>
       </el-table>
 
@@ -180,6 +251,26 @@ function ratingStars(rating) {
       />
 
     </template>
+
+    <el-dialog v-model="showCreateDialog" title="新建会话" width="480px">
+      <div class="form-grid">
+        <label>用户登录编号<input v-model="createForm.userLoginNumber" placeholder="例如 user001" /></label>
+        <label>客服登录编号<input v-model="createForm.agentLoginNumber" placeholder="例如 agent001" /></label>
+      </div>
+      <p v-if="formError" class="error">{{ formError }}</p>
+      <template #footer><el-button @click="showCreateDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="createSession">创建</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="showEditDialog" title="编辑会话" width="520px">
+      <div class="form-grid">
+        <label>标题<input v-model="editForm.title" /></label>
+        <label>优先级<select v-model="editForm.priority"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label>
+        <label>分类<select v-model="editForm.category"><option>ACCOUNT</option><option>PAYMENT</option><option>TECHNICAL</option><option>AFTER_SALES</option><option>OTHER</option></select></label>
+        <label>标签（逗号分隔）<input v-model="editForm.tags" placeholder="vip, payment" /></label>
+      </div>
+      <p v-if="formError" class="error">{{ formError }}</p>
+      <template #footer><el-button @click="showEditDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveSessionMetadata">保存</el-button></template>
+    </el-dialog>
   </section>
 </template>
 
@@ -187,6 +278,10 @@ function ratingStars(rating) {
 .session-audit {
   padding: 1rem;
 }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.form-grid { display: grid; gap: 0.85rem; }
+.form-grid label { display: grid; gap: 0.35rem; color: #374151; font-size: 0.9rem; }
+.form-grid input, .form-grid select { padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; }
 .filters {
   display: flex;
   flex-wrap: nowrap;

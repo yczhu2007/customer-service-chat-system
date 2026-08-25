@@ -27,6 +27,9 @@ public interface ChatSessionQueryService {
     /** 更新会话元数据。 */
     ChatSessionMetadataVO updateSessionMetadata(String agentId, String sessionId, ChatSessionMetadataUpdateDTO request);
 
+    /** 管理员更新任意会话元数据。 */
+    ChatSessionMetadataVO updateSessionMetadataAsAdmin(String sessionId, ChatSessionMetadataUpdateDTO request);
+
     /** 查询当前排队状态（在线客服数、队列大小、我的位置、预估等待时间）。 */
     QueueStatusVO getQueueStatus(String userId);
 

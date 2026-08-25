@@ -292,6 +292,18 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         }
     }
 
+    @Override
+    public void deleteDeadLetter(String messageId) {
+        if (messageId == null || messageId.isBlank()) {
+            throw new IllegalArgumentException("messageId不能为空");
+        }
+        Long removed = redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_DEADLETTER, messageId);
+        redisTemplate.delete(RedisConstants.PERSIST_PENDING_PAYLOAD + messageId);
+        if (removed == null || removed == 0L) {
+            throw new IllegalArgumentException("死信消息不存在");
+        }
+    }
+
     private ChatMessage parseDeadLetterSummary(String messageId, String payload) {
         if (payload == null || payload.isBlank()) {
             return null;

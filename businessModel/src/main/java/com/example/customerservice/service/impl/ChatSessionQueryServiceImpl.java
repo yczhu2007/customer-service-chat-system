@@ -221,6 +221,23 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                 || !Objects.equals(agentId, session.getAgentId())) {
             throw new IllegalArgumentException("只有会话分配的客服可以更新元数据");
         }
+        return applySessionMetadata(session, request);
+    }
+
+    @Override
+    @Transactional
+    public ChatSessionMetadataVO updateSessionMetadataAsAdmin(
+            String sessionId,
+            ChatSessionMetadataUpdateDTO request
+    ) {
+        ChatSession session = requireSession(sessionId);
+        return applySessionMetadata(session, request);
+    }
+
+    private ChatSessionMetadataVO applySessionMetadata(
+            ChatSession session,
+            ChatSessionMetadataUpdateDTO request
+    ) {
         validateMetadataRequest(request);
         List<String> normalizedTags = normalizeTags(request.getTags());
 
@@ -233,10 +250,10 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         }
 
         ChatSessionTagMapper requiredTagMapper = requireTagMapper();
-        requiredTagMapper.deleteBySessionId(sessionId);
+        requiredTagMapper.deleteBySessionId(session.getId());
         for (String value : normalizedTags) {
             ChatSessionTag tag = new ChatSessionTag();
-            tag.setSessionId(sessionId);
+            tag.setSessionId(session.getId());
             tag.setTag(value);
             if (requiredTagMapper.insert(tag) != 1) {
                 throw new BusinessStateException("会话标签更新失败");

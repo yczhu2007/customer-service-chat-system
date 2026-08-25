@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { findDeadLetters, replayDeadLetter } from '../../api/admin-api'
+import { deleteDeadLetter, findDeadLetters, replayDeadLetter } from '../../api/admin-api'
 
 const loading = ref(false)
 const error = ref(null)
@@ -49,6 +49,14 @@ async function executeReplay() {
   } finally {
     replayLoading.value = false
   }
+}
+
+async function removeDeadLetter(messageId) {
+  if (!window.confirm(`确定删除死信消息 ${messageId} 吗？`)) return
+  try {
+    await deleteDeadLetter(messageId)
+    await loadDeadLetters()
+  } catch (e) { error.value = e.message }
 }
 
 function formatDate(dt) {
@@ -101,7 +109,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="100">
+        <el-table-column label="操作" width="180">
           <template #default="{ row }">
             <el-button
               class="btn btn-sm btn-primary"
@@ -111,6 +119,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             >
               重放
             </el-button>
+            <el-button class="btn btn-sm" size="small" @click="removeDeadLetter(row.messageId)">删除</el-button>
           </template>
         </el-table-column>
         <template #empty><div class="empty">暂无死信消息</div></template>

@@ -26,6 +26,7 @@ vi.mock('../api/admin-api', () => ({
   deletePermission: vi.fn(),
   findDeadLetters: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
   replayDeadLetter: vi.fn(() => Promise.resolve({ message: '重放成功' })),
+  deleteDeadLetter: vi.fn(),
   findArchiveStats: vi.fn(() =>
     Promise.resolve({
       data: {
@@ -43,7 +44,11 @@ vi.mock('../api/admin-api', () => ({
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),
   findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
+  createAdminSession: vi.fn(),
+  updateAdminSession: vi.fn(),
+  deleteAdminSession: vi.fn(),
   searchAdminMessages: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
+  deleteAdminMessage: vi.fn(),
 }))
 
 // ─── Mock http-client ────────────────────────────────────────

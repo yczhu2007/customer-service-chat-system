@@ -116,6 +116,32 @@ export function findTransferLogs(sessionId) {
   return request(`/chat/sessions/${encodeURIComponent(sessionId)}/transfers`)
 }
 
+export function deleteDeadLetter(messageId) {
+  return request(`/chat/admin/deadletters/${encodeURIComponent(messageId)}`, {
+    method: 'DELETE',
+  })
+}
+
+export function createAdminSession(data) {
+  return request('/chat/admin/sessions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updateAdminSession(sessionId, data) {
+  return request(`/chat/admin/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deleteAdminSession(sessionId) {
+  return request(`/chat/admin/sessions/${encodeURIComponent(sessionId)}`, {
+    method: 'DELETE',
+  })
+}
+
 export function findArchiveStats() {
   return request('/chat/admin/archive-stats')
 }
@@ -141,6 +167,12 @@ export function removeVipSkill(agentId) {
 export function searchAdminMessages(params = {}) {
   const qs = new URLSearchParams(params).toString()
   return request(`/chat/admin/messages/search?${qs}`)
+}
+
+export function deleteAdminMessage(messageId) {
+  return request(`/chat/admin/messages/${encodeURIComponent(messageId)}`, {
+    method: 'DELETE',
+  })
 }
 
 export function createPermission(data) {
