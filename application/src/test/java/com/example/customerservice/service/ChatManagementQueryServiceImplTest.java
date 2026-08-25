@@ -80,7 +80,7 @@ class ChatManagementQueryServiceImplTest {
                 .thenReturn(1L);
         SessionSummaryVO summary = new SessionSummaryVO(
                 "S001", "U001", "user001", "A001", "agent001",
-                "CLOSED", LocalDateTime.now(), LocalDateTime.now(),
+                "CLOSED", "新咨询", LocalDateTime.now(), LocalDateTime.now(),
                 "已处理完成", LocalDateTime.now(), 0L, 5
         );
         when(managementMapper.findSessionSummaries(

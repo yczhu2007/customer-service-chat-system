@@ -1,9 +1,11 @@
 <script setup>
 import { onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { getProfile, updateProfile, updatePassword, regenerateRecoveryCode } from '../api/auth-api'
 import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
+const router = useRouter()
 const formRef = ref()
 const form = ref({ nickname: '', currentPassword: '', newPassword: '' })
 const recoveryCode = ref('')
@@ -63,10 +65,14 @@ async function savePassword() {
 
 async function createRecoveryCode() { await run(async () => { const result = await regenerateRecoveryCode(); recoveryCode.value = result?.data?.recoveryCode || ''; message.value = '请立即保存新的恢复码' }) }
 async function run(action) { error.value = ''; message.value = ''; loading.value = true; try { await action() } catch (e) { error.value = e.message || '操作失败' } finally { loading.value = false } }
+function returnToWorkspace() { router.push(`/${auth.homeRole.toLowerCase()}`) }
 </script>
 <template>
   <section class="account-screen"><div class="account-card">
-    <h1>账号管理</h1>
+    <div class="account-header">
+      <h1>账号管理</h1>
+      <el-button class="return-to-workspace" @click="returnToWorkspace">返回工作台</el-button>
+    </div>
     <el-alert v-if="error" class="error" :title="error" type="error" :closable="false" />
     <el-alert v-if="message" class="success" :title="message" type="success" :closable="false" />
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
@@ -104,4 +110,7 @@ async function run(action) { error.value = ''; message.value = ''; loading.value
 .account-card > .recovery :deep(.el-alert__title) { color: var(--color-primary); font-family: var(--font-mono); font-size: 14px; font-weight: 400; word-break: break-all; }
 .account-card > :deep(.el-alert--error .el-alert__title) { color: var(--color-danger); font-size: 14px; font-weight: 400; }
 .account-card > :deep(.el-alert--success .el-alert__title) { color: var(--color-success); font-size: 14px; font-weight: 400; }
+.account-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.account-header h1 { margin-bottom: 0; }
+.return-to-workspace { flex: 0 0 auto; }
 </style>

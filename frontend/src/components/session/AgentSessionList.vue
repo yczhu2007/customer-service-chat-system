@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, priorityLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
@@ -61,7 +61,7 @@ function loadMore() {
         </div>
         <div class="session-bottom">
           <span v-if="s.priority" class="priority-tag" :class="priorityClass(s.priority)">
-            {{ s.priority }}
+            {{ priorityLabel(s.priority) }}
           </span>
           <span v-if="s.category" class="category-tag" :style="categoryStyle(s.category)">{{ categoryLabel(s.category) }}</span>
           <span v-if="s.archiveStatus" class="archive-tag" :style="archiveStatusStyle(s.archiveStatus)">{{ archiveStatusLabel(s.archiveStatus) }}</span>

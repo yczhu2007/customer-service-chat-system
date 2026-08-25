@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle, statusLabel } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle, priorityLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const archiveFilter = ref('')
@@ -112,7 +112,7 @@ onMounted(() => {
         </div>
         <div class="item-footer">
           <span v-if="session.priority" class="priority-tag" :class="(session.priority || '').toLowerCase()">
-            {{ session.priority }}
+            {{ priorityLabel(session.priority) }}
           </span>
           <span v-if="chat.unreadCounts[session.sessionId]" class="unread-badge">
             {{ chat.unreadCounts[session.sessionId] }}

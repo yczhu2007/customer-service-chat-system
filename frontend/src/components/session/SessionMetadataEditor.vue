@@ -2,7 +2,7 @@
 import { ref, watch, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
-import { categoryLabel } from '../../constants/session-ui'
+import { categoryLabel, priorityLabel, tagLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -13,7 +13,8 @@ const CATEGORIES = ['ACCOUNT', 'PAYMENT', 'TECHNICAL', 'AFTER_SALES', 'OTHER']
 const title = ref('')
 const priority = ref('NORMAL')
 const category = ref('')
-const tagsInput = ref('')
+const tagInput = ref('')
+const tags = ref([])
 const saving = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
@@ -32,20 +33,31 @@ watch(
       title.value = m.title || ''
       priority.value = m.priority || 'NORMAL'
       category.value = m.category || ''
-      tagsInput.value = (m.tags || []).join(', ')
+      tags.value = [...(m.tags || [])]
+      tagInput.value = ''
     }
   },
   { immediate: true }
 )
 
-/** Parse comma-separated tags and normalize/deduplicate them. */
-function parseTags() {
-  return [...new Set(
-    tagsInput.value
-      .split(',')
-      .map((t) => t.trim().toLowerCase())
-      .filter(Boolean)
-  )]
+function addTag() {
+  const tag = tagInput.value.trim()
+  if (!tag) return
+  if (tags.value.includes(tag)) {
+    errorMsg.value = '标签已存在'
+    return
+  }
+  if (tags.value.length >= 10) {
+    errorMsg.value = '标签数量不能超过10个'
+    return
+  }
+  tags.value.push(tag)
+  tagInput.value = ''
+  errorMsg.value = ''
+}
+
+function removeTag(tag) {
+  tags.value = tags.value.filter((item) => item !== tag)
 }
 
 async function save() {
@@ -61,19 +73,13 @@ async function save() {
     return
   }
 
-  const tags = parseTags()
-  if (tags.length > 10) {
-    errorMsg.value = '标签数量不能超过10个'
-    return
-  }
-
   saving.value = true
   try {
     await chat.updateSessionMetadata(chat.activeSessionId, {
       title: title.value.trim(),
       priority: priority.value,
       category: category.value || undefined,
-      tags,
+      tags: tags.value,
     })
     successMsg.value = '元数据已更新'
     setTimeout(() => { successMsg.value = '' }, 2000)
@@ -107,26 +113,27 @@ async function save() {
       <div class="field">
         <label class="field-label">优先级</label>
         <el-select v-model="priority" :disabled="!isAssignedAgent" class="field-select">
-          <el-option v-for="p in PRIORITIES" :key="p" :label="p" :value="p" />
+          <el-option v-for="p in PRIORITIES" :key="p" :label="priorityLabel(p)" :value="p" />
         </el-select>
       </div>
 
       <div class="field">
         <label class="field-label">分类</label>
-        <el-select v-model="category" :disabled="!isAssignedAgent" class="field-select">
+        <el-select v-model="category" :disabled="!isAssignedAgent" class="field-select" placeholder="选择">
           <el-option label="未分类" value="" />
           <el-option v-for="c in CATEGORIES" :key="c" :label="categoryLabel(c)" :value="c" />
         </el-select>
       </div>
 
       <div class="field">
-        <label class="field-label">标签 <span class="hint">（逗号分隔，最多10个）</span></label>
-        <el-input
-          v-model="tagsInput"
-          :disabled="!isAssignedAgent"
-          class="field-input"
-          placeholder="tag1, tag2, tag3"
-        />
+        <label class="field-label">标签 <span class="hint">（最多10个）</span></label>
+        <div class="tag-input-row">
+          <el-input v-model="tagInput" :disabled="!isAssignedAgent" class="field-input" placeholder="输入标签" @keyup.enter="addTag" />
+          <el-button :disabled="!isAssignedAgent || !tagInput.trim()" @click="addTag">添加</el-button>
+        </div>
+        <div v-if="tags.length" class="tag-list">
+          <el-tag v-for="tag in tags" :key="tag" :disable-transitions="true" :closable="isAssignedAgent" @close="removeTag(tag)">{{ tagLabel(tag) }}</el-tag>
+        </div>
       </div>
 
       <el-alert v-if="errorMsg" :title="errorMsg" type="error" :closable="false" class="msg" />
@@ -180,6 +187,8 @@ async function save() {
   width: 100%;
   font-size: 0.825rem;
 }
+.tag-input-row { display: flex; gap: 0.5rem; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
 .field-input :deep(.el-input__wrapper),
 .field-select :deep(.el-select__wrapper) {
   min-height: 34px;

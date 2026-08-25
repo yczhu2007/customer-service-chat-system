@@ -34,7 +34,7 @@ async function removeMessage(messageId) {
     <div class="search-row"><el-input v-model="keyword" clearable placeholder="输入消息关键词" @keyup.enter="search"/><el-button type="primary" :loading="loading" :disabled="!keyword.trim()" @click="search">搜索</el-button><el-button :disabled="!keyword && !results.length" @click="clear">清空</el-button></div>
     <p v-if="error" class="error">{{ error }}</p><p v-else-if="hasSearched && !loading" class="summary">共找到 {{ total }} 条匹配消息</p>
     <el-table v-if="results.length" :data="results" class="data-table" row-key="messageId">
-      <el-table-column prop="sessionTitle" label="会话" min-width="150"/><el-table-column prop="content" label="消息内容" min-width="300"/><el-table-column prop="senderId" label="发送者" min-width="120"/><el-table-column prop="senderRole" label="角色" width="100"/><el-table-column prop="createTime" label="发送时间" min-width="170"/>
+      <el-table-column prop="sessionTitle" label="会话" min-width="150"/><el-table-column prop="content" label="消息内容" min-width="300"/><el-table-column prop="senderUsername" label="发送者登录编号" min-width="140"/><el-table-column prop="senderRole" label="角色" width="100"/><el-table-column prop="createTime" label="发送时间" min-width="170"/>
       <el-table-column label="操作" width="100"><template #default="{ row }"><el-button type="danger" link @click="removeMessage(row.messageId)">删除</el-button></template></el-table-column>
     </el-table>
     <el-pagination v-if="results.length && total > pageSize" class="pagination" layout="prev, pager, next" :current-page="pageNo" :page-size="pageSize" :total="total" :disabled="loading" @current-change="handlePageChange"/>

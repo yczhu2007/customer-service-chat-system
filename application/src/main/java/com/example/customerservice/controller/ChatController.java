@@ -3,7 +3,10 @@ package com.example.customerservice.controller;
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.SysUserMapper;
+import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.dto.*;
@@ -82,6 +85,12 @@ public class ChatController {
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
+
+    @Autowired
+    private SysUserMapper sysUserMapper;
+
+    @Autowired
+    private SysUserRoleMapper sysUserRoleMapper;
 
     @Autowired
     private ChatRedisRepository chatRedisRepository;
@@ -265,30 +274,30 @@ public class ChatController {
     }
 
     /** 管理员将指定客服加入VIP坐席技能组。 */
-    @PutMapping("/agents/{agentId}/vip-skill")
+    @PutMapping("/agents/{agentLoginNumber}/vip-skill")
     public Result<Void> enableAgentVipSkill(
             @PathVariable
-            @NotBlank(message = "客服ID不能为空")
-            @Size(max = 64, message = "客服ID长度不能超过64个字符")
-            String agentId
+            @NotBlank(message = "客服登录编号不能为空")
+            @Size(max = 64, message = "客服登录编号长度不能超过64个字符")
+            String agentLoginNumber
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatAgentOperations.setAgentVipSkill(agentId, true);
+        chatAgentOperations.setAgentVipSkill(requireEnabledAgentId(agentLoginNumber), true);
         return Result.successMessage("已加入VIP坐席技能组");
     }
 
     /** 管理员将指定客服移出VIP坐席技能组。 */
-    @DeleteMapping("/agents/{agentId}/vip-skill")
+    @DeleteMapping("/agents/{agentLoginNumber}/vip-skill")
     public Result<Void> disableAgentVipSkill(
             @PathVariable
-            @NotBlank(message = "客服ID不能为空")
-            @Size(max = 64, message = "客服ID长度不能超过64个字符")
-            String agentId
+            @NotBlank(message = "客服登录编号不能为空")
+            @Size(max = 64, message = "客服登录编号长度不能超过64个字符")
+            String agentLoginNumber
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatAgentOperations.setAgentVipSkill(agentId, false);
+        chatAgentOperations.setAgentVipSkill(requireEnabledAgentId(agentLoginNumber), false);
         return Result.successMessage("已移出VIP坐席技能组");
     }
 
@@ -297,7 +306,25 @@ public class ChatController {
     public Result<Set<String>> findVipSkillAgents() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        return Result.success(chatAgentOperations.findVipSkillAgentIds());
+        return Result.success(
+                chatAgentOperations.findVipSkillAgentIds().stream()
+                        .map(sysUserMapper::selectById)
+                        .filter(user -> user != null && user.getUsername() != null && !user.getUsername().isBlank())
+                        .map(SysUser::getUsername)
+                        .collect(java.util.stream.Collectors.toSet())
+        );
+    }
+
+    private String requireEnabledAgentId(String loginNumber) {
+        SysUser agent = sysUserMapper.findByUsername(loginNumber.trim());
+        if (agent == null || !"ENABLED".equals(agent.getStatus())) {
+            throw new IllegalArgumentException("客服登录编号不存在或账号已禁用");
+        }
+        Set<String> roles = sysUserRoleMapper.findRoleCodesByUserId(agent.getId());
+        if (roles == null || !roles.contains("AGENT")) {
+            throw new IllegalArgumentException("该登录编号不是客服账号");
+        }
+        return agent.getId();
     }
 
     /** 管理员分页查看消息落库死信。 */

@@ -9,6 +9,9 @@ import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.HistoryRequest;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.SessionArchiveRemarkDTO;
+import com.example.customerservice.domain.SysUser;
+import com.example.customerservice.mapper.SysUserMapper;
+import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatSessionQueryService;
 import com.example.customerservice.service.IAuthenticationService;
@@ -35,6 +38,7 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ChatControllerTest {
@@ -48,6 +52,8 @@ class ChatControllerTest {
     @Mock private CurrentUser currentUser;
     @Mock private ChatSessionQueryService chatSessionQueryService;
     @Mock private Validator validator;
+    @Mock private SysUserMapper sysUserMapper;
+    @Mock private SysUserRoleMapper sysUserRoleMapper;
     @InjectMocks private ChatController controller;
 
     @Test
@@ -277,6 +283,35 @@ class ChatControllerTest {
         );
 
         verifyNoInteractions(chatSessionQueryService);
+    }
+
+    @Test
+    void vipSkillOperationsResolveEnabledAgentLoginNumberBeforePersistingMembership() {
+        SysUser agent = new SysUser();
+        agent.setId("agent-internal-id");
+        agent.setUsername("agent001");
+        agent.setStatus("ENABLED");
+        lenient().when(sysUserMapper.findByUsername("agent001")).thenReturn(agent);
+        lenient().when(sysUserRoleMapper.findRoleCodesByUserId("agent-internal-id"))
+                .thenReturn(Set.of("AGENT"));
+
+        controller.enableAgentVipSkill("agent001");
+
+        verify(chatAgentOperations).setAgentVipSkill("agent-internal-id", true);
+    }
+
+    @Test
+    void vipSkillListReturnsAgentLoginNumbersInsteadOfInternalIds() {
+        SysUser agent = new SysUser();
+        agent.setId("agent-internal-id");
+        agent.setUsername("agent001");
+        lenient().when(chatAgentOperations.findVipSkillAgentIds())
+                .thenReturn(Set.of("agent-internal-id"));
+        lenient().when(sysUserMapper.selectById("agent-internal-id")).thenReturn(agent);
+
+        Result<Set<String>> result = controller.findVipSkillAgents();
+
+        assertEquals(Set.of("agent001"), result.getData());
     }
 
     private static ChatSessionMetadataVO metadata(String sessionId) {

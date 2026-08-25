@@ -54,6 +54,15 @@ describe('workspace visual text', () => {
     expect(metadataEditor).not.toContain(':style="category ? categoryStyle(category) : undefined"')
   })
 
+  it('uses the requested short Chinese placeholder for the agent category selector', async () => {
+    const metadataEditor = await readFile(
+      join(sourceRoot, 'components/session/SessionMetadataEditor.vue'),
+      'utf8'
+    )
+
+    expect(metadataEditor).toContain('placeholder="选择"')
+  })
+
   it('does not duplicate admin navigation in the dashboard content', async () => {
     const dashboard = await readFile(
       join(sourceRoot, 'components/admin/AdminDashboard.vue'),

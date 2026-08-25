@@ -4,7 +4,7 @@ import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '../../stores/chat'
 import MessageList from './MessageList.vue'
 import MessageComposer from './MessageComposer.vue'
-import { categoryLabel, categoryStyle, statusLabel } from '../../constants/session-ui'
+import { categoryLabel, categoryStyle, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const props = defineProps({
@@ -92,13 +92,12 @@ watch(() => props.quickReplyContent, (content) => {
       <div class="header-main">
         <span class="session-title">{{ session.title || '会话' }}</span>
         <span class="status-badge" :class="session.status?.toLowerCase()">{{ statusText }}</span>
-        <span v-if="session.priority" class="priority-badge" :class="priorityClass">{{ session.priority }}</span>
+        <span v-if="session.priority" class="priority-badge" :class="priorityClass">{{ priorityLabel(session.priority) }}</span>
         <span v-if="session.category" class="category-badge" :style="categoryStyle(session.category)">{{ categoryLabel(session.category) }}</span>
       </div>
       <div class="header-meta">
-        <span v-if="session.userId" class="user-info">用户: {{ session.userId }}</span>
         <span v-if="session.tags?.length" class="tags">
-          <span v-for="tag in session.tags" :key="tag" class="tag">{{ tag }}</span>
+          <span v-for="tag in session.tags" :key="tag" class="tag">{{ tagLabel(tag) }}</span>
         </span>
       </div>
       <div class="header-actions">
@@ -125,7 +124,7 @@ watch(() => props.quickReplyContent, (content) => {
           v-model="targetAgentId"
           type="text"
           class="transfer-input"
-          placeholder="目标客服账号或ID（如 agent002 / A002）"
+          placeholder="目标客服登录编号（如 agent002）"
           maxlength="64"
         />
         <button :disabled="transferring || !targetAgentId.trim()" class="transfer-confirm" @click="doTransfer">

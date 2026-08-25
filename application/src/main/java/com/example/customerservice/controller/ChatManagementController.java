@@ -103,7 +103,7 @@ public class ChatManagementController {
         sessionOperations.notifyBothParties(session);
         return Result.success(new SessionSummaryVO(
                 session.getId(), user.getId(), user.getUsername(), agent.getId(), agent.getUsername(),
-                session.getStatus(), session.getCreateTime(), session.getEndTime(), null, null, 0L, null
+                session.getStatus(), session.getTitle(), session.getCreateTime(), session.getEndTime(), null, null, 0L, null
         ));
     }
 

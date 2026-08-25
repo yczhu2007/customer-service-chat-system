@@ -183,6 +183,19 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('暂无数据')
   })
 
+  it('offers a refresh action that reloads the session management list', async () => {
+    const { request } = await import('../services/http-client')
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+    const initialCalls = request.mock.calls.length
+
+    await wrapper.get('button.refresh-sessions').trigger('click')
+
+    expect(request.mock.calls.length).toBe(initialCalls + 1)
+  })
+
   it('only offers ACTIVE and CLOSED in the status filter', async () => {
     const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
     const wrapper = mount(SessionAuditPanel)
@@ -245,7 +258,8 @@ describe('SessionAuditPanel', () => {
     await new Promise((r) => setTimeout(r, 0))
     await nextTick()
 
-    expect(wrapper.text()).toContain('s1')
+    expect(wrapper.text()).toContain('新咨询')
+    expect(wrapper.text()).not.toContain('会话 ID')
     expect(wrapper.text()).toContain('user004')
   })
 

@@ -10,6 +10,7 @@ public record SessionSummaryVO(
         String agentId,
         String agentUsername,
         String status,
+        String title,
         LocalDateTime createTime,
         LocalDateTime endTime,
         String lastMessage,

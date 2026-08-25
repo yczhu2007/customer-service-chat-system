@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { mount } from '@vue/test-utils'
 import { useAuthStore } from '../stores/auth'
 import router from '../router'
 
@@ -26,5 +27,19 @@ describe('auth routing foundation', () => {
     auth.login({ token: 't', userId: 'u', role: 'USER' })
     await router.push('/admin')
     expect(router.currentRoute.value.path).toBe('/user')
+  })
+
+  it('returns from account management to the active workspace', async () => {
+    setActivePinia(createPinia())
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u', role: 'AGENT' })
+    await router.push('/account')
+    const AccountView = (await import('../views/AccountView.vue')).default
+    const wrapper = mount(AccountView, { global: { plugins: [router] } })
+
+    await wrapper.get('button.return-to-workspace').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(router.currentRoute.value.path).toBe('/agent')
   })
 })

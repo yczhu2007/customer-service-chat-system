@@ -152,14 +152,14 @@ export function findVipSkillAgents() {
   return request('/chat/agents/vip-skill')
 }
 
-export function addVipSkill(agentId) {
-  return request(`/chat/agents/${agentId}/vip-skill`, {
+export function addVipSkill(agentLoginNumber) {
+  return request(`/chat/agents/${encodeURIComponent(agentLoginNumber)}/vip-skill`, {
     method: 'PUT',
   })
 }
 
-export function removeVipSkill(agentId) {
-  return request(`/chat/agents/${agentId}/vip-skill`, {
+export function removeVipSkill(agentLoginNumber) {
+  return request(`/chat/agents/${encodeURIComponent(agentLoginNumber)}/vip-skill`, {
     method: 'DELETE',
   })
 }

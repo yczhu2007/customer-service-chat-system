@@ -7,12 +7,12 @@ import {
 } from '../constants/session-ui'
 
 describe('session enum presentation', () => {
-  it('keeps Zendesk-style English labels for selectable archive and category values', () => {
+  it('shows Chinese labels for selectable archive and category values', () => {
     expect(ARCHIVE_STATUS_OPTIONS.map((option) => option.label)).toEqual([
-      'Solved', 'Pending', 'On-hold', 'Other',
+      '已解决', '待处理', '暂停', '其他',
     ])
     expect(CATEGORY_OPTIONS.map((option) => option.label)).toEqual([
-      'Account', 'Payment', 'Technical', 'After-sales', 'Other',
+      '账号问题', '支付问题', '技术问题', '售后问题', '其他',
     ])
   })
 

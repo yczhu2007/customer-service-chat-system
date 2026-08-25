@@ -5,7 +5,7 @@ import { findVipSkillAgents, addVipSkill, removeVipSkill } from '../../api/admin
 const loading = ref(false)
 const error = ref(null)
 const agents = ref(new Set())
-const newAgentId = ref('')
+const newAgentLoginNumber = ref('')
 const actionLoading = ref(false)
 const actionError = ref(null)
 const actionSuccess = ref(null)
@@ -35,15 +35,15 @@ function handlePageChange(nextPage) {
 onMounted(loadAgents)
 
 async function handleAdd() {
-  const id = newAgentId.value.trim()
-  if (!id) return
+  const loginNumber = newAgentLoginNumber.value.trim()
+  if (!loginNumber) return
   actionLoading.value = true
   actionError.value = null
   actionSuccess.value = null
   try {
-    await addVipSkill(id)
-    actionSuccess.value = `已将 ${id} 加入 VIP 技能组`
-    newAgentId.value = ''
+    await addVipSkill(loginNumber)
+    actionSuccess.value = `已将 ${loginNumber} 加入 VIP 技能组`
+    newAgentLoginNumber.value = ''
     await loadAgents()
   } catch (e) {
     actionError.value = e.message
@@ -52,13 +52,13 @@ async function handleAdd() {
   }
 }
 
-async function handleRemove(agentId) {
+async function handleRemove(agentLoginNumber) {
   actionLoading.value = true
   actionError.value = null
   actionSuccess.value = null
   try {
-    await removeVipSkill(agentId)
-    actionSuccess.value = `已将 ${agentId} 移出 VIP 技能组`
+    await removeVipSkill(agentLoginNumber)
+    actionSuccess.value = `已将 ${agentLoginNumber} 移出 VIP 技能组`
     await loadAgents()
   } catch (e) {
     actionError.value = e.message
@@ -77,12 +77,12 @@ async function handleRemove(agentId) {
 
     <div class="add-form">
       <input
-        v-model="newAgentId"
-        placeholder="输入客服 ID"
+        v-model="newAgentLoginNumber"
+        placeholder="输入客服登录编号"
         maxlength="64"
         @keyup.enter="handleAdd"
       />
-      <button class="btn btn-primary" :disabled="actionLoading || !newAgentId.trim()" @click="handleAdd">
+      <button class="btn btn-primary" :disabled="actionLoading || !newAgentLoginNumber.trim()" @click="handleAdd">
         添加
       </button>
     </div>
@@ -95,12 +95,12 @@ async function handleRemove(agentId) {
     <template v-else>
       <div v-if="agents.size === 0" class="empty">暂无 VIP 技能组客服</div>
       <div v-else class="agent-list">
-        <div v-for="agentId in visibleAgents" :key="agentId" class="agent-card">
-          <span class="agent-id">{{ agentId }}</span>
+        <div v-for="agentLoginNumber in visibleAgents" :key="agentLoginNumber" class="agent-card">
+          <span class="agent-id">{{ agentLoginNumber }}</span>
           <button
             class="btn btn-sm btn-danger"
             :disabled="actionLoading"
-            @click="handleRemove(agentId)"
+            @click="handleRemove(agentLoginNumber)"
           >
             移除
           </button>

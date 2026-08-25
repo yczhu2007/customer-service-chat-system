@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
-import { ARCHIVE_STATUS_OPTIONS } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
 const loading = ref(false)
@@ -19,7 +19,8 @@ const saving = ref(false)
 const editingSession = ref(null)
 const formError = ref(null)
 const createForm = ref({ userLoginNumber: '', agentLoginNumber: '' })
-const editForm = ref({ title: '', priority: 'NORMAL', category: 'OTHER', tags: '' })
+const editForm = ref({ title: '', priority: 'NORMAL', category: 'OTHER', tags: [] })
+const tagInput = ref('')
 
 // Filters
 const filters = ref({
@@ -138,8 +139,9 @@ async function openEditDialog(row) {
       title: metadata.title || '',
       priority: metadata.priority || 'NORMAL',
       category: metadata.category || 'OTHER',
-      tags: (metadata.tags || []).join(', '),
+      tags: [...(metadata.tags || [])],
     }
+    tagInput.value = ''
     showEditDialog.value = true
   } catch (e) { formError.value = e.message }
 }
@@ -152,7 +154,7 @@ async function saveSessionMetadata() {
       title: editForm.value.title,
       priority: editForm.value.priority,
       category: editForm.value.category,
-      tags: editForm.value.tags.split(',').map((tag) => tag.trim()).filter(Boolean),
+      tags: editForm.value.tags,
     })
     showEditDialog.value = false
     await loadSessions()
@@ -167,20 +169,35 @@ async function endSession(row) {
   } catch (e) { error.value = e.message }
 }
 
+function addTag() {
+  const tag = tagInput.value.trim()
+  if (!tag || editForm.value.tags.includes(tag)) return
+  if (editForm.value.tags.length >= 10) { formError.value = '标签数量不能超过10个'; return }
+  editForm.value.tags.push(tag)
+  tagInput.value = ''
+}
+
+function removeTag(tag) {
+  editForm.value.tags = editForm.value.tags.filter((item) => item !== tag)
+}
+
 </script>
 
 <template>
   <section class="session-audit">
     <div class="panel-header">
       <h2>会话管理</h2>
-      <button class="btn btn-create" @click="openCreateDialog">新建会话</button>
+      <div class="header-actions">
+        <button class="btn refresh-sessions" :disabled="loading" @click="loadSessions">刷新</button>
+        <button class="btn btn-create" @click="openCreateDialog">新建会话</button>
+      </div>
     </div>
 
     <div class="filters">
       <input v-model="filters.userLoginNumber" class="user-login-number" placeholder="用户登录编号" />
       <input v-model="filters.agentLoginNumber" class="agent-login-number" placeholder="客服登录编号" />
       <select v-model="filters.status" aria-label="Status">
-        <option v-for="s in statusOptions" :key="s" :value="s">{{ s || '全部状态' }}</option>
+        <option v-for="s in statusOptions" :key="s" :value="s">{{ s ? statusLabel(s) : '全部状态' }}</option>
       </select>
       <select v-model="filters.archiveStatus" aria-label="Archive status">
         <option value="">全部归档</option><option value="NONE">未归档</option>
@@ -197,8 +214,8 @@ async function endSession(row) {
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <el-table v-loading="loading" class="data-table" :data="sessions" row-key="sessionId">
-        <el-table-column prop="sessionId" label="会话 ID" min-width="170">
-          <template #default="{ row }"><span class="mono">{{ row.sessionId }}</span></template>
+        <el-table-column label="会话" min-width="170">
+          <template #default="{ row }">{{ row.title || '新咨询' }}</template>
         </el-table-column>
         <el-table-column prop="username" label="用户登录编号" min-width="120">
           <template #default="{ row }"><span class="mono">{{ row.username || '-' }}</span></template>
@@ -207,7 +224,7 @@ async function endSession(row) {
           <template #default="{ row }"><span class="mono">{{ row.agentUsername || '-' }}</span></template>
         </el-table-column>
         <el-table-column label="状态" width="100">
-          <template #default="{ row }"><span class="status-cell">{{ row.status }}</span></template>
+          <template #default="{ row }"><span class="status-cell">{{ statusLabel(row.status) }}</span></template>
         </el-table-column>
         <el-table-column label="评分" width="110">
           <template #default="{ row }"><span class="rating-cell" :title="row.rating + '/5'">{{ ratingStars(row.rating) }}</span></template>
@@ -226,7 +243,7 @@ async function endSession(row) {
             <div v-if="expandedSessionId === row.sessionId" class="transfer-details">
               <div v-if="!transferLogs[row.sessionId]?.length" class="empty">暂无转接记录</div>
               <div v-for="log in transferLogs[row.sessionId]" :key="log.id">
-                {{ log.sourceAgentNickname || log.sourceAgentId }} → {{ log.targetAgentNickname || log.targetAgentId }}，{{ formatDate(log.createTime) }}
+                {{ log.sourceAgentNickname || '未知客服' }} → {{ log.targetAgentNickname || '未知客服' }}，{{ formatDate(log.createTime) }}
               </div>
             </div>
           </template>
@@ -264,9 +281,10 @@ async function endSession(row) {
     <el-dialog v-model="showEditDialog" title="编辑会话" width="520px">
       <div class="form-grid">
         <label>标题<input v-model="editForm.title" /></label>
-        <label>优先级<select v-model="editForm.priority"><option>LOW</option><option>NORMAL</option><option>HIGH</option><option>URGENT</option></select></label>
-        <label>分类<select v-model="editForm.category"><option>ACCOUNT</option><option>PAYMENT</option><option>TECHNICAL</option><option>AFTER_SALES</option><option>OTHER</option></select></label>
-        <label>标签（逗号分隔）<input v-model="editForm.tags" placeholder="vip, payment" /></label>
+        <label>优先级<select v-model="editForm.priority"><option value="LOW">{{ priorityLabel('LOW') }}</option><option value="NORMAL">{{ priorityLabel('NORMAL') }}</option><option value="HIGH">{{ priorityLabel('HIGH') }}</option><option value="URGENT">{{ priorityLabel('URGENT') }}</option></select></label>
+        <label>分类<select v-model="editForm.category"><option v-for="option in CATEGORY_OPTIONS" :key="option.code" :value="option.code">{{ option.label }}</option></select></label>
+        <label>标签<div class="tag-input-row"><input v-model="tagInput" placeholder="输入标签" @keyup.enter="addTag" /><button class="btn" type="button" @click="addTag">添加</button></div></label>
+        <div v-if="editForm.tags.length" class="tag-list"><el-tag v-for="tag in editForm.tags" :key="tag" closable @close="removeTag(tag)">{{ tagLabel(tag) }}</el-tag></div>
       </div>
       <p v-if="formError" class="error">{{ formError }}</p>
       <template #footer><el-button @click="showEditDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveSessionMetadata">保存</el-button></template>
@@ -279,9 +297,13 @@ async function endSession(row) {
   padding: 1rem;
 }
 .panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+.header-actions { display: flex; gap: 0.5rem; }
 .form-grid { display: grid; gap: 0.85rem; }
 .form-grid label { display: grid; gap: 0.35rem; color: #374151; font-size: 0.9rem; }
 .form-grid input, .form-grid select { padding: 0.5rem; border: 1px solid #d1d5db; border-radius: 4px; }
+.tag-input-row { display: flex; gap: 0.5rem; }
+.tag-input-row input { flex: 1; }
+.tag-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .filters {
   display: flex;
   flex-wrap: nowrap;

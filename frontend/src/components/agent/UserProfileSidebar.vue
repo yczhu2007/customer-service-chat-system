@@ -53,8 +53,8 @@ function vipBadge(level) {
 
       <div class="info-grid">
         <div class="info-item">
-          <span class="info-label">用户ID</span>
-          <span class="info-value">{{ profile.userId || '-' }}</span>
+          <span class="info-label">登录编号</span>
+          <span class="info-value">{{ profile.username || '-' }}</span>
         </div>
         <div class="info-item">
           <span class="info-label">总会话数</span>

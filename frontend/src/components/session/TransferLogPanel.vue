@@ -13,7 +13,7 @@ function formatTime(value) { return value ? new Date(value).toLocaleString('zh-C
     <div v-if="!props.sessionId" class="empty">选择会话后查看</div>
     <div v-else-if="!chat.transferLogs.length" class="empty">暂无转接记录</div>
     <ul v-else><li v-for="log in chat.transferLogs" :key="log.id">
-      <div>{{ log.sourceAgentNickname || log.sourceAgentId }} → {{ log.targetAgentNickname || log.targetAgentId }}</div>
+      <div>{{ log.sourceAgentNickname || '未知客服' }} → {{ log.targetAgentNickname || '未知客服' }}</div>
       <small>{{ formatTime(log.createTime) }}<span v-if="log.reason"> · {{ log.reason }}</span></small>
     </li></ul>
   </section>

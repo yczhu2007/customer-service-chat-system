@@ -6,10 +6,10 @@ export const STATUS_LABELS = {
 }
 
 export const ARCHIVE_STATUS_OPTIONS = [
-  { code: 'COMPLETED', label: 'Solved', color: '#1f8a5f', backgroundColor: '#e7f4ee' },
-  { code: 'PENDING', label: 'Pending', color: '#b7791f', backgroundColor: '#fef3c7' },
-  { code: 'ON_HOLD', label: 'On-hold', color: '#635bce', backgroundColor: '#eef0ff' },
-  { code: 'OTHER', label: 'Other', color: '#6a7280', backgroundColor: '#f2f3f5' },
+  { code: 'COMPLETED', label: '已解决', color: '#1f8a5f', backgroundColor: '#e7f4ee' },
+  { code: 'PENDING', label: '待处理', color: '#b7791f', backgroundColor: '#fef3c7' },
+  { code: 'ON_HOLD', label: '暂停', color: '#635bce', backgroundColor: '#eef0ff' },
+  { code: 'OTHER', label: '其他', color: '#6a7280', backgroundColor: '#f2f3f5' },
 ]
 
 export const ARCHIVE_STATUS_LABELS = Object.fromEntries(
@@ -17,12 +17,30 @@ export const ARCHIVE_STATUS_LABELS = Object.fromEntries(
 )
 
 export const CATEGORY_OPTIONS = [
-  { code: 'ACCOUNT', label: 'Account', color: '#2563eb', backgroundColor: '#dbeafe' },
-  { code: 'PAYMENT', label: 'Payment', color: '#b45309', backgroundColor: '#fef3c7' },
-  { code: 'TECHNICAL', label: 'Technical', color: '#7c3aed', backgroundColor: '#ede9fe' },
-  { code: 'AFTER_SALES', label: 'After-sales', color: '#047857', backgroundColor: '#d1fae5' },
-  { code: 'OTHER', label: 'Other', color: '#4b5563', backgroundColor: '#f3f4f6' },
+  { code: 'ACCOUNT', label: '账号问题', color: '#2563eb', backgroundColor: '#dbeafe' },
+  { code: 'PAYMENT', label: '支付问题', color: '#b45309', backgroundColor: '#fef3c7' },
+  { code: 'TECHNICAL', label: '技术问题', color: '#7c3aed', backgroundColor: '#ede9fe' },
+  { code: 'AFTER_SALES', label: '售后问题', color: '#047857', backgroundColor: '#d1fae5' },
+  { code: 'OTHER', label: '其他', color: '#4b5563', backgroundColor: '#f3f4f6' },
 ]
+
+export const PRIORITY_LABELS = {
+  LOW: '低',
+  NORMAL: '普通',
+  HIGH: '高',
+  URGENT: '紧急',
+}
+
+const TAG_LABELS = {
+  vip: 'VIP',
+  urgent: '紧急',
+  billing: '账单',
+  payment: '支付',
+  account: '账号',
+  technical: '技术',
+  after_sales: '售后',
+  new: '新建',
+}
 
 export const CATEGORY_LABELS = Object.fromEntries(
   CATEGORY_OPTIONS.map(({ code, label }) => [code, label])
@@ -38,6 +56,14 @@ export function archiveStatusLabel(status) {
 
 export function categoryLabel(category) {
   return CATEGORY_LABELS[category] || category || ''
+}
+
+export function priorityLabel(priority) {
+  return PRIORITY_LABELS[priority] || priority || ''
+}
+
+export function tagLabel(tag) {
+  return TAG_LABELS[String(tag || '').trim().toLowerCase()] || tag || ''
 }
 
 function optionStyle(options, code) {

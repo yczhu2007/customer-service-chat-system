@@ -90,7 +90,7 @@ onUnmounted(() => {
     <el-header class="workspace-header">
       <h1 class="workspace-title">客服工作台</h1>
       <div class="header-right">
-        <span class="agent-id">{{ auth.userId }}</span>
+        <span class="agent-id">{{ auth.username }}</span>
         <span class="online-status" :class="{ online: chat.agentOnline }">
           {{ chat.agentOnline ? '在线' : '离线' }}
         </span>

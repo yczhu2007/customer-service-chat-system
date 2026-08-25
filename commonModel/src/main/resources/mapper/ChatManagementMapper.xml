@@ -49,6 +49,7 @@
             <arg column="agent_id" javaType="java.lang.String"/>
             <arg column="agent_username" javaType="java.lang.String"/>
             <arg column="status" javaType="java.lang.String"/>
+            <arg column="title" javaType="java.lang.String"/>
             <arg column="create_time" javaType="java.time.LocalDateTime"/>
             <arg column="end_time" javaType="java.time.LocalDateTime"/>
             <arg column="last_message" javaType="java.lang.String"/>
@@ -64,7 +65,7 @@
             <arg column="user_id" javaType="java.lang.String"/><arg column="agent_id" javaType="java.lang.String"/>
             <arg column="sender_id" javaType="java.lang.String"/><arg column="sender_role" javaType="java.lang.String"/>
             <arg column="type" javaType="java.lang.String"/><arg column="content" javaType="java.lang.String"/>
-            <arg column="create_time" javaType="java.time.LocalDateTime"/><arg column="session_status" javaType="java.lang.String"/><arg column="session_title" javaType="java.lang.String"/>
+            <arg column="create_time" javaType="java.time.LocalDateTime"/><arg column="session_status" javaType="java.lang.String"/><arg column="session_title" javaType="java.lang.String"/><arg column="sender_username" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
     <resultMap id="ratingSummaryResult" type="com.example.customerservice.dto.RatingSummaryVO">
@@ -362,6 +363,7 @@
                session.agent_id,
                agent.username AS agent_username,
                session.status,
+               session.title,
                session.create_time,
                session.end_time,
                (
@@ -444,7 +446,7 @@
         SELECT COUNT(*) FROM chat_message message INNER JOIN chat_session session ON session.id = message.session_id WHERE <include refid="messageSearchPredicate"/>
     </select>
     <select id="findMessageSearch" resultMap="chatMessageSearchResult">
-        SELECT message.id AS message_id, message.session_id, session.user_id, session.agent_id, message.sender_id, message.sender_role, message.type, message.content, message.create_time, session.status AS session_status, session.title AS session_title
-        FROM chat_message message INNER JOIN chat_session session ON session.id = message.session_id WHERE <include refid="messageSearchPredicate"/> ORDER BY message.create_time DESC, message.id DESC LIMIT #{offset}, #{pageSize}
+        SELECT message.id AS message_id, message.session_id, session.user_id, session.agent_id, message.sender_id, message.sender_role, message.type, message.content, message.create_time, session.status AS session_status, session.title AS session_title, sender.username AS sender_username
+        FROM chat_message message INNER JOIN chat_session session ON session.id = message.session_id LEFT JOIN sys_user sender ON sender.id = message.sender_id WHERE <include refid="messageSearchPredicate"/> ORDER BY message.create_time DESC, message.id DESC LIMIT #{offset}, #{pageSize}
     </select>
 </mapper>
