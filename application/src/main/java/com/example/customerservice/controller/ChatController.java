@@ -330,6 +330,18 @@ public class ChatController {
         return Result.successMessage("死信消息已提交重放");
     }
 
+    @DeleteMapping("/admin/deadletters/{messageId}")
+    public Result<Void> deleteDeadLetter(
+            @PathVariable
+            @NotBlank(message = "消息ID不能为空")
+            @Size(max = 64, message = "消息ID长度不能超过64个字符")
+            String messageId
+    ) {
+        requireDeadLetterManagementPermission();
+        messagePersistService.deleteDeadLetter(messageId);
+        return Result.successMessage("死信消息已删除");
+    }
+
     private void requireDeadLetterManagementPermission() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:message:deadletter:manage");
