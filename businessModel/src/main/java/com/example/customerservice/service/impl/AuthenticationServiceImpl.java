@@ -82,8 +82,13 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
                 tokenService.getTokenTtlSeconds(request.isRememberMe()),
                 user.getId(),
                 user.getUsername(),
+                displayName(user),
                 roleCodes
         );
+    }
+
+    private String displayName(SysUser user) {
+        return StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername();
     }
 
     @Override

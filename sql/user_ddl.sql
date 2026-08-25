@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS sys_user
 (
     id          VARCHAR(64)  NOT NULL COMMENT '用户ID，例如U001、A001',
     username    VARCHAR(64)  NOT NULL COMMENT '登录用户名',
+    nickname    VARCHAR(64)  NOT NULL COMMENT '展示昵称',
     password    VARCHAR(255) NOT NULL COMMENT 'PBKDF2密码哈希',
     status      VARCHAR(16)  NOT NULL DEFAULT 'ENABLED'
         COMMENT '用户状态：ENABLED、DISABLED',

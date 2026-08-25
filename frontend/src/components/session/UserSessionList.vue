@@ -86,7 +86,7 @@ onMounted(() => {
     <div v-if="chat.sessionsLoading" class="loading-state">加载中…</div>
 
     <!-- Error state -->
-    <div v-else-if="chat.error" class="error-state">{{ chat.error }}</div>
+    <div v-else-if="chat.sessionsError" class="error-state">{{ chat.sessionsError }}</div>
 
     <!-- Empty state -->
     <div v-else-if="!chat.sessions.length" class="empty-state">暂无会话</div>
@@ -121,6 +121,9 @@ onMounted(() => {
         </div>
       </li>
     </ul>
+    <div v-if="chat.sessionsError && chat.sessions.length" class="refresh-error">
+      会话刷新失败：{{ chat.sessionsError }}
+    </div>
     <button
       v-if="chat.sessionsHasMore"
       class="load-more-btn"

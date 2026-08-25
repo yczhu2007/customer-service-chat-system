@@ -8,6 +8,7 @@ import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.HistoryRequest;
 import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SessionArchiveRemarkDTO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatSessionQueryService;
 import com.example.customerservice.service.IAuthenticationService;
@@ -48,6 +49,19 @@ class ChatControllerTest {
     @Mock private ChatSessionQueryService chatSessionQueryService;
     @Mock private Validator validator;
     @InjectMocks private ChatController controller;
+
+    @Test
+    void assignedAgentCanSaveArchiveRemarkIndependently() {
+        SessionArchiveRemarkDTO request = new SessionArchiveRemarkDTO();
+        request.setRemark("新的唯一备注");
+        when(currentUser.getUserId()).thenReturn("A001");
+
+        controller.saveArchiveRemark("S001", request);
+
+        verify(currentUser).requireRole("AGENT");
+        verify(currentUser).requirePermission("chat:session:archive");
+        verify(chatSessionQueryService).saveArchiveRemark("A001", "S001", request);
+    }
 
     @Test
     void ordinaryUserCanStartConsultationExplicitly() {

@@ -13,6 +13,7 @@
         SELECT
             id,
             username,
+            nickname,
             password,
             status,
             vip_level,
@@ -32,6 +33,10 @@
         <set>
 
             id = id,
+
+            <if test="nickname != null">
+                nickname = #{nickname},
+            </if>
 
             <if test="username != null and username != ''">
                 username = #{username},

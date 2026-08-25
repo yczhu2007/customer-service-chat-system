@@ -1,5 +1,6 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.config.MinioAttachmentProperties;
 import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.ChatAttachmentVO;
@@ -7,9 +8,10 @@ import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.service.ChatAttachmentService;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.FileSystemResource;
+import com.example.customerservice.storage.AttachmentObjectStorage;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -20,16 +22,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
-import java.util.ArrayList;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
@@ -54,13 +52,17 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     );
     private final ChatAttachmentMapper attachmentMapper;
     private final ChatSessionMapper sessionMapper;
-    private final Path storageRoot;
+    private final AttachmentObjectStorage storage;
+    private final MinioAttachmentProperties properties;
 
+    @Autowired
     public ChatAttachmentServiceImpl(ChatAttachmentMapper attachmentMapper, ChatSessionMapper sessionMapper,
-                                     @Value("${app.chat.attachment.storage-path:./data/chat-attachments}") String storagePath) {
+                                     AttachmentObjectStorage storage,
+                                     MinioAttachmentProperties properties) {
         this.attachmentMapper = attachmentMapper;
         this.sessionMapper = sessionMapper;
-        this.storageRoot = Path.of(storagePath).toAbsolutePath().normalize();
+        this.storage = storage;
+        this.properties = properties;
     }
 
     @Override
@@ -77,17 +79,14 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 
         String id = UUID.randomUUID().toString().replace("-", "");
         String storedName = id + "." + extension;
-        Path destination = storageRoot.resolve(storedName).normalize();
-        if (!destination.startsWith(storageRoot)) throw new IllegalArgumentException("附件存储路径不合法");
         try {
-            Files.createDirectories(storageRoot);
             try (InputStream input = file.getInputStream()) {
-                Files.copy(input, destination, StandardCopyOption.REPLACE_EXISTING);
+                storage.put(storedName, input, file.getSize(), CONTENT_TYPES.get(extension));
             }
         } catch (IOException exception) {
             throw new IllegalStateException("附件保存失败", exception);
         }
-        registerRollbackCleanup(destination);
+        registerRollbackCleanup(storedName);
 
         try {
             ChatAttachment attachment = new ChatAttachment();
@@ -101,7 +100,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
             if (saved == null) throw new IllegalStateException("附件记录读取失败");
             return toVO(saved);
         } catch (RuntimeException exception) {
-            deleteQuietly(destination);
+            deleteQuietly(storedName);
             throw exception;
         }
     }
@@ -189,18 +188,18 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         return true;
     }
 
-    private void registerRollbackCleanup(Path destination) {
+    private void registerRollbackCleanup(String objectName) {
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
             TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
                 @Override public void afterCompletion(int status) {
-                    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) deleteQuietly(destination);
+                    if (status == TransactionSynchronization.STATUS_ROLLED_BACK) deleteQuietly(objectName);
                 }
             });
         }
     }
 
-    private void deleteQuietly(Path destination) {
-        try { Files.deleteIfExists(destination); } catch (IOException ignored) { }
+    private void deleteQuietly(String objectName) {
+        try { storage.delete(objectName); } catch (RuntimeException ignored) { }
     }
 
     @Override
@@ -213,36 +212,32 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
 
     @Override
     public Resource load(ChatAttachment attachment) {
-        Path file = storageRoot.resolve(attachment.getStoredName()).normalize();
-        if (!file.startsWith(storageRoot) || !Files.isRegularFile(file)) throw new NotFoundException("附件文件不存在");
-        return new FileSystemResource(file);
+        try {
+            return new InputStreamResource(storage.open(attachment.getStoredName()));
+        } catch (RuntimeException exception) {
+            throw new NotFoundException("附件文件不存在");
+        }
     }
 
     @Override
     public int cleanupOrphanFiles() {
-        if (!Files.isDirectory(storageRoot)) return 0;
-        int removed = 0;
-        try (Stream<Path> paths = Files.list(storageRoot)) {
-            List<Path> batch = new ArrayList<>(200);
-            java.util.Iterator<Path> iterator = paths.filter(Files::isRegularFile).iterator();
-            while (iterator.hasNext()) {
-                batch.add(iterator.next());
-                if (batch.size() == 200) { removed += removeOrphanBatch(batch); batch.clear(); }
-            }
-            removed += removeOrphanBatch(batch);
-        } catch (IOException exception) { throw new IllegalStateException("孤儿附件清理失败", exception); }
-        return removed;
-    }
-
-    private int removeOrphanBatch(List<Path> paths) throws IOException {
-        if (paths.isEmpty()) return 0;
-        List<String> storedNames = paths.stream().map(path -> path.getFileName().toString()).toList();
+        List<AttachmentObjectStorage.StoredObject> objects = storage.list("");
+        if (objects.isEmpty()) return 0;
+        List<String> storedNames = objects.stream().map(AttachmentObjectStorage.StoredObject::objectName).toList();
         Set<String> referencedNames = new HashSet<>();
         attachmentMapper.selectList(com.baomidou.mybatisplus.core.toolkit.Wrappers.<ChatAttachment>lambdaQuery()
                         .select(ChatAttachment::getStoredName).in(ChatAttachment::getStoredName, storedNames))
                 .forEach(value -> referencedNames.add(value.getStoredName()));
         int removed = 0;
-        for (Path path : paths) if (!referencedNames.contains(path.getFileName().toString()) && Files.deleteIfExists(path)) removed++;
+        Instant cutoff = Instant.now().minusSeconds(properties.getOrphanGracePeriodSeconds());
+        for (AttachmentObjectStorage.StoredObject object : objects) {
+            String objectName = object.objectName();
+            if (object.lastModified() != null && object.lastModified().isAfter(cutoff)) continue;
+            if (!referencedNames.contains(objectName)) {
+                deleteQuietly(objectName);
+                removed++;
+            }
+        }
         return removed;
     }
 

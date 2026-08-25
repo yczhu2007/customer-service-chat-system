@@ -33,6 +33,9 @@ public interface ChatSessionQueryService {
     /** 客服对已结束会话设置/更新归档状态。 */
     void setArchiveStatus(String agentId, String sessionId, SessionArchiveDTO request);
 
+    /** 客服独立保存已结束会话的单条归档备注。 */
+    void saveArchiveRemark(String agentId, String sessionId, SessionArchiveRemarkDTO request);
+
     /** 管理员查询归档统计概览。 */
     ArchiveStatsVO findArchiveStats();
 }

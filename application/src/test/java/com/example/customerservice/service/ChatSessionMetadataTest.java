@@ -12,6 +12,7 @@ import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
 import com.example.customerservice.dto.ChatSessionMetadataVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.SessionArchiveDTO;
+import com.example.customerservice.dto.SessionArchiveRemarkDTO;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -271,6 +272,24 @@ class ChatSessionMetadataTest {
                 ArgumentCaptor.forClass(com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper.class);
         verify(sessionMapper).update(org.mockito.ArgumentMatchers.any(ChatSession.class), wrapper.capture());
         assertTrue(wrapper.getValue().getSqlSegment().contains("archive_status IS NULL"));
+    }
+
+    @Test
+    void assignedAgentCanReplaceTheSingleArchiveRemarkWithoutChangingArchiveStatus() {
+        ChatSession session = session("S001", "U001", "A001");
+        session.setStatus(ChatConstants.SESSION_STATUS_CLOSED);
+        session.setArchiveStatus(ChatConstants.ARCHIVE_PENDING);
+        session.setArchiveRemark("旧备注");
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+        when(sessionMapper.update(any(ChatSession.class), any())).thenReturn(1);
+        SessionArchiveRemarkDTO request = new SessionArchiveRemarkDTO();
+        request.setRemark("新的唯一备注");
+
+        service.saveArchiveRemark("A001", "S001", request);
+
+        assertEquals("新的唯一备注", session.getArchiveRemark());
+        assertEquals(ChatConstants.ARCHIVE_PENDING, session.getArchiveStatus());
+        verify(sessionMapper).update(any(ChatSession.class), any());
     }
 
     private static ChatSession session(String id, String userId, String agentId) {

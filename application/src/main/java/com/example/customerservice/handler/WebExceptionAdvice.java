@@ -161,7 +161,9 @@ public class WebExceptionAdvice {
         log.warn("HTTP状态异常：{}", status, exception);
         return buildResponse(
                 status,
-                safeStatusMessage(status)
+                "用户名或密码错误".equals(exception.getReason())
+                        ? exception.getReason()
+                        : safeStatusMessage(status)
         );
     }
 

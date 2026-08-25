@@ -5,6 +5,7 @@ import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import MessageComposer from '../components/chat/MessageComposer.vue'
 import MessageList from '../components/chat/MessageList.vue'
+import UserSessionList from '../components/session/UserSessionList.vue'
 import { fetchAttachmentBlob } from '../api/chat-api'
 
 // Mock fetch globally
@@ -210,13 +211,138 @@ describe('User Workspace', () => {
   it('records queue events and automatically selects an assigned session', () => {
     const chat = useChatStore()
     chat.sessions = [{ sessionId: 's1', status: 'ACTIVE' }]
+    chat.consultationStarting = true
     chat.selectSession = vi.fn()
 
     chat._handleChatEvent({ event: 'WAITING_FOR_AGENT', queuePosition: 2 })
-    expect(chat.queueNotice).toContain('排队')
+    expect(chat.queueNotice).toBeNull()
 
     chat._handleChatEvent({ event: 'SESSION_CREATED', sessionId: 's1' })
     expect(chat.selectSession).toHaveBeenCalledWith('s1')
+  })
+
+  it('ignores a late waiting event after queue cancellation returned to idle', () => {
+    const chat = useChatStore()
+    chat.queueStatus = { queueSize: 0, myPosition: null }
+    chat.queueWaiting = false
+    chat.consultationStarting = false
+
+    chat._handleChatEvent({ event: 'WAITING_FOR_AGENT', queuePosition: 1 })
+
+    expect(chat.consultationState).toBe('IDLE')
+    expect(chat.queueNotice).toBeNull()
+  })
+
+  it('keeps loaded sessions visible when an unrelated chat error exists', () => {
+    const chat = useChatStore()
+    chat.sessions = [{ sessionId: 's1', title: '之前的会话', status: 'CLOSED' }]
+    chat.error = '服务器内部错误'
+
+    const wrapper = mount(UserSessionList)
+
+    expect(wrapper.text()).toContain('之前的会话')
+  })
+
+  it('uses one authoritative consultation state for idle, queued and active users', () => {
+    const chat = useChatStore()
+    expect(chat.consultationState).toBe('IDLE')
+    expect(chat.canStartConsultation).toBe(true)
+
+    chat.consultationStarting = true
+    expect(chat.consultationState).toBe('STARTING')
+    expect(chat.canStartConsultation).toBe(false)
+
+    chat.queueStatus = { queueSize: 2, myPosition: 1 }
+    expect(chat.consultationState).toBe('QUEUED')
+
+    chat.sessions = [{ sessionId: 's1', status: 'ACTIVE' }]
+    expect(chat.consultationState).toBe('ACTIVE')
+  })
+
+  it('finishes the submitting state when the server confirms queue entry', () => {
+    vi.useFakeTimers()
+    try {
+      const chat = useChatStore()
+      chat.consultationStarting = true
+      chat._consultationTimeout = setTimeout(() => {}, 15000)
+
+      chat._handleChatEvent({ event: 'WAITING_FOR_AGENT', waitingPosition: 2 })
+
+      expect(chat.consultationStarting).toBe(false)
+      expect(chat._consultationTimeout).toBeNull()
+      expect(chat.queueNotice).toBeNull()
+      expect(chat.consultationState).toBe('QUEUED')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('returns to idle immediately when queue cancellation is confirmed', () => {
+    const chat = useChatStore()
+    chat.consultationStarting = true
+    chat.queueStatus = { onlineAgentCount: 1, queueSize: 1, myPosition: 1, estimatedWaitSeconds: 300 }
+
+    chat._handleChatEvent({ event: 'QUEUE_CANCELLED' })
+
+    expect(chat.consultationStarting).toBe(false)
+    expect(chat.queueStatus).toEqual({
+      onlineAgentCount: 1,
+      queueSize: 0,
+      myPosition: null,
+      estimatedWaitSeconds: null,
+    })
+    expect(chat.canStartConsultation).toBe(true)
+  })
+
+  it('keeps the queued visual state stable until cancellation is confirmed and applies it once', async () => {
+    const chat = useChatStore()
+    chat.queueWaiting = true
+    chat.queueStatus = {
+      onlineAgentCount: 2,
+      queueSize: 5,
+      myPosition: 2,
+      estimatedWaitSeconds: 120,
+    }
+    let resolveCancellation
+    mockFetch.mockReturnValueOnce(new Promise((resolve) => { resolveCancellation = resolve }))
+
+    const cancellation = chat.cancelQueue()
+
+    expect(chat.consultationState).toBe('QUEUED')
+    expect(chat.queueStatus).toEqual({
+      onlineAgentCount: 2,
+      queueSize: 5,
+      myPosition: 2,
+      estimatedWaitSeconds: 120,
+    })
+
+    chat._handleChatEvent({ event: 'QUEUE_CANCELLED' })
+    expect(chat.consultationState).toBe('IDLE')
+    expect(chat.queueStatus.queueSize).toBe(4)
+    expect(chat.queueStatus.myPosition).toBeNull()
+
+    resolveCancellation({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: null }),
+    })
+    await cancellation
+
+    expect(chat.queueStatus.queueSize).toBe(4)
+    expect(chat.queueStatus.myPosition).toBeNull()
+  })
+
+  it('releases consultation state after the server rejects a queue request', () => {
+    const chat = useChatStore()
+    chat.consultationStarting = true
+    chat.queueWaiting = false
+
+    chat._handleStompErrorEvent({ event: 'ERROR', message: '服务器处理消息失败' })
+
+    expect(chat.consultationStarting).toBe(false)
+    expect(chat.queueWaiting).toBe(false)
+    expect(chat.consultationState).toBe('IDLE')
+    expect(chat.error).toBe('服务器处理消息失败')
   })
 
   it('prevents duplicate consultation requests while a session is active or a request is pending', () => {

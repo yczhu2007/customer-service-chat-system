@@ -44,7 +44,7 @@ describe('authentication API', () => {
     auth.login({ token: 'session-token', userId: 'user-1', role: 'USER' })
 
     await getProfile()
-    await updateProfile({ username: 'renamed_user' })
+    await updateProfile({ nickname: '新的昵称' })
     await updatePassword({ currentPassword: 'old-password', newPassword: 'new-password' })
     await regenerateRecoveryCode()
 
@@ -52,5 +52,17 @@ describe('authentication API', () => {
     expect(fetch).toHaveBeenCalledWith('/account/profile', expect.objectContaining({ method: 'PUT' }))
     expect(fetch).toHaveBeenCalledWith('/account/password', expect.objectContaining({ method: 'PUT' }))
     expect(fetch).toHaveBeenCalledWith('/account/recovery-code', expect.objectContaining({ method: 'POST' }))
+  })
+
+  it('provides user role assignment endpoints for the admin user panel', async () => {
+    const { findUserRoles, assignRoleToUser, removeRoleFromUser } = await import('../api/admin-api')
+
+    await findUserRoles('user-1')
+    await assignRoleToUser('user-1', 'agent-role')
+    await removeRoleFromUser('user-1', 'agent-role')
+
+    expect(fetch).toHaveBeenNthCalledWith(1, '/users/user-1/roles', expect.any(Object))
+    expect(fetch).toHaveBeenNthCalledWith(2, '/users/user-1/roles/agent-role', expect.objectContaining({ method: 'PUT' }))
+    expect(fetch).toHaveBeenNthCalledWith(3, '/users/user-1/roles/agent-role', expect.objectContaining({ method: 'DELETE' }))
   })
 })

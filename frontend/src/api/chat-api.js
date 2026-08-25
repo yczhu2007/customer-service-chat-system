@@ -157,6 +157,13 @@ export const setArchiveStatus = (sessionId, data) =>
     body: JSON.stringify(data),
   })
 
+export const saveArchiveRemark = (sessionId, data) =>
+  request(`/chat/sessions/${sessionId}/archive-remark`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
 /**
  * Get user profile sidebar for a session (AGENT only).
  */

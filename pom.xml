@@ -36,6 +36,8 @@
         <!-- JDK 26 需要更新版本的 Mockito/ByteBuddy 才能初始化 inline mock maker。 -->
         <mockito.version>5.23.0</mockito.version>
         <byte-buddy.version>1.18.10</byte-buddy.version>
+        <minio.version>8.2.2</minio.version>
+        <okhttp.version>4.12.0</okhttp.version>
     </properties>
 
     <dependencies>

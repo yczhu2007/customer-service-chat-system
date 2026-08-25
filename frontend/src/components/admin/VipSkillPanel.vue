@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { findVipSkillAgents, addVipSkill, removeVipSkill } from '../../api/admin-api'
 
 const loading = ref(false)
@@ -9,6 +9,10 @@ const newAgentId = ref('')
 const actionLoading = ref(false)
 const actionError = ref(null)
 const actionSuccess = ref(null)
+const pageNo = ref(1)
+const pageSize = ref(20)
+const agentList = computed(() => Array.from(agents.value))
+const visibleAgents = computed(() => agentList.value.slice((pageNo.value - 1) * pageSize.value, pageNo.value * pageSize.value))
 
 async function loadAgents() {
   loading.value = true
@@ -16,11 +20,16 @@ async function loadAgents() {
   try {
     const res = await findVipSkillAgents()
     agents.value = new Set(res.data ?? [])
+    pageNo.value = Math.min(pageNo.value, Math.max(1, Math.ceil(agentList.value.length / pageSize.value)))
   } catch (e) {
     error.value = e.message
   } finally {
     loading.value = false
   }
+}
+
+function handlePageChange(nextPage) {
+  pageNo.value = nextPage
 }
 
 onMounted(loadAgents)
@@ -86,7 +95,7 @@ async function handleRemove(agentId) {
     <template v-else>
       <div v-if="agents.size === 0" class="empty">暂无 VIP 技能组客服</div>
       <div v-else class="agent-list">
-        <div v-for="agentId in Array.from(agents)" :key="agentId" class="agent-card">
+        <div v-for="agentId in visibleAgents" :key="agentId" class="agent-card">
           <span class="agent-id">{{ agentId }}</span>
           <button
             class="btn btn-sm btn-danger"
@@ -97,6 +106,16 @@ async function handleRemove(agentId) {
           </button>
         </div>
       </div>
+      <el-pagination
+        v-if="agentList.length > pageSize"
+        class="pagination"
+        layout="prev, pager, next"
+        :current-page="pageNo"
+        :page-size="pageSize"
+        :total="agentList.length"
+        :disabled="actionLoading"
+        @current-change="handlePageChange"
+      />
     </template>
   </section>
 </template>
@@ -136,6 +155,11 @@ async function handleRemove(agentId) {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 0.75rem 1rem;
+}
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
 }
 .agent-id {
   font-family: monospace;

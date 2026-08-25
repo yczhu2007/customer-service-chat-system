@@ -85,9 +85,9 @@
             <arg column="id" javaType="java.lang.String"/>
             <arg column="session_id" javaType="java.lang.String"/>
             <arg column="source_agent_id" javaType="java.lang.String"/>
-            <arg column="source_agent_username" javaType="java.lang.String"/>
+              <arg column="source_agent_nickname" javaType="java.lang.String"/>
             <arg column="target_agent_id" javaType="java.lang.String"/>
-            <arg column="target_agent_username" javaType="java.lang.String"/>
+              <arg column="target_agent_nickname" javaType="java.lang.String"/>
             <arg column="reason" javaType="java.lang.String"/>
             <arg column="create_time" javaType="java.time.LocalDateTime"/>
         </constructor>
@@ -95,11 +95,11 @@
 
     <sql id="sessionFilters">
         <where>
-            <if test="userId != null and userId != ''">
-                AND session.user_id = #{userId}
+            <if test="userLoginNumber != null and userLoginNumber != ''">
+                AND customer.username = #{userLoginNumber}
             </if>
-            <if test="agentId != null and agentId != ''">
-                AND session.agent_id = #{agentId}
+            <if test="agentLoginNumber != null and agentLoginNumber != ''">
+                AND agent.username = #{agentLoginNumber}
             </if>
             <if test="status != null and status != ''">
                 AND session.status = #{status}
@@ -349,6 +349,8 @@
     <select id="countSessionSummaries" resultType="long">
         SELECT COUNT(*)
         FROM chat_session session
+        JOIN sys_user customer ON customer.id = session.user_id
+        LEFT JOIN sys_user agent ON agent.id = session.agent_id
         LEFT JOIN chat_session_rating rating ON rating.session_id = session.id
         <include refid="sessionFilters"/>
     </select>
@@ -420,9 +422,9 @@
         SELECT transfer_log.id,
                transfer_log.session_id,
                transfer_log.source_agent_id,
-               source_agent.username AS source_agent_username,
+               COALESCE(NULLIF(source_agent.nickname, ''), source_agent.username) AS source_agent_nickname,
                transfer_log.target_agent_id,
-               target_agent.username AS target_agent_username,
+               COALESCE(NULLIF(target_agent.nickname, ''), target_agent.username) AS target_agent_nickname,
                transfer_log.reason,
                transfer_log.create_time
         FROM chat_session_transfer_log transfer_log

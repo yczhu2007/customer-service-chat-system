@@ -12,6 +12,7 @@ import {
   getSessionMetadata,
   updateSessionMetadata,
   setArchiveStatus,
+  saveArchiveRemark as saveArchiveRemarkRequest,
   getUserProfile,
   findAgentDashboard,
   findAgentRatingSummary,
@@ -30,6 +31,8 @@ export const useChatStore = defineStore('chat', {
     messages: [],
     /** Queue status object: { onlineAgentCount, queueSize, myPosition, estimatedWaitSeconds } */
     queueStatus: null,
+    queueWaiting: false,
+    queueCancelling: false,
     queueNotice: null,
     consultationStarting: false,
     /** Map of sessionId -> unread count */
@@ -65,6 +68,9 @@ export const useChatStore = defineStore('chat', {
     sessionsHasMore: false,
     sessionsLoadingMore: false,
     _sessionsRequestSequence: 0,
+    sessionsError: null,
+    _queueStatusRequestSequence: 0,
+    _queueLifecycleVersion: 0,
     _consultationTimeout: null,
     /** Loading state for messages */
     messagesLoading: false,
@@ -104,6 +110,19 @@ export const useChatStore = defineStore('chat', {
         const tb = b.lastMessageTime || b.createTime || ''
         return tb.localeCompare(ta)
       })
+    },
+    consultationState(state) {
+      if (state.sessions.some((session) => session.status === 'ACTIVE')) return 'ACTIVE'
+      if (state.queueWaiting || state.queueStatus?.myPosition != null) return 'QUEUED'
+      if (state.queueCancelling) return 'CANCELLING'
+      if (state.consultationStarting) return 'STARTING'
+      return 'IDLE'
+    },
+    canStartConsultation() {
+      return this.consultationState === 'IDLE'
+    },
+    hasClosedConsultation(state) {
+      return state.sessions.some((session) => session.status === 'CLOSED')
     },
   },
 
@@ -147,7 +166,7 @@ export const useChatStore = defineStore('chat', {
       const pageSize = Number(params.pageSize || this.sessionsPageSize)
       const requestSequence = ++this._sessionsRequestSequence
       this.sessionsLoading = true
-      this.error = null
+      this.sessionsError = null
       try {
         const result = await listSessions({ ...params, pageNo, pageSize })
         if (requestSequence !== this._sessionsRequestSequence) return
@@ -172,7 +191,10 @@ export const useChatStore = defineStore('chat', {
         this.sessionsHasMore = this.sessionsPageNo < this.sessionsTotalPages
         return true
       } catch (e) {
-        if (requestSequence === this._sessionsRequestSequence) this.error = e.message
+        if (requestSequence === this._sessionsRequestSequence) {
+          this.sessionsError = e.message
+          this.error = e.message
+        }
         return false
       } finally {
         if (requestSequence === this._sessionsRequestSequence) this.sessionsLoading = false
@@ -369,8 +391,8 @@ export const useChatStore = defineStore('chat', {
         this.error = '未连接到服务器'
         return
       }
-      if (this.consultationStarting || this.sessions.some((session) => session.status === 'ACTIVE' || session.status === 'QUEUED')) {
-        this.error = '当前已有进行中的咨询'
+      if (!this.canStartConsultation) {
+        this.error = this.consultationState === 'QUEUED' ? '当前已在排队中' : '当前已有进行中的咨询'
         return
       }
       this.consultationStarting = true
@@ -511,23 +533,58 @@ export const useChatStore = defineStore('chat', {
      * Fetch queue status via REST.
      */
     async loadQueueStatus() {
+      const requestSequence = ++this._queueStatusRequestSequence
+      const lifecycleVersion = this._queueLifecycleVersion
       try {
         const result = await getQueueStatus()
+        if (requestSequence !== this._queueStatusRequestSequence || lifecycleVersion !== this._queueLifecycleVersion) return
         this.queueStatus = result?.data || result
+        this.queueWaiting = this.queueStatus?.myPosition != null
+        if (this.queueWaiting) this._finishConsultationStart()
       } catch (e) {
         // Non-critical, don't set error
       }
     },
 
     async cancelQueue() {
+      if (this.queueCancelling) return false
+      this.queueCancelling = true
+      this._queueLifecycleVersion += 1
+      this.queueNotice = null
       try {
         await cancelQueue()
-        this.queueNotice = '已取消排队'
-        await Promise.all([this.loadQueueStatus(), this.loadSessions()])
+        this._applyQueueCancellation()
         return true
       } catch (exception) {
+        if (!this.queueWaiting && this.queueStatus?.myPosition == null) return true
+        this.queueCancelling = false
         this.error = exception.message || '取消排队失败'
         return false
+      }
+    },
+
+    _applyQueueCancellation() {
+      const wasWaiting = this.queueWaiting || this.queueStatus?.myPosition != null
+      this._queueLifecycleVersion += 1
+      this._finishConsultationStart()
+      this.queueWaiting = false
+      this.queueCancelling = false
+      this.queueStatus = {
+        ...(this.queueStatus || {}),
+        queueSize: wasWaiting
+          ? Math.max(0, Number(this.queueStatus?.queueSize || 0) - 1)
+          : Number(this.queueStatus?.queueSize || 0),
+        myPosition: null,
+        estimatedWaitSeconds: null,
+      }
+      this.queueNotice = null
+    },
+
+    _finishConsultationStart() {
+      this.consultationStarting = false
+      if (this._consultationTimeout) {
+        clearTimeout(this._consultationTimeout)
+        this._consultationTimeout = null
       }
     },
 
@@ -630,11 +687,9 @@ export const useChatStore = defineStore('chat', {
               stomp.subscribe('/user/queue/errors', (frame) => {
                 try {
                   const body = JSON.parse(frame.body)
-                  const reason = body.message || body.error || '服务端拒绝了消息'
-                  this.error = reason
-                  this._markLatestPendingMessageFailed(reason)
+                  this._handleStompErrorEvent(body)
                 } catch {
-                  this.error = frame.body || '操作失败'
+                  this._handleStompErrorEvent({ message: frame.body || '操作失败' })
                 }
               })
               // Pull offline messages on connect
@@ -710,6 +765,8 @@ export const useChatStore = defineStore('chat', {
       this.activeSessionId = null
       this.messages = []
       this.queueStatus = null
+      this.queueWaiting = false
+      this.queueCancelling = false
       this.queueNotice = null
       this.consultationStarting = false
       this.unreadCounts = {}
@@ -882,6 +939,20 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async saveArchiveRemark(sessionId, remark) {
+      try {
+        await saveArchiveRemarkRequest(sessionId, { remark })
+        const index = this.sessions.findIndex((session) => session.sessionId === sessionId)
+        if (index !== -1) {
+          this.sessions[index] = { ...this.sessions[index], archiveRemark: remark || null }
+        }
+        return true
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
     /**
      * Load user profile for a session (agent sidebar).
      */
@@ -995,17 +1066,21 @@ export const useChatStore = defineStore('chat', {
       }
 
       if (event === 'QUEUE_CANCELLED') {
-        this.queueStatus = null
-        this.queueNotice = '已取消排队'
+        this._applyQueueCancellation()
         return
       }
 
       if (event === 'WAITING_FOR_AGENT' || event === 'VIP_CALLBACK_REQUIRED' || event === 'ASSIGNMENT_PROCESSING') {
+        if (this.queueCancelling || (!this.consultationStarting && !this.queueWaiting)) return
+        if (event !== 'ASSIGNMENT_PROCESSING') {
+          this._finishConsultationStart()
+          this.queueWaiting = true
+        }
         this.queueNotice = event === 'VIP_CALLBACK_REQUIRED'
           ? '暂时没有可接待的 VIP 客服，已登记回呼。'
           : event === 'ASSIGNMENT_PROCESSING'
             ? '正在分配客服…'
-            : '已进入排队，正在等待客服接入。'
+            : null
         this.loadQueueStatus()
         return
       }
@@ -1015,8 +1090,8 @@ export const useChatStore = defineStore('chat', {
           this._markMessageFailed(body.clientMsgId, body.message || body.error || '服务端拒绝了消息')
           return
         }
-        this.consultationStarting = false
-        if (this._consultationTimeout) { clearTimeout(this._consultationTimeout); this._consultationTimeout = null }
+        this._finishConsultationStart()
+        this.queueWaiting = false
         this.queueNotice = null
         this.error = body.message || body.error || '咨询请求失败'
         return
@@ -1028,7 +1103,9 @@ export const useChatStore = defineStore('chat', {
           this.refreshAgentViews()
         } else {
           const sessionId = body.sessionId || body.session?.sessionId
-          this.consultationStarting = false
+          this._finishConsultationStart()
+          this.queueWaiting = false
+          this.queueCancelling = false
           this.queueNotice = null
           const selectAssignedSession = () => {
             if (sessionId && this.sessions.some((session) => session.sessionId === sessionId)) {
@@ -1043,6 +1120,17 @@ export const useChatStore = defineStore('chat', {
           this.loadQueueStatus()
         }
       }
+    },
+
+    _handleStompErrorEvent(body) {
+      const reason = body?.message || body?.error || '服务端拒绝了消息'
+      if (this.consultationStarting) {
+        this._finishConsultationStart()
+        this.queueWaiting = false
+        this.queueNotice = null
+      }
+      this.error = reason
+      this._markLatestPendingMessageFailed(reason)
     },
 
     /**

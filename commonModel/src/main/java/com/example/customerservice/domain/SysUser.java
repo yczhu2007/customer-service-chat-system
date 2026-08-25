@@ -14,6 +14,8 @@ public class SysUser {
 
     private String username;
 
+    private String nickname;
+
     private String password;
 
     private String status;
@@ -50,6 +52,14 @@ public class SysUser {
     ) {
 
         this.username = username;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
     }
 
 
@@ -123,6 +133,7 @@ public class SysUser {
         return "SysUser{" +
                 "id='" + id + '\'' +
                 ", username='" + username + '\'' +
+                ", nickname='" + nickname + '\'' +
                 ", password='******'" +
                 ", status='" + status + '\'' +
                 ", vipLevel=" + vipLevel +

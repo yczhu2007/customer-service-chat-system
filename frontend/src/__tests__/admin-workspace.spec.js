@@ -10,6 +10,9 @@ vi.mock('../api/admin-api', () => ({
   updateUser: vi.fn(),
   deleteUser: vi.fn(),
   updateUserPassword: vi.fn(),
+  findUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
+  assignRoleToUser: vi.fn(),
+  removeRoleFromUser: vi.fn(),
   listRoles: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
   createRole: vi.fn(),
   updateRole: vi.fn(),
@@ -18,6 +21,9 @@ vi.mock('../api/admin-api', () => ({
   assignPermissionToRole: vi.fn(),
   removePermissionFromRole: vi.fn(),
   listPermissions: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
+  createPermission: vi.fn(),
+  updatePermission: vi.fn(),
+  deletePermission: vi.fn(),
   findDeadLetters: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
   replayDeadLetter: vi.fn(() => Promise.resolve({ message: '重放成功' })),
   findArchiveStats: vi.fn(() =>
@@ -32,10 +38,12 @@ vi.mock('../api/admin-api', () => ({
       },
     })
   ),
+  findAdminDashboard: vi.fn(() => Promise.resolve({ data: {} })),
   findVipSkillAgents: vi.fn(() => Promise.resolve({ data: [] })),
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),
   findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
+  searchAdminMessages: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
 }))
 
 // ─── Mock http-client ────────────────────────────────────────
@@ -179,6 +187,25 @@ describe('SessionAuditPanel', () => {
     expect(statusOptions.map((option) => option.attributes('value'))).toEqual(['', 'ACTIVE', 'CLOSED'])
   })
 
+  it('searches sessions by user and agent login numbers', async () => {
+    const { request } = await import('../services/http-client')
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await nextTick()
+    request.mockClear()
+
+    const inputs = wrapper.findAll('.filters input')
+    await inputs[0].setValue('user004')
+    await inputs[1].setValue('agent001')
+    await wrapper.findAll('.filters button')[0].trigger('click')
+
+    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+    expect(requestUrl.searchParams.get('userLoginNumber')).toBe('user004')
+    expect(requestUrl.searchParams.get('agentLoginNumber')).toBe('agent001')
+    expect(wrapper.text()).not.toContain('用户 ID')
+    expect(wrapper.text()).not.toContain('客服 ID')
+  })
+
   it('uses one explicit date-time format and normalizes it for the API', async () => {
     const { request } = await import('../services/http-client')
     const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
@@ -203,7 +230,7 @@ describe('SessionAuditPanel', () => {
     const { request } = await import('../services/http-client')
     request.mockResolvedValueOnce({
       data: {
-        records: [{ sessionId: 's1', userId: 'u1', status: 'CLOSED', rating: 5 }],
+        records: [{ sessionId: 's1', username: 'user004', agentUsername: 'agent001', status: 'CLOSED', rating: 5 }],
         total: 1,
       },
     })
@@ -214,7 +241,127 @@ describe('SessionAuditPanel', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('s1')
-    expect(wrapper.text()).toContain('u1')
+    expect(wrapper.text()).toContain('user004')
+  })
+
+  it('renders Element Plus pagination and reloads the selected audit page', async () => {
+    const { request } = await import('../services/http-client')
+    request.mockResolvedValue({
+      data: { records: [], total: 41 },
+    })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+
+    await new Promise((r) => setTimeout(r, 0))
+    await nextTick()
+    request.mockClear()
+
+    const pagination = wrapper.findComponent({ name: 'ElPagination' })
+    expect(pagination.exists()).toBe(true)
+    expect(pagination.props('pageSize')).toBe(20)
+    expect(pagination.props('total')).toBe(41)
+
+    pagination.vm.$emit('current-change', 2)
+    await nextTick()
+    expect(request).toHaveBeenCalledWith(expect.stringContaining('pageNo=2'))
+  })
+})
+
+describe('AdminDashboard', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('offers a refresh action for dashboard data', async () => {
+    const { findAdminDashboard } = await import('../api/admin-api')
+    findAdminDashboard.mockResolvedValue({ data: {} })
+    const AdminDashboard = (await import('../components/admin/AdminDashboard.vue')).default
+    const wrapper = mount(AdminDashboard)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    const initialCalls = findAdminDashboard.mock.calls.length
+    await wrapper.get('button.refresh-dashboard').trigger('click')
+    expect(findAdminDashboard.mock.calls.length).toBe(initialCalls + 1)
+  })
+})
+
+describe('RoleManagementPanel', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('offers a refresh action for role and permission data', async () => {
+    const { listRoles, listPermissions } = await import('../api/admin-api')
+    listRoles.mockResolvedValue({ data: { records: [], total: 0 } })
+    listPermissions.mockResolvedValue({ data: { records: [], total: 0 } })
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    const initialRoleCalls = listRoles.mock.calls.length
+    const initialPermissionCalls = listPermissions.mock.calls.length
+    await wrapper.get('button.refresh-roles').trigger('click')
+    expect(listRoles.mock.calls.length).toBe(initialRoleCalls + 1)
+    expect(listPermissions.mock.calls.length).toBe(initialPermissionCalls + 1)
+  })
+
+  it('offers a permission create action when permission management is available', async () => {
+    const RoleManagementPanel = (await import('../components/admin/RoleManagementPanel.vue')).default
+    const wrapper = mount(RoleManagementPanel)
+    await nextTick()
+
+    expect(wrapper.text()).toContain('新增权限')
+  })
+})
+
+describe('AdminMessageSearchPanel', () => {
+  it('paginates search results and reloads the selected page', async () => {
+    const { searchAdminMessages } = await import('../api/admin-api')
+    searchAdminMessages.mockResolvedValue({
+      data: {
+        records: [{ messageId: 'm1', content: '测试消息' }],
+        total: 21,
+      },
+    })
+    const AdminMessageSearchPanel = (await import('../components/admin/AdminMessageSearchPanel.vue')).default
+    const wrapper = mount(AdminMessageSearchPanel)
+
+    await wrapper.find('.el-input__inner').setValue('测试')
+    await wrapper.find('.el-button--primary').trigger('click')
+    await nextTick()
+
+    const pagination = wrapper.findComponent({ name: 'ElPagination' })
+    expect(pagination.exists()).toBe(true)
+    expect(pagination.props('pageSize')).toBe(20)
+    expect(searchAdminMessages).toHaveBeenLastCalledWith({ keyword: '测试', pageNo: 1, pageSize: 20 })
+
+    pagination.vm.$emit('current-change', 2)
+    await nextTick()
+    expect(searchAdminMessages).toHaveBeenLastCalledWith({ keyword: '测试', pageNo: 2, pageSize: 20 })
+  })
+})
+
+describe('VipSkillPanel', () => {
+  it('paginates a large VIP agent list on the client', async () => {
+    const { findVipSkillAgents } = await import('../api/admin-api')
+    findVipSkillAgents.mockResolvedValue({
+      data: Array.from({ length: 21 }, (_, index) => `agent-${index + 1}`),
+    })
+    const VipSkillPanel = (await import('../components/admin/VipSkillPanel.vue')).default
+    const wrapper = mount(VipSkillPanel)
+
+    await new Promise((r) => setTimeout(r, 0))
+    await nextTick()
+
+    const pagination = wrapper.findComponent({ name: 'ElPagination' })
+    expect(pagination.exists()).toBe(true)
+    expect(wrapper.text()).toContain('agent-1')
+    expect(wrapper.text()).not.toContain('agent-21')
+    pagination.vm.$emit('current-change', 2)
+    await nextTick()
+    expect(wrapper.text()).toContain('agent-21')
   })
 })
 
@@ -251,5 +398,26 @@ describe('RoleManagementPanel', () => {
 
     expect(wrapper.text()).toContain('chat:read')
     expect(wrapper.text()).toContain('查看会话')
+  })
+})
+
+describe('UserManagementPanel', () => {
+  beforeEach(() => {
+    setActivePinia(createPinia())
+  })
+
+  it('offers a refresh action that reloads the user list', async () => {
+    const { listUsers } = await import('../api/admin-api')
+    listUsers.mockResolvedValue({ data: { records: [], total: 0 } })
+    const UserManagementPanel = (await import('../components/admin/UserManagementPanel.vue')).default
+    const wrapper = mount(UserManagementPanel)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+    const initialCalls = listUsers.mock.calls.length
+    await wrapper.get('button.refresh-users').trigger('click')
+
+    expect(listUsers.mock.calls.length).toBe(initialCalls + 1)
+    expect(wrapper.text()).toContain('刷新')
   })
 })

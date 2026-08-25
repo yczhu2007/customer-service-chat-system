@@ -10,14 +10,14 @@ const error = ref(null)
 const sessions = ref([])
 const total = ref(0)
 const pageNo = ref(1)
-const pageSize = ref(100)
+const pageSize = ref(20)
 const expandedSessionId = ref(null)
 const transferLogs = ref({})
 
 // Filters
 const filters = ref({
-  userId: '',
-  agentId: '',
+  userLoginNumber: '',
+  agentLoginNumber: '',
   status: '',
   archiveStatus: '',
   rating: '',
@@ -47,8 +47,8 @@ async function loadSessions() {
     const qs = new URLSearchParams()
     qs.set('pageNo', pageNo.value)
     qs.set('pageSize', pageSize.value)
-    if (filters.value.userId) qs.set('userId', filters.value.userId)
-    if (filters.value.agentId) qs.set('agentId', filters.value.agentId)
+    if (filters.value.userLoginNumber) qs.set('userLoginNumber', filters.value.userLoginNumber)
+    if (filters.value.agentLoginNumber) qs.set('agentLoginNumber', filters.value.agentLoginNumber)
     if (filters.value.status) qs.set('status', filters.value.status)
     if (filters.value.rating) qs.set('rating', filters.value.rating)
     if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
@@ -73,8 +73,14 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  filters.value = { userId: '', agentId: '', status: '', archiveStatus: '', rating: '', from: '', to: '' }
+  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', from: '', to: '' }
   pageNo.value = 1
+  loadSessions()
+}
+
+function handlePageChange(nextPage) {
+  if (nextPage === pageNo.value) return
+  pageNo.value = nextPage
   loadSessions()
 }
 
@@ -106,8 +112,8 @@ function ratingStars(rating) {
     <h2>会话审计</h2>
 
     <div class="filters">
-      <input v-model="filters.userId" placeholder="用户 ID" />
-      <input v-model="filters.agentId" placeholder="客服 ID" />
+      <input v-model="filters.userLoginNumber" class="user-login-number" placeholder="用户登录编号" />
+      <input v-model="filters.agentLoginNumber" class="agent-login-number" placeholder="客服登录编号" />
       <select v-model="filters.status" aria-label="Status">
         <option v-for="s in statusOptions" :key="s" :value="s">{{ s || '全部状态' }}</option>
       </select>
@@ -129,11 +135,11 @@ function ratingStars(rating) {
         <el-table-column prop="sessionId" label="会话 ID" min-width="170">
           <template #default="{ row }"><span class="mono">{{ row.sessionId }}</span></template>
         </el-table-column>
-        <el-table-column prop="userId" label="用户 ID" min-width="120">
-          <template #default="{ row }"><span class="mono">{{ row.userId }}</span></template>
+        <el-table-column prop="username" label="用户登录编号" min-width="120">
+          <template #default="{ row }"><span class="mono">{{ row.username || '-' }}</span></template>
         </el-table-column>
-        <el-table-column prop="agentId" label="客服 ID" min-width="120">
-          <template #default="{ row }"><span class="mono">{{ row.agentId || '-' }}</span></template>
+        <el-table-column prop="agentUsername" label="客服登录编号" min-width="120">
+          <template #default="{ row }"><span class="mono">{{ row.agentUsername || '-' }}</span></template>
         </el-table-column>
         <el-table-column label="状态" width="100">
           <template #default="{ row }"><span class="status-cell">{{ row.status }}</span></template>
@@ -155,13 +161,23 @@ function ratingStars(rating) {
             <div v-if="expandedSessionId === row.sessionId" class="transfer-details">
               <div v-if="!transferLogs[row.sessionId]?.length" class="empty">暂无转接记录</div>
               <div v-for="log in transferLogs[row.sessionId]" :key="log.id">
-                {{ log.sourceAgentUsername || log.sourceAgentId }} → {{ log.targetAgentUsername || log.targetAgentId }}，{{ formatDate(log.createTime) }}
+                {{ log.sourceAgentNickname || log.sourceAgentId }} → {{ log.targetAgentNickname || log.targetAgentId }}，{{ formatDate(log.createTime) }}
               </div>
             </div>
           </template>
         </el-table-column>
         <template #empty><div class="empty">暂无数据</div></template>
       </el-table>
+
+      <el-pagination
+        class="pagination"
+        layout="prev, pager, next"
+        :current-page="pageNo"
+        :page-size="pageSize"
+        :total="total"
+        :disabled="loading"
+        @current-change="handlePageChange"
+      />
 
     </template>
   </section>
@@ -246,6 +262,11 @@ function ratingStars(rating) {
   color: #dc2626;
 }
 .data-table { width: 100%; }
+.pagination {
+  display: flex;
+  justify-content: center;
+  margin-top: 1rem;
+}
 .data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; vertical-align: top; }
 .data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }

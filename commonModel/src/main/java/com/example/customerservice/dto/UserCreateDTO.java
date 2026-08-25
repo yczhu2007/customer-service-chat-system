@@ -20,6 +20,9 @@ public class UserCreateDTO implements Serializable {
     @Size(max = 64, message = "用户名长度不能超过64个字符")
     private String username;
 
+    @Size(max = 64, message = "昵称长度不能超过64个字符")
+    private String nickname;
+
     @NotBlank(message = "密码不能为空")
     @Size(min = 8, max = 128, message = "密码长度必须在8到128个字符之间")
     private String password;
@@ -59,6 +62,14 @@ public class UserCreateDTO implements Serializable {
     ) {
 
         this.username = username;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
     }
 
 

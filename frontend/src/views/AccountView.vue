@@ -5,16 +5,16 @@ import { useAuthStore } from '../stores/auth'
 
 const auth = useAuthStore()
 const formRef = ref()
-const form = ref({ username: '', currentPassword: '', newPassword: '' })
+const form = ref({ nickname: '', currentPassword: '', newPassword: '' })
 const recoveryCode = ref('')
 const message = ref('')
 const error = ref('')
 const loading = ref(false)
 
 const rules = {
-  username: [
-    { required: true, message: '请输入用户名', trigger: 'blur' },
-    { min: 3, max: 64, message: '用户名长度为 3-64 个字符', trigger: 'blur' },
+  nickname: [
+    { required: true, message: '请输入昵称', trigger: 'blur' },
+    { max: 64, message: '昵称不能超过 64 个字符', trigger: 'blur' },
   ],
   currentPassword: [{ required: true, message: '请输入当前密码', trigger: 'blur' }],
   newPassword: [
@@ -26,7 +26,7 @@ const rules = {
 onMounted(async () => {
   try {
     const result = await getProfile()
-    form.value.username = result?.data?.username || auth.userId || ''
+    form.value.nickname = result?.data?.nickname || auth.displayName || auth.userId || ''
   } catch (e) {
     error.value = e.message
   }
@@ -42,12 +42,12 @@ async function validateFields(fields) {
 }
 
 async function saveProfile() {
-  if (!await validateFields('username')) return
+  if (!await validateFields('nickname')) return
   await run(async () => {
-    const result = await updateProfile({ username: form.value.username.trim() })
-    form.value.username = result?.data?.username || form.value.username
-    auth.updateUsername(form.value.username)
-    message.value = '用户名已更新'
+    const result = await updateProfile({ nickname: form.value.nickname.trim() })
+    form.value.nickname = result?.data?.nickname || form.value.nickname
+    auth.updateNickname(form.value.nickname)
+    message.value = '昵称已更新'
   })
 }
 
@@ -70,10 +70,11 @@ async function run(action) { error.value = ''; message.value = ''; loading.value
     <el-alert v-if="error" class="error" :title="error" type="error" :closable="false" />
     <el-alert v-if="message" class="success" :title="message" type="success" :closable="false" />
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top">
-      <el-form-item label="用户名" prop="username">
-        <el-input v-model="form.username" />
+      <el-form-item label="昵称" prop="nickname">
+        <el-input v-model="form.nickname" />
       </el-form-item>
-      <el-button type="primary" :loading="loading" @click="saveProfile">保存用户名</el-button>
+      <el-button type="primary" :loading="loading" @click="saveProfile">保存昵称</el-button>
+      <p class="login-identifier">登录编号：{{ auth.username }}</p>
       <el-divider />
       <el-form-item label="当前密码" prop="currentPassword">
         <el-input v-model="form.currentPassword" type="password" show-password />
@@ -99,6 +100,7 @@ async function run(action) { error.value = ''; message.value = ''; loading.value
 .account-card :deep(.el-button) { min-height: 40px; }
 .account-card :deep(.el-divider) { margin: 0; }
 .account-card > .recovery { padding: 10px; background: #f6f8ff; }
+.login-identifier { margin: -4px 0 0; color: var(--color-faint); font-size: 12px; }
 .account-card > .recovery :deep(.el-alert__title) { color: var(--color-primary); font-family: var(--font-mono); font-size: 14px; font-weight: 400; word-break: break-all; }
 .account-card > :deep(.el-alert--error .el-alert__title) { color: var(--color-danger); font-size: 14px; font-weight: 400; }
 .account-card > :deep(.el-alert--success .el-alert__title) { color: var(--color-success); font-size: 14px; font-weight: 400; }

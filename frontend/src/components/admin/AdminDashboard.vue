@@ -24,7 +24,10 @@ onMounted(loadDashboard)
 
 <template>
   <section class="admin-dashboard">
-    <h2>管理仪表盘</h2>
+    <div class="panel-header">
+      <h2>管理仪表盘</h2>
+      <button class="btn refresh-dashboard" :disabled="loading" @click="loadDashboard">刷新</button>
+    </div>
 
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
@@ -58,6 +61,11 @@ onMounted(loadDashboard)
   margin: 0 auto;
 }
 .admin-dashboard h2 { margin: 0 0 18px; font-size: 19px; }
+.panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.panel-header h2 { margin: 0; }
+.btn { padding: 0.4rem 0.75rem; border: 1px solid #d1d5db; border-radius: 4px; background: #fff; cursor: pointer; font-size: 0.9rem; }
+.btn:hover:not(:disabled) { background: #f3f4f6; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
 .summary-cards {
   display: flex;
   display: grid;

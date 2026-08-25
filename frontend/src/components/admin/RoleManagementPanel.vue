@@ -9,6 +9,9 @@ import {
   assignPermissionToRole,
   removePermissionFromRole,
   listPermissions,
+  createPermission,
+  updatePermission,
+  deletePermission,
 } from '../../api/admin-api'
 
 // ─── Roles ──────────────────────────────────────────────────
@@ -25,11 +28,29 @@ const permissions = ref([])
 const totalPermissions = ref(0)
 const permPageNo = ref(1)
 const permPageSize = ref(20)
+const showPermissionDialog = ref(false)
+const permissionDialogMode = ref('create')
+const permissionForm = ref(emptyPermissionForm())
+const permissionFormError = ref(null)
+const showDeletePermissionConfirm = ref(false)
+const deletePermissionId = ref(null)
 
 // ─── Role-Permission assignment ─────────────────────────────
 const selectedRoleId = ref(null)
 const selectedRolePerms = ref(new Set())
 const permAssignLoading = ref(false)
+
+function emptyPermissionForm() {
+  return {
+    permissionCode: '',
+    permissionName: '',
+    permissionType: 'BUTTON',
+    requestMethod: '',
+    requestPath: '',
+    description: '',
+    status: 'ENABLED',
+  }
+}
 
 // ─── Dialogs ────────────────────────────────────────────────
 const showRoleDialog = ref(false)
@@ -74,6 +95,72 @@ async function loadRolePermissions(roleId) {
   } catch (e) {
     error.value = e.message
   }
+}
+
+function openCreatePermission() {
+  permissionDialogMode.value = 'create'
+  permissionForm.value = emptyPermissionForm()
+  permissionFormError.value = null
+  showPermissionDialog.value = true
+}
+
+function openEditPermission(permission) {
+  permissionDialogMode.value = 'edit'
+  permissionForm.value = {
+    permissionCode: permission.permissionCode || '',
+    permissionName: permission.permissionName || '',
+    permissionType: permission.permissionType || 'BUTTON',
+    requestMethod: permission.requestMethod || '',
+    requestPath: permission.requestPath || '',
+    description: permission.description || '',
+    status: permission.status || 'ENABLED',
+    _id: permission.id,
+  }
+  permissionFormError.value = null
+  showPermissionDialog.value = true
+}
+
+async function submitPermissionForm() {
+  permissionFormError.value = null
+  try {
+    const payload = {
+      permissionCode: permissionForm.value.permissionCode,
+      permissionName: permissionForm.value.permissionName,
+      permissionType: permissionForm.value.permissionType,
+      requestMethod: permissionForm.value.requestMethod,
+      requestPath: permissionForm.value.requestPath,
+      description: permissionForm.value.description,
+      status: permissionForm.value.status,
+    }
+    if (permissionDialogMode.value === 'create') {
+      await createPermission(payload)
+    } else {
+      await updatePermission(permissionForm.value._id, payload)
+    }
+    showPermissionDialog.value = false
+    await loadPermissions()
+  } catch (e) {
+    permissionFormError.value = e.message
+  }
+}
+
+function confirmDeletePermission(id) {
+  deletePermissionId.value = id
+  showDeletePermissionConfirm.value = true
+}
+
+async function executeDeletePermission() {
+  try {
+    await deletePermission(deletePermissionId.value)
+    showDeletePermissionConfirm.value = false
+    await loadPermissions()
+  } catch (e) {
+    error.value = e.message
+  }
+}
+
+async function refreshManagement() {
+  await Promise.all([loadRoles(), loadPermissions()])
 }
 
 onMounted(async () => {
@@ -159,7 +246,10 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
   <section class="role-panel">
     <div class="panel-header">
       <h2>角色管理</h2>
-      <button class="btn btn-primary" @click="openCreateRole">+ 新增角色</button>
+      <div class="panel-actions">
+        <button class="btn refresh-roles" :disabled="loading || permissionsLoading" @click="refreshManagement">刷新</button>
+        <button class="btn btn-primary" @click="openCreateRole">+ 新增角色</button>
+      </div>
     </div>
 
     <div v-if="error" class="error">{{ error }}</div>
@@ -197,7 +287,10 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
 
       <!-- Permission List / Assignment -->
       <div class="col">
-        <h3>权限管理</h3>
+        <div class="sub-panel-header">
+          <h3>权限管理</h3>
+          <button class="btn btn-primary btn-sm" @click="openCreatePermission">+ 新增权限</button>
+        </div>
         <p v-if="selectedRoleId" class="hint">
           点击勾选为选中角色分配权限（当前角色: {{ roles.find(r => r.id === selectedRoleId)?.roleCode }})
         </p>
@@ -215,6 +308,14 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
           </el-table-column>
           <el-table-column prop="permissionCode" label="编码" />
           <el-table-column prop="permissionName" label="名称" />
+          <el-table-column label="操作" width="130">
+            <template #default="{ row }">
+              <div class="actions">
+                <el-button class="btn btn-sm" size="small" @click.stop="openEditPermission(row)">编辑</el-button>
+                <el-button class="btn btn-sm btn-danger" size="small" @click.stop="confirmDeletePermission(row.id)">删除</el-button>
+              </div>
+            </template>
+          </el-table-column>
           <template #empty><div class="empty">暂无数据</div></template>
         </el-table>
         <el-pagination
@@ -230,6 +331,29 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
         </el-pagination>
       </div>
     </div>
+
+    <el-dialog v-model="showPermissionDialog" class="dialog" :title="permissionDialogMode === 'create' ? '新增权限' : '编辑权限'" width="500px">
+      <div v-if="permissionFormError" class="error">{{ permissionFormError }}</div>
+      <el-form label-position="top" @submit.prevent="submitPermissionForm">
+        <el-form-item label="权限编码">
+          <el-input v-model="permissionForm.permissionCode" :disabled="permissionDialogMode === 'edit'" required maxlength="128" />
+        </el-form-item>
+        <el-form-item label="权限名称"><el-input v-model="permissionForm.permissionName" required maxlength="64" /></el-form-item>
+        <el-form-item label="权限类型">
+          <el-select v-model="permissionForm.permissionType"><el-option label="API" value="API" /><el-option label="MENU" value="MENU" /><el-option label="BUTTON" value="BUTTON" /></el-select>
+        </el-form-item>
+        <el-form-item label="请求方法"><el-select v-model="permissionForm.requestMethod" clearable><el-option v-for="method in ['', 'GET', 'POST', 'PUT', 'DELETE', 'PATCH']" :key="method || 'none'" :label="method || '无'" :value="method" /></el-select></el-form-item>
+        <el-form-item label="请求路径"><el-input v-model="permissionForm.requestPath" maxlength="255" /></el-form-item>
+        <el-form-item label="描述"><el-input v-model="permissionForm.description" maxlength="255" /></el-form-item>
+        <el-form-item label="状态"><el-select v-model="permissionForm.status"><el-option label="启用" value="ENABLED" /><el-option label="禁用" value="DISABLED" /></el-select></el-form-item>
+        <div class="dialog-actions"><el-button class="btn" @click="showPermissionDialog = false">取消</el-button><el-button class="btn btn-primary" native-type="submit">确定</el-button></div>
+      </el-form>
+    </el-dialog>
+
+    <el-dialog v-model="showDeletePermissionConfirm" class="dialog" title="确认删除权限" width="420px">
+      <p>确定要删除该权限吗？</p>
+      <template #footer><div class="dialog-actions"><el-button class="btn" @click="showDeletePermissionConfirm = false">取消</el-button><el-button class="btn btn-danger" @click="executeDeletePermission">删除</el-button></div></template>
+    </el-dialog>
 
     <el-dialog v-model="showRoleDialog" class="dialog" :title="roleDialogMode === 'create' ? '新增角色' : '编辑角色'" width="420px">
       <div v-if="roleFormError" class="error">{{ roleFormError }}</div>
@@ -272,6 +396,7 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
   align-items: center;
   margin-bottom: 1rem;
 }
+.panel-actions { display: flex; gap: 0.5rem; }
 .two-col {
   display: flex;
   gap: 1.5rem;
@@ -283,6 +408,8 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
 .col h3 {
   margin-top: 0;
 }
+.sub-panel-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.sub-panel-header h3 { margin: 0; }
 .hint {
   color: #888;
   font-size: 0.9rem;

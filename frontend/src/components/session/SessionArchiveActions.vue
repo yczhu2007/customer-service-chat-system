@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle } from '../../constants/session-ui'
 
@@ -22,12 +22,19 @@ const VALID_TRANSITIONS = {
 
 const remark = ref('')
 const saving = ref(false)
+const savingRemark = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
 const session = computed(() => chat.activeSession)
 const currentArchiveStatus = computed(() => session.value?.archiveStatus || null)
 const isClosed = computed(() => session.value?.status === 'CLOSED')
+
+watch(() => chat.activeSessionId, () => {
+  remark.value = chat.activeSession?.archiveRemark || ''
+  errorMsg.value = ''
+  successMsg.value = ''
+}, { immediate: true })
 
 const availableStatuses = computed(() => {
   const valid = VALID_TRANSITIONS[currentArchiveStatus.value] || []
@@ -43,24 +50,42 @@ async function setArchive(code) {
     return
   }
 
-  if (remark.value.length > 255) {
-    errorMsg.value = '备注不能超过255个字符'
-    return
-  }
-
   saving.value = true
   try {
     await chat.updateArchiveStatus(chat.activeSessionId, {
       archiveStatus: code,
-      remark: remark.value.trim() || undefined,
     })
     successMsg.value = `已归档为：${archiveStatusLabel(code)}`
-    remark.value = ''
     setTimeout(() => { successMsg.value = '' }, 2000)
   } catch (e) {
     errorMsg.value = e.message || '归档操作失败'
   } finally {
     saving.value = false
+  }
+}
+
+async function saveRemark() {
+  errorMsg.value = ''
+  successMsg.value = ''
+  if (!chat.activeSessionId) {
+    errorMsg.value = '请先选择会话'
+    return
+  }
+  if (remark.value.length > 255) {
+    errorMsg.value = '备注不能超过255个字符'
+    return
+  }
+  savingRemark.value = true
+  try {
+    const savedRemark = remark.value.trim()
+    await chat.saveArchiveRemark(chat.activeSessionId, savedRemark)
+    remark.value = savedRemark
+    successMsg.value = '备注已保存'
+    setTimeout(() => { successMsg.value = '' }, 2000)
+  } catch (e) {
+    errorMsg.value = e.message || '备注保存失败'
+  } finally {
+    savingRemark.value = false
   }
 }
 </script>
@@ -96,6 +121,9 @@ async function setArchive(code) {
           class="remark-input"
           placeholder="归档备注（可选）"
         />
+        <el-button size="small" :loading="savingRemark" :disabled="saving" @click="saveRemark">
+          保存备注
+        </el-button>
       </div>
 
       <div class="btn-group">

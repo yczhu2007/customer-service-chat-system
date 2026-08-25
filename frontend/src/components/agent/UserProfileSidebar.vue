@@ -37,9 +37,9 @@ function vipBadge(level) {
 
     <template v-else>
       <div class="profile-section">
-        <div class="avatar">{{ (profile.username || '?')[0] }}</div>
+  <div class="avatar">{{ (profile.nickname || '?')[0] }}</div>
         <div class="name-row">
-          <span class="username">{{ profile.username || '-' }}</span>
+  <span class="username">{{ profile.nickname || '-' }}</span>
           <el-tag
             size="small"
             effect="light"

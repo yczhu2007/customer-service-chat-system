@@ -40,3 +40,6 @@ data/
 .worktrees/
 frontend/node/
 frontend/.npm-cache/
+.env
+.m2/
+.docker-config/

@@ -37,8 +37,8 @@ public interface ChatManagementQueryService {
     );
 
     PageResult<SessionSummaryVO> searchSessions(
-            String userId,
-            String agentId,
+            String userLoginNumber,
+            String agentLoginNumber,
             String status,
             String archiveStatus,
             Integer rating,

@@ -64,6 +64,7 @@ vi.mock('../api/chat-api', () => ({
     })
   ),
   setArchiveStatus: vi.fn(() => Promise.resolve({ data: null })),
+  saveArchiveRemark: vi.fn(() => Promise.resolve({ data: null })),
   getUserProfile: vi.fn(() =>
     Promise.resolve({
       data: {
@@ -120,6 +121,7 @@ import {
   getSessionMetadata,
   updateSessionMetadata,
   setArchiveStatus,
+  saveArchiveRemark,
   getUserProfile,
   listQuickReplies,
   createQuickReply,
@@ -132,6 +134,7 @@ import {
 } from '../api/chat-api'
 import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
 import AgentSessionList from '../components/session/AgentSessionList.vue'
+import SessionArchiveActions from '../components/session/SessionArchiveActions.vue'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -512,6 +515,49 @@ describe('Archive State Transitions', () => {
       archiveStatus: 'ON_HOLD',
       remark: '等待用户回复',
     })
+  })
+
+  it('shows the one saved archive remark again when reopening its session', async () => {
+    const chat = useChatStore()
+    chat.sessions = [
+      { sessionId: 's1', status: 'CLOSED', archiveRemark: '已保存的备注' },
+      { sessionId: 's2', status: 'CLOSED' },
+    ]
+    chat.activeSessionId = 's1'
+    const wrapper = mount(SessionArchiveActions)
+    const textarea = wrapper.get('textarea')
+    expect(textarea.element.value).toBe('已保存的备注')
+
+    await textarea.setValue('尚未保存的新内容')
+
+    chat.activeSessionId = 's2'
+    await nextTick()
+
+    expect(wrapper.get('textarea').element.value).toBe('')
+
+    chat.activeSessionId = 's1'
+    await nextTick()
+
+    expect(wrapper.get('textarea').element.value).toBe('已保存的备注')
+  })
+
+  it('saves the archive remark independently without changing archive status', async () => {
+    const chat = useChatStore()
+    chat.sessions = [
+      { sessionId: 's1', status: 'CLOSED', archiveStatus: 'PENDING', archiveRemark: '旧备注' },
+    ]
+    chat.activeSessionId = 's1'
+    const wrapper = mount(SessionArchiveActions)
+    await wrapper.get('textarea').setValue('新的唯一备注')
+
+    const saveButton = wrapper.findAll('button').find((button) => button.text() === '保存备注')
+    expect(saveButton).toBeTruthy()
+    await saveButton.trigger('click')
+    await nextTick()
+
+    expect(saveArchiveRemark).toHaveBeenCalledWith('s1', { remark: '新的唯一备注' })
+    expect(chat.activeSession.archiveRemark).toBe('新的唯一备注')
+    expect(chat.activeSession.archiveStatus).toBe('PENDING')
   })
 })
 

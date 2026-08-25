@@ -16,15 +16,8 @@ public class UserUpdateDTO implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Pattern(
-            regexp = "(?s).*\\S.*",
-            message = "用户名不能是空字符串"
-    )
-    @Size(
-            max = 64,
-            message = "用户名长度不能超过64个字符"
-    )
-    private String username;
+    @Size(max = 64, message = "昵称长度不能超过64个字符")
+    private String nickname;
 
     @Pattern(
             regexp = "(?i)ENABLED|DISABLED",
@@ -36,15 +29,9 @@ public class UserUpdateDTO implements Serializable {
     @Max(value = 5, message = "VIP等级不能大于5")
     private Integer vipLevel;
 
-    public String getUsername() {
-        return username;
-    }
+    public String getNickname() { return nickname; }
 
-    public void setUsername(
-            String username
-    ) {
-        this.username = username;
-    }
+    public void setNickname(String nickname) { this.nickname = nickname; }
 
     public String getStatus() {
         return status;

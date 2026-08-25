@@ -174,6 +174,10 @@ public class UserServiceImpl
                 username
         );
 
+        user.setNickname(
+                StringUtils.hasText(request.getNickname()) ? request.getNickname().trim() : username
+        );
+
 
         user.setPassword(
                 PasswordUtil.hash(
@@ -238,12 +242,6 @@ public class UserServiceImpl
         }
 
 
-        boolean hasUsername =
-                StringUtils.hasText(
-                        request.getUsername()
-                );
-
-
         boolean hasStatus =
                 StringUtils.hasText(
                         request.getStatus()
@@ -252,10 +250,12 @@ public class UserServiceImpl
         boolean hasVipLevel =
                 request.getVipLevel() != null;
 
-        if (!hasUsername && !hasStatus && !hasVipLevel) {
+        boolean hasNickname = request.getNickname() != null;
+
+        if (!hasNickname && !hasStatus && !hasVipLevel) {
 
             throw new IllegalArgumentException(
-                    "username、status和vipLevel至少需要提供一项"
+                    "nickname、status和vipLevel至少需要提供一项"
             );
         }
 
@@ -269,36 +269,8 @@ public class UserServiceImpl
         );
 
 
-        if (hasUsername) {
-
-            String username =
-                    request.getUsername()
-                            .trim();
-
-
-            SysUser sameUsernameUser =
-                    sysUserMapper.findByUsername(
-                            username
-                    );
-
-
-            if (
-                    sameUsernameUser != null &&
-                            !currentUser.getId()
-                                    .equals(
-                                            sameUsernameUser.getId()
-                                    )
-            ) {
-
-                throw new IllegalArgumentException(
-                        "用户名已经存在"
-                );
-            }
-
-
-            user.setUsername(
-                    username
-            );
+        if (hasNickname) {
+            user.setNickname(request.getNickname().trim());
         }
 
 
@@ -637,6 +609,10 @@ public class UserServiceImpl
 
         userVO.setUsername(
                 user.getUsername()
+        );
+
+        userVO.setNickname(
+                StringUtils.hasText(user.getNickname()) ? user.getNickname() : user.getUsername()
         );
 
 

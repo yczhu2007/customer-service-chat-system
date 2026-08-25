@@ -179,6 +179,8 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         UserProfileSidebarVO vo = new UserProfileSidebarVO();
         vo.setUserId(user.getId());
         vo.setUsername(user.getUsername());
+        vo.setNickname(user.getNickname() == null || user.getNickname().isBlank()
+                ? user.getUsername() : user.getNickname());
         vo.setVipLevel(user.getVipLevel() == null ? 0 : user.getVipLevel());
         vo.setTotalSessionCount(totalSessions == null ? 0 : totalSessions.intValue());
         vo.setLastSessionTime(lastSession == null ? null : lastSession.getCreateTime());
@@ -474,7 +476,6 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     "不允许从 " + (session.getArchiveStatus() == null ? "未归档" : session.getArchiveStatus())
                             + " 转换到 " + target);
         }
-        session.setArchiveRemark(request.getRemark());
         session.setArchivedBy(agentId);
         session.setArchivedAt(LocalDateTime.now());
         /* 使用 WHERE archive_status = :expected 防止并发覆盖 */
@@ -487,13 +488,53 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
         } else {
             update.eq(ChatSession::getArchiveStatus, previousStatus);
         }
-        int updated = sessionMapper.update(session, update
+        var archiveUpdate = update
                 .set(ChatSession::getArchiveStatus, target)
-                .set(ChatSession::getArchiveRemark, request.getRemark())
                 .set(ChatSession::getArchivedBy, agentId)
-                .set(ChatSession::getArchivedAt, LocalDateTime.now()));
+                .set(ChatSession::getArchivedAt, LocalDateTime.now());
+        if (request.getRemark() != null) {
+            session.setArchiveRemark(request.getRemark());
+            archiveUpdate.set(ChatSession::getArchiveRemark, request.getRemark());
+        }
+        int updated = sessionMapper.update(session, archiveUpdate);
         if (updated != 1) {
             throw new BusinessStateException("归档状态已被其他操作修改，请刷新后重试");
+        }
+    }
+
+    @Override
+    @Transactional
+    public void saveArchiveRemark(String agentId, String sessionId, SessionArchiveRemarkDTO request) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = sessionMapper.selectById(sessionId);
+        if (session == null) {
+            throw new NotFoundException("会话不存在");
+        }
+        if (!ChatConstants.SESSION_STATUS_CLOSED.equals(session.getStatus())) {
+            throw new BusinessStateException("只能对已结束的会话保存归档备注");
+        }
+        if (!agentId.equals(session.getAgentId())) {
+            throw new IllegalArgumentException("只有该会话的客服可以保存归档备注");
+        }
+        String previousRemark = session.getArchiveRemark();
+        String remark = request.getRemark() == null || request.getRemark().isBlank()
+                ? null
+                : request.getRemark().trim();
+        session.setArchiveRemark(remark);
+        var update = Wrappers.<ChatSession>lambdaUpdate()
+                .eq(ChatSession::getId, sessionId)
+                .eq(ChatSession::getAgentId, agentId)
+                .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_CLOSED);
+        if (previousRemark == null) {
+            update.isNull(ChatSession::getArchiveRemark);
+        } else {
+            update.eq(ChatSession::getArchiveRemark, previousRemark);
+        }
+        int updated = sessionMapper.update(session, update.set(ChatSession::getArchiveRemark, remark));
+        if (updated != 1) {
+            throw new BusinessStateException("归档备注已被其他操作修改，请刷新后重试");
         }
     }
 

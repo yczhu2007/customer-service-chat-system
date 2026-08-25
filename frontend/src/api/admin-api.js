@@ -142,3 +142,37 @@ export function searchAdminMessages(params = {}) {
   const qs = new URLSearchParams(params).toString()
   return request(`/chat/admin/messages/search?${qs}`)
 }
+
+export function createPermission(data) {
+  return request('/permissions', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  })
+}
+
+export function updatePermission(id, data) {
+  return request(`/permissions/${encodeURIComponent(id)}`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  })
+}
+
+export function deletePermission(id) {
+  return request(`/permissions/${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export function findUserRoles(userId) {
+  return request(`/users/${encodeURIComponent(userId)}/roles`)
+}
+
+export function assignRoleToUser(userId, roleId) {
+  return request(`/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`, {
+    method: 'PUT',
+  })
+}
+
+export function removeRoleFromUser(userId, roleId) {
+  return request(`/users/${encodeURIComponent(userId)}/roles/${encodeURIComponent(roleId)}`, {
+    method: 'DELETE',
+  })
+}

@@ -10,6 +10,7 @@ public record LoginResponse(
         long expiresInSeconds,
         String userId,
         String username,
+        String nickname,
         Set<String> roles
 ) implements Serializable {
 

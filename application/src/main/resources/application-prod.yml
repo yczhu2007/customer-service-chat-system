@@ -14,6 +14,16 @@ app:
   websocket:
     # 生产环境必须配置精确的受信任前端来源，禁止使用通配符或 localhost。
     allowed-origin-patterns: ${WEBSOCKET_ALLOWED_ORIGIN_PATTERNS}
+  chat:
+    attachment:
+      minio:
+        endpoint: ${MINIO_ENDPOINT}
+        access-key: ${MINIO_ACCESS_KEY}
+        secret-key: ${MINIO_SECRET_KEY}
+        bucket: ${MINIO_BUCKET:chat-attachments}
+      migration:
+        enabled: ${ATTACHMENT_MIGRATION_ENABLED:false}
+        legacy-storage-path: ${CHAT_ATTACHMENT_LEGACY_STORAGE_PATH:./data/chat-attachments}
   bootstrap:
     admin:
       # 默认不创建管理员；仅在受控的首次部署中显式开启。

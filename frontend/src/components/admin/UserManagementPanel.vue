@@ -6,6 +6,10 @@ import {
   updateUser,
   deleteUser,
   updateUserPassword,
+  listRoles,
+  findUserRoles,
+  assignRoleToUser,
+  removeRoleFromUser,
 } from '../../api/admin-api'
 
 const loading = ref(false)
@@ -30,6 +34,14 @@ const passwordError = ref(null)
 // Delete confirmation
 const showDeleteConfirm = ref(false)
 const deleteUserId = ref(null)
+
+const showRoleDialog = ref(false)
+const roleUser = ref(null)
+const roles = ref([])
+const selectedRoleCodes = ref([])
+const originalRoleCodes = ref([])
+const roleLoading = ref(false)
+const roleError = ref(null)
 
 function emptyForm() {
   return {
@@ -139,6 +151,49 @@ async function submitPassword() {
   }
 }
 
+async function openRoleDialog(user) {
+  roleUser.value = user
+  roleError.value = null
+  roleLoading.value = true
+  showRoleDialog.value = true
+  try {
+    const [roleResult, userRoleResult] = await Promise.all([
+      listRoles({ pageNo: 1, pageSize: 100 }),
+      findUserRoles(user.id),
+    ])
+    roles.value = roleResult.data?.records ?? []
+    originalRoleCodes.value = [...(userRoleResult.data ?? [])]
+    selectedRoleCodes.value = [...originalRoleCodes.value]
+  } catch (e) {
+    roleError.value = e.message
+  } finally {
+    roleLoading.value = false
+  }
+}
+
+async function saveRoles() {
+  if (!roleUser.value) return
+  roleError.value = null
+  roleLoading.value = true
+  try {
+    const previous = new Set(originalRoleCodes.value)
+    const selected = new Set(selectedRoleCodes.value)
+    const additions = roles.value.filter((role) => selected.has(role.roleCode) && !previous.has(role.roleCode))
+    const removals = roles.value.filter((role) => !selected.has(role.roleCode) && previous.has(role.roleCode))
+    await Promise.all([
+      ...additions.map((role) => assignRoleToUser(roleUser.value.id, role.id)),
+      ...removals.map((role) => removeRoleFromUser(roleUser.value.id, role.id)),
+    ])
+    roleUser.value.roles = [...selected]
+    showRoleDialog.value = false
+    await loadUsers()
+  } catch (e) {
+    roleError.value = e.message
+  } finally {
+    roleLoading.value = false
+  }
+}
+
 const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 </script>
 
@@ -146,16 +201,25 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
   <section class="user-panel">
     <div class="panel-header">
       <h2>用户管理</h2>
-      <button class="btn btn-primary" @click="openCreate">+ 新增用户</button>
+      <div class="panel-actions">
+        <button class="btn refresh-users" :disabled="loading" @click="loadUsers">刷新</button>
+        <button class="btn btn-primary" @click="openCreate">+ 新增用户</button>
+      </div>
     </div>
 
     <div v-if="loading" class="loading">加载中...</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <el-table v-loading="loading" class="data-table" :data="users" row-key="id">
-        <el-table-column prop="username" label="用户名" />
+        <el-table-column prop="username" label="登录编号" />
         <el-table-column label="昵称">
           <template #default="{ row }">{{ row.nickname || '-' }}</template>
+        </el-table-column>
+        <el-table-column label="角色" width="110">
+          <template #default="{ row }">
+            <span v-if="row.roles?.length" class="role-list" :title="row.roles.join('、')">{{ row.roles.join('、') }}</span>
+            <span v-else class="muted">未分配</span>
+          </template>
         </el-table-column>
         <el-table-column label="状态">
           <template #default="{ row }">
@@ -167,10 +231,11 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
         <el-table-column prop="vipLevel" label="VIP 等级">
           <template #default="{ row }">{{ row.vipLevel ?? 0 }}</template>
         </el-table-column>
-        <el-table-column label="操作" width="190">
+        <el-table-column label="操作" min-width="220">
           <template #default="{ row }">
             <div class="actions">
               <el-button class="btn btn-sm" size="small" @click="openEdit(row)">编辑</el-button>
+              <el-button class="btn btn-sm" size="small" @click="openRoleDialog(row)">分配角色</el-button>
               <el-button class="btn btn-sm" size="small" @click="openPasswordDialog(row.id)">密码</el-button>
               <el-button class="btn btn-sm btn-danger" size="small" @click="confirmDelete(row.id)">删除</el-button>
             </div>
@@ -195,7 +260,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
     <el-dialog v-model="showDialog" class="dialog" :title="dialogMode === 'create' ? '新增用户' : '编辑用户'" width="420px">
       <div v-if="formError" class="error">{{ formError }}</div>
       <el-form label-position="top" @submit.prevent="submitForm">
-        <el-form-item v-if="dialogMode === 'create'" label="用户名">
+        <el-form-item v-if="dialogMode === 'create'" label="登录编号">
           <el-input v-model="formData.username" required maxlength="64" />
         </el-form-item>
         <el-form-item label="昵称">
@@ -233,6 +298,24 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       </el-form>
     </el-dialog>
 
+    <el-dialog v-model="showRoleDialog" class="dialog" title="分配用户角色" width="460px">
+      <div v-if="roleError" class="error">{{ roleError }}</div>
+      <div v-loading="roleLoading" class="role-dialog-body">
+        <p class="role-target">账号：{{ roleUser?.nickname || '未设置昵称' }}</p>
+        <el-checkbox-group v-model="selectedRoleCodes" class="role-options">
+          <el-checkbox v-for="role in roles" :key="role.id" :value="role.roleCode">
+            {{ role.roleCode }}<span v-if="role.roleName">（{{ role.roleName }}）</span>
+          </el-checkbox>
+        </el-checkbox-group>
+      </div>
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button class="btn" @click="showRoleDialog = false">取消</el-button>
+          <el-button class="btn btn-primary" :loading="roleLoading" @click="saveRoles">保存角色</el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="showDeleteConfirm" class="dialog" title="确认删除" width="420px">
       <p>确定要删除该用户吗？此操作不可撤销。</p>
       <template #footer>
@@ -248,6 +331,8 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 <style scoped>
 .user-panel {
   padding: 1rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 .panel-header {
   display: flex;
@@ -284,6 +369,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 .actions {
   display: flex;
   gap: 0.5rem;
+  white-space: nowrap;
 }
 .empty {
   text-align: center;
@@ -334,6 +420,12 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 .error {
   color: #dc2626;
 }
+.panel-actions { display: flex; gap: 0.5rem; }
+.muted { color: #888; }
+.role-list { display: inline-block; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
+.role-dialog-body { min-height: 80px; }
+.role-target { margin: 0 0 14px; color: var(--color-muted); }
+.role-options { display: grid; gap: 10px; }
 .dialog-overlay {
   position: fixed;
   inset: 0;
@@ -376,6 +468,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 .data-table { width: 100%; }
 .data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; }
+.data-table :deep(.el-table__body-wrapper .cell) { white-space: nowrap; }
 .data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
 .data-table :deep(.el-table__empty-text) { color: #888; }
 .pagination :deep(.el-pagination__total), .pagination :deep(.btn-prev), .pagination :deep(.btn-next), .pagination :deep(.el-pager li) { font-size: 0.9rem; }

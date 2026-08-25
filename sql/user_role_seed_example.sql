@@ -16,11 +16,11 @@ SET NAMES utf8mb4;
 --   ${ADMIN_PASSWORD_HASH}
 
 -- INSERT INTO sys_user
---     (id, username, password, status)
+--     (id, username, nickname, password, status)
 -- VALUES
---     ('U001', 'user001', '${U001_PASSWORD_HASH}', 'ENABLED'),
---     ('A001', 'agent001', '${A001_PASSWORD_HASH}', 'ENABLED'),
---     ('admin', 'admin', '${ADMIN_PASSWORD_HASH}', 'ENABLED')
+--     ('U001', 'user001', 'user001', '${U001_PASSWORD_HASH}', 'ENABLED'),
+--     ('A001', 'agent001', 'agent001', '${A001_PASSWORD_HASH}', 'ENABLED'),
+--     ('admin', 'admin', 'admin', '${ADMIN_PASSWORD_HASH}', 'ENABLED')
 -- ON DUPLICATE KEY UPDATE
 --     username = VALUES(username),
 --     password = VALUES(password),
@@ -38,4 +38,3 @@ SET NAMES utf8mb4;
 --     ('admin', 'R_ADMIN')
 -- ON DUPLICATE KEY UPDATE
 --     user_id = VALUES(user_id);
-

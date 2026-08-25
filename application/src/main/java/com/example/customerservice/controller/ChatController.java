@@ -462,6 +462,18 @@ public class ChatController {
         return Result.successMessage("归档状态更新成功");
     }
 
+    /** 客服独立保存已结束会话的单条归档备注。 */
+    @PutMapping("/sessions/{sessionId}/archive-remark")
+    public Result<Void> saveArchiveRemark(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId,
+            @Valid @RequestBody SessionArchiveRemarkDTO request
+    ) {
+        currentUser.requireRole("AGENT");
+        currentUser.requirePermission("chat:session:archive");
+        chatSessionQueryService.saveArchiveRemark(currentUser.getUserId(), sessionId, request);
+        return Result.successMessage("归档备注保存成功");
+    }
+
     /** 管理员查看已结束会话的归档统计概览。 */
     @GetMapping("/admin/archive-stats")
     public Result<ArchiveStatsVO> findArchiveStats() {

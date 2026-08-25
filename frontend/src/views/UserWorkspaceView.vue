@@ -14,7 +14,12 @@ let queueTimer = null
 const activeSession = computed(() => chat.activeSession)
 const isClosed = computed(() => activeSession.value?.status === 'CLOSED')
 const showRating = computed(() => isClosed.value && activeSession.value)
-const hasActiveConsultation = computed(() => chat.consultationStarting || chat.sessions.some((session) => session.status === 'ACTIVE' || session.status === 'QUEUED'))
+const consultationButtonLabel = computed(() => {
+  if (chat.consultationState === 'STARTING') return '正在提交…'
+  if (chat.consultationState === 'QUEUED') return '排队中'
+  if (chat.consultationState === 'ACTIVE') return '咨询进行中'
+  return chat.hasClosedConsultation ? '重新咨询' : '发起咨询'
+})
 
 /** Queue status display */
 const inQueue = computed(() => chat.queueStatus?.myPosition != null)
@@ -86,8 +91,8 @@ onUnmounted(() => {
           </div>
         </div>
         <div class="queue-actions">
-          <button class="consult-btn" :disabled="hasActiveConsultation" @click="startConsultation">
-            {{ chat.consultationStarting ? '正在咨询…' : '重新咨询' }}
+          <button class="consult-btn" :disabled="!chat.canStartConsultation" @click="startConsultation">
+            {{ consultationButtonLabel }}
           </button>
           <button class="refresh-queue-btn" @click="refreshQueue">刷新</button>
           <button v-if="inQueue" class="cancel-queue-btn" @click="cancelQueue">取消排队</button>

@@ -12,7 +12,7 @@ const submitting = ref(false)
 const error = ref('')
 
 const rules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  username: [{ required: true, message: '请输入登录编号', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
 }
 
@@ -31,7 +31,7 @@ async function submit() {
     if (!payload?.token || !payload?.userId) {
       throw new Error('登录响应缺少认证信息')
     }
-    auth.login({ token: payload.token, userId: payload.userId, username: payload.username || form.value.username.trim(), roles })
+    auth.login({ token: payload.token, userId: payload.userId, username: payload.username || form.value.username.trim(), nickname: payload.nickname, roles })
     await router.push(`/${auth.homeRole.toLowerCase()}`)
   } catch (e) {
     error.value = e.message || '登录失败'
@@ -47,8 +47,8 @@ async function submit() {
         <h1>客服工作台</h1>
         <p>Customer Service Chat</p>
       </div>
-      <el-form-item label="用户名" prop="username">
-        <el-input v-model="form.username" autocomplete="username" placeholder="请输入用户名" />
+      <el-form-item label="登录编号" prop="username">
+        <el-input v-model="form.username" autocomplete="username" placeholder="请输入登录编号" />
       </el-form-item>
       <div class="password-field">
         <el-form-item label="密码" prop="password">

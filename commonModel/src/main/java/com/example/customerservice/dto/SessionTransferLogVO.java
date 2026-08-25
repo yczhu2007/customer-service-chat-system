@@ -7,9 +7,9 @@ public record SessionTransferLogVO(
         String id,
         String sessionId,
         String sourceAgentId,
-        String sourceAgentUsername,
+        String sourceAgentNickname,
         String targetAgentId,
-        String targetAgentUsername,
+        String targetAgentNickname,
         String reason,
         LocalDateTime createTime
 ) implements Serializable {

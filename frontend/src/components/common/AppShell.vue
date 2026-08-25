@@ -53,7 +53,7 @@ async function switchWorkspace(role) {
             {{ role === 'ADMIN' ? '管理' : role === 'AGENT' ? '客服' : '用户' }}
           </el-button>
         </el-button-group>
-        <RouterLink class="account-link" to="/account">{{ auth.username || auth.userId }}</RouterLink>
+      <RouterLink class="account-link" to="/account">{{ auth.displayName }}</RouterLink>
         <el-button class="logout-button" type="default" plain size="small" @click="signOut">退出登录</el-button>
       </div>
     </header>

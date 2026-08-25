@@ -48,8 +48,8 @@ public interface ChatManagementMapper {
     List<AgentLoadVO> findAgentLoads(@Param("agentIds") List<String> agentIds);
 
     long countSessionSummaries(
-            @Param("userId") String userId,
-            @Param("agentId") String agentId,
+            @Param("userLoginNumber") String userLoginNumber,
+            @Param("agentLoginNumber") String agentLoginNumber,
             @Param("status") String status,
             @Param("archiveStatus") String archiveStatus,
             @Param("rating") Integer rating,
@@ -58,8 +58,8 @@ public interface ChatManagementMapper {
     );
 
     List<SessionSummaryVO> findSessionSummaries(
-            @Param("userId") String userId,
-            @Param("agentId") String agentId,
+            @Param("userLoginNumber") String userLoginNumber,
+            @Param("agentLoginNumber") String agentLoginNumber,
             @Param("status") String status,
             @Param("archiveStatus") String archiveStatus,
             @Param("rating") Integer rating,

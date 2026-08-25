@@ -130,8 +130,8 @@ public class ChatManagementController {
 
     @GetMapping("/admin/sessions")
     public Result<PageResult<SessionSummaryVO>> searchSessions(
-            @RequestParam(required = false) String userId,
-            @RequestParam(required = false) String agentId,
+            @RequestParam(required = false) String userLoginNumber,
+            @RequestParam(required = false) String agentLoginNumber,
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String archiveStatus,
             @RequestParam(required = false) Integer rating,
@@ -148,8 +148,8 @@ public class ChatManagementController {
         currentUser.requirePermission("chat:session:audit:view");
         return Result.success(
                 managementQueryService.searchSessions(
-                        userId,
-                        agentId,
+                        userLoginNumber,
+                        agentLoginNumber,
                         status,
                         archiveStatus,
                         rating,

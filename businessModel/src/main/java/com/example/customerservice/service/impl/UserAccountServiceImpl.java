@@ -66,6 +66,7 @@ public class UserAccountServiceImpl implements UserAccountService {
         SysUser user = new SysUser();
         user.setId(UUID.randomUUID().toString().replace("-", ""));
         user.setUsername(username);
+        user.setNickname(username);
         user.setPassword(PasswordUtil.hash(request.getPassword()));
         user.setStatus("ENABLED");
         user.setVipLevel(0);
@@ -87,12 +88,7 @@ public class UserAccountServiceImpl implements UserAccountService {
     @Transactional
     public UserVO updateProfile(String userId, ProfileUpdateDTO request) {
         SysUser user = requireUser(userId);
-        String username = request.getUsername().trim();
-        SysUser duplicate = userMapper.findByUsername(username);
-        if (duplicate != null && !duplicate.getId().equals(userId)) {
-            throw new IllegalArgumentException("用户名已经存在");
-        }
-        user.setUsername(username);
+        user.setNickname(request.getNickname() == null ? "" : request.getNickname().trim());
         if (userMapper.updateSelective(user) != 1) {
             throw new IllegalStateException("账号资料修改失败");
         }
@@ -184,10 +180,16 @@ public class UserAccountServiceImpl implements UserAccountService {
     private UserVO toVO(SysUser user) {
         UserVO vo = new UserVO();
         vo.setId(user.getId()); vo.setUsername(user.getUsername()); vo.setStatus(user.getStatus());
+        vo.setNickname(displayName(user));
         vo.setVipLevel(user.getVipLevel() == null ? 0 : user.getVipLevel());
         vo.setCreateTime(user.getCreateTime()); vo.setUpdateTime(user.getUpdateTime());
         Set<String> roles = userRoleMapper.findAllRoleCodesByUserId(user.getId());
         vo.setRoles(roles == null ? Set.of() : roles);
         return vo;
+    }
+
+    private String displayName(SysUser user) {
+        return user.getNickname() == null || user.getNickname().isBlank()
+                ? user.getUsername() : user.getNickname();
     }
 }

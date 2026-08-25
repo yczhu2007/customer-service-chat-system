@@ -187,8 +187,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
 
     @Override
     public PageResult<SessionSummaryVO> searchSessions(
-            String userId,
-            String agentId,
+            String userLoginNumber,
+            String agentLoginNumber,
             String status,
             String archiveStatus,
             Integer rating,
@@ -206,13 +206,13 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         }
         validateTimeRange(fromTime, toTime);
 
-        String normalizedUserId = normalize(userId);
-        String normalizedAgentId = normalize(agentId);
+        String normalizedUserLoginNumber = normalize(userLoginNumber);
+        String normalizedAgentLoginNumber = normalize(agentLoginNumber);
         String normalizedStatus = normalize(status);
         String normalizedArchiveStatus = normalize(archiveStatus);
         long total = managementMapper.countSessionSummaries(
-                normalizedUserId,
-                normalizedAgentId,
+                normalizedUserLoginNumber,
+                normalizedAgentLoginNumber,
                 normalizedStatus,
                 normalizedArchiveStatus,
                 rating,
@@ -223,8 +223,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         List<SessionSummaryVO> records = total == 0
                 ? List.of()
                 : managementMapper.findSessionSummaries(
-                        normalizedUserId,
-                        normalizedAgentId,
+                        normalizedUserLoginNumber,
+                        normalizedAgentLoginNumber,
                         normalizedStatus,
                         normalizedArchiveStatus,
                         rating,

@@ -18,6 +18,8 @@ public class UserVO implements Serializable {
 
     private String username;
 
+    private String nickname;
+
     private String status;
 
     private Integer vipLevel;
@@ -62,6 +64,14 @@ public class UserVO implements Serializable {
     ) {
 
         this.username = username;
+    }
+
+    public String getNickname() {
+        return nickname;
+    }
+
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
     }
 
 
