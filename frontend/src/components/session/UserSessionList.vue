@@ -1,10 +1,9 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { ARCHIVE_STATUS_OPTIONS, archiveStatusLabel, archiveStatusStyle, priorityLabel, statusLabel } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, priorityLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
-const archiveFilter = ref('')
 
 /** Status CSS class */
 function statusClass(status) {
@@ -41,23 +40,12 @@ function selectSession(sessionId) {
 
 /** Refresh sessions */
 function refresh() {
-  const params = {}
-  if (archiveFilter.value) params.archiveStatus = archiveFilter.value
-  chat.loadSessions(params)
+  chat.loadSessions()
 }
 
 function loadMore() {
-  const params = {}
-  if (archiveFilter.value) params.archiveStatus = archiveFilter.value
-  chat.loadNextSessionsPage(params)
+  chat.loadNextSessionsPage()
 }
-
-/** Archive filter options */
-const archiveOptions = [
-  { label: '全部', value: '' },
-  { label: '未归档', value: 'NONE' },
-  ...ARCHIVE_STATUS_OPTIONS,
-]
 
 onMounted(() => {
   if (!chat.sessions.length) refresh()
@@ -71,15 +59,6 @@ onMounted(() => {
       <button class="refresh-btn" @click="refresh" :disabled="chat.sessionsLoading">
         {{ chat.sessionsLoading ? '加载中…' : '刷新' }}
       </button>
-    </div>
-
-    <!-- Archive status filter -->
-    <div class="filter-row">
-      <select v-model="archiveFilter" class="archive-select" @change="refresh">
-        <option v-for="opt in archiveOptions" :key="opt.value" :value="opt.value">
-          {{ opt.label }}
-        </option>
-      </select>
     </div>
 
     <!-- Loading state -->
@@ -168,17 +147,6 @@ onMounted(() => {
 .refresh-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-.filter-row {
-  padding: 0.5rem 1rem;
-  border-bottom: 1px solid #f3f4f6;
-}
-.archive-select {
-  width: 100%;
-  padding: 0.35rem;
-  border: 1px solid #d1d5db;
-  border-radius: 4px;
-  font-size: 0.85rem;
 }
 .session-items {
   list-style: none;

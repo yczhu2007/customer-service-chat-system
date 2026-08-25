@@ -243,6 +243,13 @@ describe('User Workspace', () => {
     expect(wrapper.text()).toContain('之前的会话')
   })
 
+  it('does not show an archive filter in the user session list', () => {
+    const wrapper = mount(UserSessionList)
+
+    expect(wrapper.find('.filter-row').exists()).toBe(false)
+    expect(wrapper.find('select.archive-select').exists()).toBe(false)
+  })
+
   it('uses one authoritative consultation state for idle, queued and active users', () => {
     const chat = useChatStore()
     expect(chat.consultationState).toBe('IDLE')
