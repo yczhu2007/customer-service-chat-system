@@ -3,7 +3,6 @@ package com.example.customerservice.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.domain.SysUser;
-import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
@@ -62,10 +61,15 @@ public class UserServiceImpl
 
 
     @Override
-    public PageResult<UserVO> findPage(long pageNo, long pageSize) {
+    public PageResult<UserVO> findPage(long pageNo, long pageSize, String keyword) {
+        String searchKeyword = StringUtils.hasText(keyword) ? keyword.trim() : null;
         Page<SysUser> page = sysUserMapper.selectPage(
                 new Page<>(pageNo, pageSize),
                 Wrappers.<SysUser>lambdaQuery()
+                        .and(searchKeyword != null, query -> query
+                                .like(SysUser::getUsername, searchKeyword)
+                                .or()
+                                .like(SysUser::getNickname, searchKeyword))
                         .orderByDesc(SysUser::getCreateTime)
                         .orderByDesc(SysUser::getId)
         );
@@ -331,36 +335,17 @@ public class UserServiceImpl
 
     @Override
     @Transactional
-    public void updatePassword(
-            String id,
-            PasswordUpdateDTO request
-    ) {
+    public void resetPasswordByAdmin(String id) {
 
         requireUser(
                 id
         );
 
-
-        if (request == null) {
-
-            throw new IllegalArgumentException(
-                    "修改密码请求不能为空"
-            );
-        }
-
-
-        String rawPassword =
-                requireText(
-                        request.getPassword(),
-                        "password不能为空"
-                );
-
-
         int updatedRows =
                 sysUserMapper.updatePassword(
                         id,
                         PasswordUtil.hash(
-                                rawPassword
+                                "12345678"
                         )
                 );
 
@@ -368,7 +353,7 @@ public class UserServiceImpl
         if (updatedRows != 1) {
 
             throw new IllegalStateException(
-                    "修改密码失败"
+                    "重置密码失败"
             );
         }
 

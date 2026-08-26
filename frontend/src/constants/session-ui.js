@@ -5,6 +5,17 @@ export const STATUS_LABELS = {
   PENDING: '待处理',
 }
 
+export const AGENT_VIEW_OPTIONS = [
+  { code: 'MY_ACTIVE', label: '处理中' },
+  { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
+  { code: 'MY_UNARCHIVED', label: '未归档' },
+  { code: 'MY_RECENT_CLOSED', label: '最近关闭' },
+  { code: 'MY_ARCHIVED_COMPLETED', label: '已解决' },
+  { code: 'MY_ARCHIVED_PENDING', label: '待处理' },
+  { code: 'MY_ARCHIVED_ON_HOLD', label: '暂停' },
+  { code: 'MY_ARCHIVED_OTHER', label: '其他' },
+]
+
 export const ARCHIVE_STATUS_OPTIONS = [
   { code: 'COMPLETED', label: '已解决', color: '#1f8a5f', backgroundColor: '#e7f4ee' },
   { code: 'PENDING', label: '待处理', color: '#b7791f', backgroundColor: '#fef3c7' },

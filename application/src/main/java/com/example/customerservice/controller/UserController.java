@@ -1,6 +1,5 @@
 package com.example.customerservice.controller;
 
-import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
@@ -53,12 +52,15 @@ public class UserController {
             @RequestParam(defaultValue = "20")
             @Min(value = 1, message = "pageSize不能小于1")
             @Max(value = 100, message = "pageSize不能大于100")
-            long pageSize
+            long pageSize,
+            @RequestParam(required = false)
+            @Size(max = 64, message = "查询关键词长度不能超过64个字符")
+            String keyword
     ) {
 
         requireUserManagementPermission();
 
-        return Result.success(userService.findPage(pageNo, pageSize));
+        return Result.success(userService.findPage(pageNo, pageSize, keyword));
     }
 
 
@@ -113,25 +115,19 @@ public class UserController {
     }
 
 
-    @PutMapping("/{id}/password")
-    public Result<Void> updatePassword(
+    @PostMapping("/{id}/reset-password")
+    public Result<Void> resetPassword(
             @PathVariable
             @NotBlank(message = "用户ID不能为空")
             @Size(max = 64, message = "用户ID长度不能超过64个字符")
-            String id,
-            @Valid
-            @RequestBody
-            PasswordUpdateDTO request
+            String id
     ) {
         requireUserManagementPermission();
 
-        userService.updatePassword(
-                id,
-                request
-        );
+        userService.resetPasswordByAdmin(id);
 
         return Result.successMessage(
-                "密码修改成功"
+                "密码已重置为12345678"
         );
     }
 

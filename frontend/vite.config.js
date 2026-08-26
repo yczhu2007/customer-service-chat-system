@@ -25,24 +25,10 @@ export default defineConfig(({ command, mode }) => ({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
-    rollupOptions: {
-      output: {
-        manualChunks(id) {
-          if (!id.includes('node_modules')) return
-          if (id.includes('element-plus')) {
-            const component = id.match(/element-plus[/\\]es[/\\]components[/\\]([^/\\]+)/)
-            return component ? `el-${component[1]}` : 'element-plus-core'
-          }
-          if (id.includes('/vue/') || id.includes('vue-router') || id.includes('pinia')) return 'vue-vendor'
-          if (id.includes('@stomp/stompjs') || id.includes('sockjs-client')) return 'realtime-vendor'
-          return 'vendor'
-        },
-      },
-    },
   },
   server: {
-    host: "0.0.0.0",
-    port: 5173,
+    host: "127.0.0.1",
+    port: 4173,
     proxy: {
       "/chat": {
         target: backendTarget,

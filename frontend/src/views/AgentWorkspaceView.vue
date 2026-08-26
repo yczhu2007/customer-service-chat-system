@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import { agentOnline, agentOffline } from '../api/chat-api'
@@ -14,6 +14,7 @@ import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 import AgentOverviewPanel from '../components/agent/AgentOverviewPanel.vue'
 import AgentMessageSearchPanel from '../components/agent/AgentMessageSearchPanel.vue'
 import TransferLogPanel from '../components/session/TransferLogPanel.vue'
+import { AGENT_VIEW_OPTIONS } from '../constants/session-ui'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -22,17 +23,9 @@ const presenceError = ref('')
 const presencePending = ref(false)
 const showMessageSearch = ref(false)
 
-const QUICK_REPLY_LABELS = {
-  MY_ACTIVE: '处理中',
-  MY_UNREAD: '未读',
-  MY_HIGH_PRIORITY: '高优先级',
-  MY_UNARCHIVED: '未归档',
-  MY_RECENT_CLOSED: '最近关闭',
-  MY_ARCHIVED_COMPLETED: '已解决',
-  MY_ARCHIVED_PENDING: '待处理',
-  MY_ARCHIVED_ON_HOLD: '暂停',
-  MY_ARCHIVED_OTHER: '其他',
-}
+const activeViewLabel = computed(() => (
+  AGENT_VIEW_OPTIONS.find((view) => view.code === chat.activeAgentView)?.label || '会话'
+))
 
 /** Set agent online and connect STOMP */
 async function goOnline() {
@@ -114,7 +107,7 @@ onUnmounted(() => {
         <AgentViewNav />
         <div class="sidebar-divider" />
         <div class="session-list-header">
-          <span class="list-title">{{ QUICK_REPLY_LABELS[chat.activeAgentView] || '会话' }}</span>
+          <span class="list-title">{{ activeViewLabel }}</span>
           <button class="refresh-btn" @click="chat.refreshAgentViews()">刷新</button>
         </div>
         <AgentSessionList />

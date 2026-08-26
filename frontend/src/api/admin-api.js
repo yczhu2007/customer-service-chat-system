@@ -6,6 +6,7 @@ export function listUsers(params = {}) {
   const qs = new URLSearchParams()
   if (params.pageNo) qs.set('pageNo', params.pageNo)
   if (params.pageSize) qs.set('pageSize', params.pageSize)
+  if (params.keyword?.trim()) qs.set('keyword', params.keyword.trim())
   return request(`/users?${qs.toString()}`)
 }
 
@@ -27,11 +28,8 @@ export function deleteUser(id) {
   return request(`/users/${id}`, { method: 'DELETE' })
 }
 
-export function updateUserPassword(id, data) {
-  return request(`/users/${id}/password`, {
-    method: 'PUT',
-    body: JSON.stringify(data),
-  })
+export function resetUserPassword(id) {
+  return request(`/users/${id}/reset-password`, { method: 'POST' })
 }
 
 // ─── Role Management ────────────────────────────────────────

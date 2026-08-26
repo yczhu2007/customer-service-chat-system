@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "dev:host": "vite --host 0.0.0.0",
-    "build": "vite build && node scripts/sync-backend-static.mjs",
+    "build": "vite build",
+    "build:sync": "npm run build && node scripts/sync-backend-static.mjs",
     "build:verify": "npm run build && node -e \"console.log('Frontend bundle ready in dist/')\"",
     "test": "vitest"
   },

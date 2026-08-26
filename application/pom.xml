@@ -61,7 +61,7 @@
                     <jvmArguments>-Djava.io.tmpdir=${project.build.directory}</jvmArguments>
                 </configuration>
             </plugin>
-            <!-- Always package an existing Vue build; use -Pfrontend when it must be rebuilt first. -->
+            <!-- Package the Vue bundle produced with the locally installed Node.js: npm run build. -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-resources-plugin</artifactId>
@@ -84,50 +84,5 @@
             </plugin>
         </plugins>
     </build>
-
-    <profiles>
-        <profile>
-            <id>frontend</id>
-            <activation>
-                <activeByDefault>true</activeByDefault>
-            </activation>
-            <build>
-                <plugins>
-                    <plugin>
-                        <groupId>com.github.eirslett</groupId>
-                        <artifactId>frontend-maven-plugin</artifactId>
-                        <version>1.15.1</version>
-                        <configuration>
-                            <workingDirectory>${project.parent.basedir}/frontend</workingDirectory>
-                            <nodeVersion>v24.19.0</nodeVersion>
-                            <npmVersion>11.17.0</npmVersion>
-                            <environmentVariables>
-                                <npm_config_cache>${project.build.directory}/npm-cache</npm_config_cache>
-                            </environmentVariables>
-                        </configuration>
-                        <executions>
-                            <execution>
-                                <id>install-node-and-npm</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>install-node-and-npm</goal></goals>
-                            </execution>
-                            <execution>
-                                <id>npm-ci</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>npm</goal></goals>
-                                <configuration><arguments>ci</arguments></configuration>
-                            </execution>
-                            <execution>
-                                <id>npm-build</id>
-                                <phase>generate-resources</phase>
-                                <goals><goal>npm</goal></goals>
-                                <configuration><arguments>run build</arguments></configuration>
-                            </execution>
-                        </executions>
-                    </plugin>
-                </plugins>
-            </build>
-        </profile>
-    </profiles>
 
 </project>

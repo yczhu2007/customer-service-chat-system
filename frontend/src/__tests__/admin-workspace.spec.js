@@ -9,7 +9,7 @@ vi.mock('../api/admin-api', () => ({
   createUser: vi.fn(),
   updateUser: vi.fn(),
   deleteUser: vi.fn(),
-  updateUserPassword: vi.fn(),
+  resetUserPassword: vi.fn(),
   findUserRoles: vi.fn(() => Promise.resolve({ data: [] })),
   assignRoleToUser: vi.fn(),
   removeRoleFromUser: vi.fn(),
@@ -506,5 +506,38 @@ describe('UserManagementPanel', () => {
 
     expect(listUsers.mock.calls.length).toBe(initialCalls + 1)
     expect(wrapper.text()).toContain('刷新')
+  })
+
+  it('queries users by login number or nickname from the first page', async () => {
+    const { listUsers } = await import('../api/admin-api')
+    listUsers.mockResolvedValue({ data: { records: [], total: 0 } })
+    const UserManagementPanel = (await import('../components/admin/UserManagementPanel.vue')).default
+    const wrapper = mount(UserManagementPanel)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await wrapper.get('.user-search-input input').setValue('agent001')
+    await wrapper.get('button.search-users').trigger('click')
+
+    expect(listUsers).toHaveBeenLastCalledWith({ pageNo: 1, pageSize: 20, keyword: 'agent001' })
+  })
+
+  it('confirms the fixed administrator password reset instead of accepting a password input', async () => {
+    const { listUsers, resetUserPassword } = await import('../api/admin-api')
+    listUsers.mockResolvedValue({
+      data: { records: [{ id: 'user-1', username: 'zhangsan', nickname: '张三' }], total: 1 },
+    })
+    const UserManagementPanel = (await import('../components/admin/UserManagementPanel.vue')).default
+    const wrapper = mount(UserManagementPanel)
+
+    await vi.dynamicImportSettled()
+    await nextTick()
+    const resetButton = wrapper.findAll('button').find((button) => button.text() === '重置密码')
+    await resetButton.trigger('click')
+
+    expect(wrapper.text()).toContain('12345678')
+    const confirmButton = wrapper.findAll('button').find((button) => button.text() === '确认重置')
+    await confirmButton.trigger('click')
+
+    expect(resetUserPassword).toHaveBeenCalledWith('user-1')
   })
 })

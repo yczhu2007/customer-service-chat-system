@@ -5,7 +5,7 @@ import {
   createUser,
   updateUser,
   deleteUser,
-  updateUserPassword,
+  resetUserPassword,
   listRoles,
   findUserRoles,
   assignRoleToUser,
@@ -18,6 +18,7 @@ const users = ref([])
 const total = ref(0)
 const pageNo = ref(1)
 const pageSize = ref(20)
+const keyword = ref('')
 
 // Dialog state
 const showDialog = ref(false)
@@ -27,8 +28,7 @@ const formError = ref(null)
 
 // Password dialog
 const showPasswordDialog = ref(false)
-const passwordUserId = ref(null)
-const passwordForm = ref({ newPassword: '' })
+const passwordUser = ref(null)
 const passwordError = ref(null)
 
 // Delete confirmation
@@ -57,7 +57,9 @@ async function loadUsers() {
   loading.value = true
   error.value = null
   try {
-    const res = await listUsers({ pageNo: pageNo.value, pageSize: pageSize.value })
+    const params = { pageNo: pageNo.value, pageSize: pageSize.value }
+    if (keyword.value.trim()) params.keyword = keyword.value.trim()
+    const res = await listUsers(params)
     users.value = res.data?.records ?? []
     total.value = res.data?.total ?? 0
   } catch (e) {
@@ -134,20 +136,27 @@ async function executeDelete() {
   }
 }
 
-function openPasswordDialog(userId) {
-  passwordUserId.value = userId
-  passwordForm.value = { newPassword: '' }
+function openPasswordDialog(user) {
+  passwordUser.value = user
   passwordError.value = null
   showPasswordDialog.value = true
 }
 
-async function submitPassword() {
+async function resetPassword() {
   passwordError.value = null
   try {
-    await updateUserPassword(passwordUserId.value, passwordForm.value)
+    await resetUserPassword(passwordUser.value.id)
     showPasswordDialog.value = false
   } catch (e) {
     passwordError.value = e.message
+  }
+}
+
+async function searchUsers() {
+  if (pageNo.value === 1) {
+    await loadUsers()
+  } else {
+    pageNo.value = 1
   }
 }
 
@@ -202,6 +211,16 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
     <div class="panel-header">
       <h2>用户管理</h2>
       <div class="panel-actions">
+        <div class="user-query">
+          <el-input
+            v-model="keyword"
+            class="user-search-input"
+            clearable
+            placeholder="搜索登录编号或昵称"
+            @keyup.enter="searchUsers"
+          />
+          <el-button class="btn search-users" :disabled="loading" @click="searchUsers">查询</el-button>
+        </div>
         <button class="btn refresh-users" :disabled="loading" @click="loadUsers">刷新</button>
         <button class="btn btn-primary" @click="openCreate">+ 新增用户</button>
       </div>
@@ -236,7 +255,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
             <div class="actions">
               <el-button class="btn btn-sm" size="small" @click="openEdit(row)">编辑</el-button>
               <el-button class="btn btn-sm" size="small" @click="openRoleDialog(row)">分配角色</el-button>
-              <el-button class="btn btn-sm" size="small" @click="openPasswordDialog(row.id)">密码</el-button>
+              <el-button class="btn btn-sm" size="small" @click="openPasswordDialog(row)">重置密码</el-button>
               <el-button class="btn btn-sm btn-danger" size="small" @click="confirmDelete(row.id)">删除</el-button>
             </div>
           </template>
@@ -285,17 +304,13 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       </el-form>
     </el-dialog>
 
-    <el-dialog v-model="showPasswordDialog" class="dialog" title="修改密码" width="420px">
+    <el-dialog v-model="showPasswordDialog" class="dialog" title="强制重置密码" width="420px">
       <div v-if="passwordError" class="error">{{ passwordError }}</div>
-      <el-form label-position="top" @submit.prevent="submitPassword">
-        <el-form-item label="新密码">
-          <el-input v-model="passwordForm.newPassword" type="password" show-password required maxlength="128" />
-        </el-form-item>
-        <div class="dialog-actions">
-          <el-button class="btn" @click="showPasswordDialog = false">取消</el-button>
-          <el-button class="btn btn-primary" native-type="submit">确定</el-button>
-        </div>
-      </el-form>
+      <p>确定将“{{ passwordUser?.nickname || passwordUser?.username }}”的密码重置为 <strong>12345678</strong> 吗？</p>
+      <div class="dialog-actions">
+        <el-button class="btn" @click="showPasswordDialog = false">取消</el-button>
+        <el-button class="btn btn-primary" @click="resetPassword">确认重置</el-button>
+      </div>
     </el-dialog>
 
     <el-dialog v-model="showRoleDialog" class="dialog" title="分配用户角色" width="460px">
@@ -420,7 +435,9 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
 .error {
   color: #dc2626;
 }
-.panel-actions { display: flex; gap: 0.5rem; }
+.panel-actions { display: flex; align-items: center; gap: 0.5rem; }
+.user-query { display: flex; gap: 0.5rem; }
+.user-search-input { width: 220px; }
 .muted { color: #888; }
 .role-list { display: inline-block; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
 .role-dialog-body { min-height: 80px; }

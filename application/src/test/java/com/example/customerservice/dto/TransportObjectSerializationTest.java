@@ -32,7 +32,6 @@ class TransportObjectSerializationTest {
                 PageResult.class,
                 MessageMutationResult.class,
                 MessageReadResult.class,
-                PasswordUpdateDTO.class,
                 PermissionCreateDTO.class,
                 PermissionUpdateDTO.class,
                 PermissionVO.class,

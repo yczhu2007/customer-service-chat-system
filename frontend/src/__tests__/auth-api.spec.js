@@ -65,4 +65,14 @@ describe('authentication API', () => {
     expect(fetch).toHaveBeenNthCalledWith(2, '/users/user-1/roles/agent-role', expect.objectContaining({ method: 'PUT' }))
     expect(fetch).toHaveBeenNthCalledWith(3, '/users/user-1/roles/agent-role', expect.objectContaining({ method: 'DELETE' }))
   })
+
+  it('calls the administrator reset endpoint without accepting a supplied password', async () => {
+    const { resetUserPassword } = await import('../api/admin-api')
+
+    await resetUserPassword('user-1')
+
+    expect(fetch).toHaveBeenCalledWith('/users/user-1/reset-password', expect.objectContaining({
+      method: 'POST',
+    }))
+  })
 })

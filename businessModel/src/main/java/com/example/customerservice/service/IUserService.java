@@ -1,6 +1,5 @@
 package com.example.customerservice.service;
 
-import com.example.customerservice.dto.PasswordUpdateDTO;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
@@ -14,7 +13,7 @@ import java.util.Set;
  */
 public interface IUserService {
 
-    PageResult<UserVO> findPage(long pageNo, long pageSize);
+    PageResult<UserVO> findPage(long pageNo, long pageSize, String keyword);
 
     UserVO findById(
             String id
@@ -29,10 +28,7 @@ public interface IUserService {
             UserUpdateDTO request
     );
 
-    void updatePassword(
-            String id,
-            PasswordUpdateDTO request
-    );
+    void resetPasswordByAdmin(String id);
 
     void deleteById(
             String id

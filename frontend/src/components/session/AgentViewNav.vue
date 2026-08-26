@@ -1,20 +1,9 @@
 <script setup>
 import { onMounted, computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { AGENT_VIEW_OPTIONS } from '../../constants/session-ui'
 
 const chat = useChatStore()
-
-/** Fixed agent views. */
-const VIEW_DEFS = [
-  { code: 'MY_ACTIVE', label: '处理中' },
-  { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
-  { code: 'MY_UNARCHIVED', label: '未归档' },
-  { code: 'MY_RECENT_CLOSED', label: '最近关闭' },
-  { code: 'MY_ARCHIVED_COMPLETED', label: '已解决' },
-  { code: 'MY_ARCHIVED_PENDING', label: '待处理' },
-  { code: 'MY_ARCHIVED_ON_HOLD', label: '暂停' },
-  { code: 'MY_ARCHIVED_OTHER', label: '其他' },
-]
 
 /** Build a map of code -> count for quick lookup */
 const countMap = computed(() => {
@@ -39,7 +28,7 @@ onMounted(() => {
     <h3 class="nav-title">视图</h3>
     <ul class="view-list">
       <li
-        v-for="v in VIEW_DEFS"
+        v-for="v in AGENT_VIEW_OPTIONS"
         :key="v.code"
         class="view-item"
         :class="{ active: chat.activeAgentView === v.code }"

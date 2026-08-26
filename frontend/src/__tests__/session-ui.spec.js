@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AGENT_VIEW_OPTIONS,
   ARCHIVE_STATUS_OPTIONS,
   CATEGORY_OPTIONS,
   archiveStatusStyle,
@@ -7,6 +8,19 @@ import {
 } from '../constants/session-ui'
 
 describe('session enum presentation', () => {
+  it('keeps one frontend agent view list without the unread view', () => {
+    expect(AGENT_VIEW_OPTIONS.map((option) => option.code)).toEqual([
+      'MY_ACTIVE',
+      'MY_HIGH_PRIORITY',
+      'MY_UNARCHIVED',
+      'MY_RECENT_CLOSED',
+      'MY_ARCHIVED_COMPLETED',
+      'MY_ARCHIVED_PENDING',
+      'MY_ARCHIVED_ON_HOLD',
+      'MY_ARCHIVED_OTHER',
+    ])
+  })
+
   it('shows Chinese labels for selectable archive and category values', () => {
     expect(ARCHIVE_STATUS_OPTIONS.map((option) => option.label)).toEqual([
       '已解决', '待处理', '暂停', '其他',
