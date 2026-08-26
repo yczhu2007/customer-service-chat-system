@@ -1,0 +1,158 @@
+package com.example.customerservice.service;
+
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
+import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.domain.SupportTicket;
+import com.example.customerservice.domain.SysUser;
+import com.example.customerservice.dto.SupportTicketCreateDTO;
+import com.example.customerservice.dto.SupportTicketUpdateDTO;
+import com.example.customerservice.dto.SupportTicketVO;
+import com.example.customerservice.exception.BusinessStateException;
+import com.example.customerservice.mapper.ChatSessionMapper;
+import com.example.customerservice.mapper.SupportTicketMapper;
+import com.example.customerservice.mapper.SysUserMapper;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
+import org.apache.shiro.authz.UnauthorizedException;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+
+import java.time.LocalDateTime;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+@ExtendWith(MockitoExtension.class)
+class SupportTicketServiceTest {
+
+    @Mock private SupportTicketMapper ticketMapper;
+    @Mock private ChatSessionMapper sessionMapper;
+    @Mock private SysUserMapper userMapper;
+
+    private SupportTicketService service;
+
+    @BeforeAll
+    static void initializeMybatisMetadata() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), "SupportTicketServiceTest"),
+                SupportTicket.class
+        );
+    }
+
+    @BeforeEach
+    void setUp() {
+        service = new SupportTicketService(ticketMapper, sessionMapper, userMapper);
+    }
+
+    @Test
+    void assignedAgentCanCreateOneTicketForAnActiveSession() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(125L);
+            return 1;
+        });
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+
+        SupportTicketVO ticket = service.createTicket("A001", "S001", createRequest("无法完成订单支付"));
+
+        assertEquals("TK-00000125", ticket.getTicketNo());
+        assertEquals("OPEN", ticket.getStatus());
+        assertEquals("无法完成订单支付", ticket.getDescription());
+        verify(ticketMapper).insert(any(SupportTicket.class));
+    }
+
+    @Test
+    void nonAssignedAgentCannotCreateTicket() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+
+        assertThrows(UnauthorizedException.class,
+                () -> service.createTicket("A999", "S001", createRequest("支付失败")));
+
+        verify(ticketMapper, never()).insert(any(SupportTicket.class));
+    }
+
+    @Test
+    void sessionUserCanReadNoTicketButUnrelatedUserCannotRead() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.selectOne(any())).thenReturn(null);
+
+        assertNull(service.findBySessionId("U001", false, "S001"));
+        assertThrows(UnauthorizedException.class,
+                () -> service.findBySessionId("U999", false, "S001"));
+    }
+
+    @Test
+    void resolvingTicketRequiresResolution() {
+        when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "IN_PROGRESS", 0));
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.updateTicket("A001", "TK-00000125", updateRequest("RESOLVED", "支付失败", null, 0)));
+    }
+
+    @Test
+    void versionConflictDoesNotOverwriteTicket() {
+        when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "OPEN", 0));
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(0);
+
+        BusinessStateException exception = assertThrows(BusinessStateException.class,
+                () -> service.updateTicket("A001", "TK-00000125", updateRequest("IN_PROGRESS", "支付失败", null, 0)));
+
+        assertEquals("工单已被其他操作修改，请刷新后重试", exception.getMessage());
+    }
+
+    private static ChatSession session(String id, String userId, String agentId) {
+        ChatSession session = new ChatSession();
+        session.setId(id);
+        session.setUserId(userId);
+        session.setAgentId(agentId);
+        session.setTitle("订单咨询");
+        session.setPriority("HIGH");
+        session.setCategory("PAYMENT");
+        return session;
+    }
+
+    private static SysUser user(String id, String nickname) {
+        SysUser user = new SysUser();
+        user.setId(id);
+        user.setNickname(nickname);
+        return user;
+    }
+
+    private static SupportTicket ticket(String sessionId, String status, int version) {
+        SupportTicket ticket = new SupportTicket();
+        ticket.setId(125L);
+        ticket.setSessionId(sessionId);
+        ticket.setStatus(status);
+        ticket.setDescription("支付失败");
+        ticket.setVersion(version);
+        ticket.setCreatedAt(LocalDateTime.of(2026, 8, 26, 10, 0));
+        ticket.setUpdatedAt(LocalDateTime.of(2026, 8, 26, 10, 0));
+        return ticket;
+    }
+
+    private static SupportTicketCreateDTO createRequest(String description) {
+        SupportTicketCreateDTO request = new SupportTicketCreateDTO();
+        request.setDescription(description);
+        return request;
+    }
+
+    private static SupportTicketUpdateDTO updateRequest(String status, String description, String resolution, int version) {
+        SupportTicketUpdateDTO request = new SupportTicketUpdateDTO();
+        request.setStatus(status);
+        request.setDescription(description);
+        request.setResolution(resolution);
+        request.setVersion(version);
+        return request;
+    }
+}
