@@ -182,7 +182,7 @@ PATCH /chat/tickets/{ticketNo}
 
 ```json
 {
-  "type": "TICKET_UPDATED",
+  "event": "TICKET_UPDATED",
   "sessionId": "会话ID",
   "ticketNo": "TK-00000125",
   "version": 1

@@ -129,6 +129,23 @@ export const findAgentRatingSummary = (params = {}) => {
 export const findTransferLogs = (sessionId) =>
   request(`/chat/sessions/${encodeURIComponent(sessionId)}/transfers`)
 
+export const getSupportTicket = (sessionId) =>
+  request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket`)
+
+export const createSupportTicket = (sessionId, data) =>
+  request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
+export const updateSupportTicket = (ticketNo, data) =>
+  request(`/chat/tickets/${encodeURIComponent(ticketNo)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
 /**
  * Get session metadata (title, priority, category, tags).
  */

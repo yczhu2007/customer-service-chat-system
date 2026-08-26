@@ -263,6 +263,40 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('user004')
   })
 
+  it('lets an administrator open a read-only ticket detail for a session', async () => {
+    const { request } = await import('../services/http-client')
+    request
+      .mockResolvedValueOnce({
+        data: {
+          records: [{ sessionId: 's1', username: 'user004', agentUsername: 'agent001', status: 'CLOSED', title: '支付咨询' }],
+          total: 1,
+        },
+      })
+      .mockResolvedValueOnce({
+        data: {
+          ticketNo: 'TK-00000125', status: 'IN_PROGRESS', title: '支付咨询',
+          agentNickname: '客服一', description: '支付失败', resolution: '正在处理',
+          updatedAt: '2026-08-26T10:00:00',
+        },
+      })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel, { attachTo: document.body })
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await nextTick()
+      await wrapper.get('button.open-ticket').trigger('click')
+      await nextTick()
+
+      expect(request).toHaveBeenLastCalledWith('/chat/sessions/s1/ticket')
+      expect(document.body.textContent).toContain('TK-00000125')
+      expect(document.body.textContent).toContain('处理中')
+      expect(document.body.textContent).toContain('支付失败')
+      expect(document.body.textContent).not.toContain('更新工单')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
   it('renders Element Plus pagination and reloads the selected audit page', async () => {
     const { request } = await import('../services/http-client')
     request.mockResolvedValue({
