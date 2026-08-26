@@ -20,16 +20,25 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doThrow;
 
 @ExtendWith(MockitoExtension.class)
 class SupportTicketServiceTest {
@@ -37,6 +46,7 @@ class SupportTicketServiceTest {
     @Mock private SupportTicketMapper ticketMapper;
     @Mock private ChatSessionMapper sessionMapper;
     @Mock private SysUserMapper userMapper;
+    @Mock private SimpMessagingTemplate messagingTemplate;
 
     private SupportTicketService service;
 
@@ -50,7 +60,7 @@ class SupportTicketServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SupportTicketService(ticketMapper, sessionMapper, userMapper);
+        service = new SupportTicketService(ticketMapper, sessionMapper, userMapper, messagingTemplate);
     }
 
     @Test
@@ -109,6 +119,113 @@ class SupportTicketServiceTest {
                 () -> service.updateTicket("A001", "TK-00000125", updateRequest("IN_PROGRESS", "支付失败", null, 0)));
 
         assertEquals("工单已被其他操作修改，请刷新后重试", exception.getMessage());
+    }
+
+    @Test
+    void closedSessionCanCreateTicketAndDuplicateCreateIsAConflict() {
+        ChatSession closedSession = session("S001", "U001", "A001");
+        closedSession.setStatus("CLOSED");
+        when(sessionMapper.selectById("S001")).thenReturn(closedSession);
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(126L);
+            return 1;
+        });
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+
+        assertEquals("TK-00000126", service.createTicket("A001", "S001", createRequest("关闭后继续跟进")).getTicketNo());
+
+        when(ticketMapper.insert(any(SupportTicket.class))).thenThrow(new DuplicateKeyException("duplicate"));
+        assertThrows(BusinessStateException.class,
+                () -> service.createTicket("A001", "S001", createRequest("重复创建")));
+    }
+
+    @Test
+    void assignedAgentAndAdministratorCanReadButUnrelatedAgentCannot() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.selectOne(any())).thenReturn(ticket("S001", "OPEN", 0));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+
+        assertEquals("TK-00000125", service.findBySessionId("A001", false, "S001").getTicketNo());
+        assertEquals("TK-00000125", service.findBySessionId("ADMIN001", true, "S001").getTicketNo());
+        assertThrows(UnauthorizedException.class,
+                () -> service.findBySessionId("A999", false, "S001"));
+    }
+
+    @Test
+    void resolvingThenReopeningSetsAndClearsResolvedTime() {
+        SupportTicket inProgress = ticket("S001", "IN_PROGRESS", 0);
+        when(ticketMapper.selectById(125L)).thenReturn(inProgress);
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(1);
+
+        SupportTicketVO resolved = service.updateTicket("A001", "TK-00000125", updateRequest("RESOLVED", "支付失败", "已修复", 0));
+        assertEquals("RESOLVED", resolved.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(resolved.getResolvedAt());
+
+        SupportTicket resolvedTicket = ticket("S001", "RESOLVED", 1);
+        resolvedTicket.setResolvedAt(LocalDateTime.of(2026, 8, 26, 11, 0));
+        when(ticketMapper.selectById(125L)).thenReturn(resolvedTicket);
+        SupportTicketVO reopened = service.updateTicket("A001", "TK-00000125", updateRequest("IN_PROGRESS", "继续跟进", null, 1));
+
+        assertEquals("IN_PROGRESS", reopened.getStatus());
+        assertNull(reopened.getResolvedAt());
+        verify(ticketMapper).update(org.mockito.ArgumentMatchers.<SupportTicket>argThat(
+                saved -> "IN_PROGRESS".equals(saved.getStatus()) && saved.getResolvedAt() == null
+        ), any());
+    }
+
+    @Test
+    void ticketNotificationIsSentOnlyAfterTransactionCommit() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(125L);
+            return 1;
+        });
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.createTicket("A001", "S001", createRequest("无法完成订单支付"));
+
+            verifyNoInteractions(messagingTemplate);
+            TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit);
+
+            verify(messagingTemplate).convertAndSendToUser(
+                    eq("U001"), eq("/queue/chat"), org.mockito.ArgumentMatchers.<Map<String, Object>>argThat(body ->
+                            "TICKET_CREATED".equals(body.get("event"))
+                                    && "S001".equals(body.get("sessionId"))
+                                    && "TK-00000125".equals(body.get("ticketNo"))
+                                    && Integer.valueOf(0).equals(body.get("version"))
+                    )
+            );
+            verify(messagingTemplate).convertAndSendToUser(
+                    eq("A001"), eq("/queue/chat"), org.mockito.ArgumentMatchers.anyMap()
+            );
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
+    }
+
+    @Test
+    void notificationFailureDoesNotTurnCommittedTicketIntoAnError() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(125L);
+            return 1;
+        });
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        doThrow(new RuntimeException("broker unavailable"))
+                .when(messagingTemplate).convertAndSendToUser(eq("U001"), eq("/queue/chat"), any());
+        TransactionSynchronizationManager.initSynchronization();
+        try {
+            service.createTicket("A001", "S001", createRequest("无法完成订单支付"));
+
+            assertDoesNotThrow(() -> TransactionSynchronizationManager.getSynchronizations()
+                    .forEach(TransactionSynchronization::afterCommit));
+        } finally {
+            TransactionSynchronizationManager.clearSynchronization();
+        }
     }
 
     private static ChatSession session(String id, String userId, String agentId) {

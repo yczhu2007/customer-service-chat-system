@@ -83,6 +83,9 @@ vi.mock('../api/chat-api', () => ({
   findAgentDashboard: vi.fn(() => Promise.resolve({ data: { queueSize: 2, activeSessions: [], todayClosedSessions: 4 } })),
   findAgentRatingSummary: vi.fn(() => Promise.resolve({ data: { averageRating: 4.5, ratingCount: 8 } })),
   findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
+  getSupportTicket: vi.fn(() => Promise.resolve({ data: null })),
+  createSupportTicket: vi.fn(() => Promise.resolve({ data: null })),
+  updateSupportTicket: vi.fn(() => Promise.resolve({ data: null })),
   listQuickReplies: vi.fn(() =>
     Promise.resolve({
       data: [

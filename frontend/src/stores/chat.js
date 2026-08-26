@@ -17,6 +17,9 @@ import {
   findAgentDashboard,
   findAgentRatingSummary,
   findTransferLogs,
+  getSupportTicket,
+  createSupportTicket,
+  updateSupportTicket,
 } from '../api/chat-api'
 import { createStompClient } from '../services/stomp-client'
 import { handleUnauthorized } from '../services/http-client'
@@ -95,6 +98,10 @@ export const useChatStore = defineStore('chat', {
     pinnedAgentSearchSession: null,
     /** Metadata for the active session */
     activeMetadata: null,
+    activeSupportTicket: null,
+    supportTicketLoading: false,
+    supportTicketError: null,
+    _supportTicketRequestSequence: 0,
     /** User profile for the active session */
     activeUserProfile: null,
     /** Agent online status */
@@ -221,6 +228,9 @@ export const useChatStore = defineStore('chat', {
       this.messagesLoading = false
       this.activeSessionId = sessionId
       this.messages = []
+      this.activeSupportTicket = null
+      this.supportTicketError = null
+      const ticketRequestSequence = ++this._supportTicketRequestSequence
       this._sentClientMsgIds.clear()
       this.historyCursor = null
       this.historyHasMore = false
@@ -230,6 +240,7 @@ export const useChatStore = defineStore('chat', {
         this.unreadCounts[sessionId] = 0
       }
       await this.loadHistory(sessionId)
+      this.loadSupportTicket(sessionId, ticketRequestSequence)
     },
 
     /**
@@ -626,6 +637,57 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async loadSupportTicket(sessionId, requestSequence = ++this._supportTicketRequestSequence) {
+      if (!sessionId) {
+        this.activeSupportTicket = null
+        return null
+      }
+      this.supportTicketLoading = true
+      try {
+        const result = await getSupportTicket(sessionId)
+        const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        if (this.activeSessionId === sessionId && requestSequence === this._supportTicketRequestSequence) {
+          this.activeSupportTicket = ticket
+          this.supportTicketError = null
+        }
+        return ticket
+      } catch (e) {
+        if (this.activeSessionId === sessionId && requestSequence === this._supportTicketRequestSequence) {
+          this.supportTicketError = e.message
+          this.error = e.message
+        }
+        return null
+      } finally {
+        if (this.activeSessionId === sessionId && requestSequence === this._supportTicketRequestSequence) {
+          this.supportTicketLoading = false
+        }
+      }
+    },
+
+    async createSupportTicket(sessionId, data) {
+      try {
+        const result = await createSupportTicket(sessionId, data)
+        const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        if (this.activeSessionId === sessionId) this.activeSupportTicket = ticket
+        return ticket
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
+    async updateSupportTicket(ticketNo, data) {
+      try {
+        const result = await updateSupportTicket(ticketNo, data)
+        const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        if (this.activeSessionId === ticket?.sessionId) this.activeSupportTicket = ticket
+        return ticket
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
     /**
      * Connect STOMP and subscribe to user queues.
      */
@@ -783,6 +845,9 @@ export const useChatStore = defineStore('chat', {
       this.historyLoadingMore = false
       this.agentViewCounts = []
       this.activeMetadata = null
+      this.activeSupportTicket = null
+      this.supportTicketLoading = false
+      this.supportTicketError = null
       this.activeUserProfile = null
       this.agentOnline = false
       this.agentDashboard = null
@@ -1037,6 +1102,11 @@ export const useChatStore = defineStore('chat', {
             delete this.typingBySession[body.sessionId]
           }
         }
+        return
+      }
+
+      if (event === 'TICKET_CREATED' || event === 'TICKET_UPDATED') {
+        if (body.sessionId === this.activeSessionId) this.loadSupportTicket(body.sessionId)
         return
       }
 

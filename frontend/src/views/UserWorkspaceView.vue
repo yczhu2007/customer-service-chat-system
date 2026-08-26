@@ -6,6 +6,7 @@ import ChatWindow from '../components/chat/ChatWindow.vue'
 import UserSessionList from '../components/session/UserSessionList.vue'
 import SessionRatingForm from '../components/session/SessionRatingForm.vue'
 import ConnectionStatus from '../components/common/ConnectionStatus.vue'
+import SupportTicketPanel from '../components/session/SupportTicketPanel.vue'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -107,6 +108,8 @@ onUnmounted(() => {
 
     <el-main class="center-panel">
       <ChatWindow />
+
+      <SupportTicketPanel />
 
       <!-- Rating form (shown at bottom when session is closed) -->
       <SessionRatingForm

@@ -14,6 +14,7 @@ import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 import AgentOverviewPanel from '../components/agent/AgentOverviewPanel.vue'
 import AgentMessageSearchPanel from '../components/agent/AgentMessageSearchPanel.vue'
 import TransferLogPanel from '../components/session/TransferLogPanel.vue'
+import SupportTicketPanel from '../components/session/SupportTicketPanel.vue'
 import { AGENT_VIEW_OPTIONS } from '../constants/session-ui'
 
 const chat = useChatStore()
@@ -126,6 +127,7 @@ onUnmounted(() => {
         <UserProfileSidebar />
         <div class="sidebar-divider" />
         <SessionMetadataEditor />
+        <SupportTicketPanel />
         <TransferLogPanel :session-id="chat.activeSessionId" />
       </el-aside>
     </el-container>

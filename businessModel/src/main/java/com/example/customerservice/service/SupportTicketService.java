@@ -13,28 +13,37 @@ import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SupportTicketMapper;
 import com.example.customerservice.mapper.SysUserMapper;
+import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthorizedException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 
 @Service
+@Slf4j
 public class SupportTicketService {
 
     private final SupportTicketMapper ticketMapper;
     private final ChatSessionMapper sessionMapper;
     private final SysUserMapper userMapper;
+    private final SimpMessagingTemplate messagingTemplate;
 
     public SupportTicketService(
             SupportTicketMapper ticketMapper,
             ChatSessionMapper sessionMapper,
-            SysUserMapper userMapper
+            SysUserMapper userMapper,
+            SimpMessagingTemplate messagingTemplate
     ) {
         this.ticketMapper = ticketMapper;
         this.sessionMapper = sessionMapper;
         this.userMapper = userMapper;
+        this.messagingTemplate = messagingTemplate;
     }
 
     public SupportTicketVO findBySessionId(String callerId, boolean administrator, String sessionId) {
@@ -67,7 +76,9 @@ public class SupportTicketService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessStateException("该会话已创建工单", exception);
         }
-        return toView(ticket, session);
+        SupportTicketVO view = toView(ticket, session);
+        notifyAfterCommit(session, view, "TICKET_CREATED");
+        return view;
     }
 
     @Transactional
@@ -117,7 +128,9 @@ public class SupportTicketService {
         }
         next.setSessionId(ticket.getSessionId());
         next.setCreatedAt(ticket.getCreatedAt());
-        return toView(next, session);
+        SupportTicketVO view = toView(next, session);
+        notifyAfterCommit(session, view, "TICKET_UPDATED");
+        return view;
     }
 
     private ChatSession requireSession(String sessionId) {
@@ -201,5 +214,36 @@ public class SupportTicketService {
             }
         }
         return view;
+    }
+
+    private void notifyAfterCommit(ChatSession session, SupportTicketVO ticket, String event) {
+        Runnable notification = () -> {
+            Map<String, Object> payload = Map.of(
+                    "event", event,
+                    "sessionId", session.getId(),
+                    "ticketNo", ticket.getTicketNo(),
+                    "version", ticket.getVersion()
+            );
+            notifyParticipant(session.getUserId(), payload, ticket.getTicketNo(), session.getId());
+            notifyParticipant(session.getAgentId(), payload, ticket.getTicketNo(), session.getId());
+        };
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            notification.run();
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                notification.run();
+            }
+        });
+    }
+
+    private void notifyParticipant(String userId, Map<String, Object> payload, String ticketNo, String sessionId) {
+        try {
+            messagingTemplate.convertAndSendToUser(userId, "/queue/chat", payload);
+        } catch (RuntimeException exception) {
+            log.warn("工单实时通知发送失败，工单：{}，会话：{}", ticketNo, sessionId);
+        }
     }
 }
