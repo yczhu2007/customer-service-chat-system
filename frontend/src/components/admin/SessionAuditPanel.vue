@@ -2,6 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
+import { getSupportTicket } from '../../api/chat-api'
 import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
@@ -21,6 +22,11 @@ const formError = ref(null)
 const createForm = ref({ userLoginNumber: '', agentLoginNumber: '' })
 const editForm = ref({ title: '', priority: 'NORMAL', category: 'OTHER', tags: [] })
 const tagInput = ref('')
+const showTicketDialog = ref(false)
+const ticketLoading = ref(false)
+const ticketError = ref(null)
+const selectedTicket = ref(null)
+const ticketSessionId = ref(null)
 
 // Filters
 const filters = ref({
@@ -169,6 +175,27 @@ async function endSession(row) {
   } catch (e) { error.value = e.message }
 }
 
+function ticketStatusLabel(status) {
+  return ({ OPEN: '待处理', IN_PROGRESS: '处理中', WAITING_USER: '等待用户', RESOLVED: '已解决' })[status] || status || '-'
+}
+
+async function openTicket(row) {
+  const sessionId = row.sessionId
+  ticketSessionId.value = sessionId
+  selectedTicket.value = null
+  ticketError.value = null
+  ticketLoading.value = true
+  showTicketDialog.value = true
+  try {
+    const result = await getSupportTicket(sessionId)
+    if (ticketSessionId.value === sessionId) selectedTicket.value = result?.data ?? null
+  } catch (e) {
+    if (ticketSessionId.value === sessionId) ticketError.value = e.message
+  } finally {
+    if (ticketSessionId.value === sessionId) ticketLoading.value = false
+  }
+}
+
 function addTag() {
   const tag = tagInput.value.trim()
   if (!tag || editForm.value.tags.includes(tag)) return
@@ -248,8 +275,9 @@ function removeTag(tag) {
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="180" fixed="right">
+        <el-table-column label="操作" min-width="250" fixed="right">
           <template #default="{ row }">
+            <el-button class="open-ticket" size="small" @click="openTicket(row)">工单</el-button>
             <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="endSession(row)">结束会话</el-button>
           </template>
@@ -288,6 +316,22 @@ function removeTag(tag) {
       </div>
       <p v-if="formError" class="error">{{ formError }}</p>
       <template #footer><el-button @click="showEditDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveSessionMetadata">保存</el-button></template>
+    </el-dialog>
+
+    <el-dialog v-model="showTicketDialog" title="关联工单" width="520px">
+      <div v-loading="ticketLoading" class="ticket-detail">
+        <p v-if="ticketError" class="error">{{ ticketError }}</p>
+        <p v-else-if="!ticketLoading && !selectedTicket" class="empty">该会话暂未创建工单</p>
+        <dl v-else-if="selectedTicket">
+          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }}</dd>
+          <dt>工单状态</dt><dd>{{ ticketStatusLabel(selectedTicket.status) }}</dd>
+          <dt>会话标题</dt><dd>{{ selectedTicket.title || '新咨询' }}</dd>
+          <dt>负责客服</dt><dd>{{ selectedTicket.agentNickname || '-' }}</dd>
+          <dt>问题描述</dt><dd>{{ selectedTicket.description || '-' }}</dd>
+          <template v-if="selectedTicket.resolution"><dt>处理结果</dt><dd>{{ selectedTicket.resolution }}</dd></template>
+          <dt>更新时间</dt><dd>{{ formatDate(selectedTicket.updatedAt) }}</dd>
+        </dl>
+      </div>
     </el-dialog>
   </section>
 </template>
@@ -390,4 +434,7 @@ function removeTag(tag) {
 .status-cell { display: inline-block; white-space: nowrap; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell:nth-child(4)) { white-space: nowrap; }
 .transfer-details { margin-top: 0.5rem; color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
+.ticket-detail dl { display: grid; grid-template-columns: 76px 1fr; gap: 0.7rem 0.8rem; margin: 0; font-size: 0.9rem; }
+.ticket-detail dt { color: #6b7280; }
+.ticket-detail dd { margin: 0; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
 </style>
