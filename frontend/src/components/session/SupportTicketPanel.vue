@@ -23,6 +23,12 @@ const successMessage = ref('')
 const ticket = computed(() => chat.activeSupportTicket)
 const canEdit = computed(() => chat.activeSession?.agentId === auth.userId && auth.role === 'AGENT')
 const statusLabel = computed(() => statusOptions.find((item) => item.value === ticket.value?.status)?.label || '未知状态')
+const quickStatuses = computed(() => ({
+  OPEN: ['IN_PROGRESS', 'WAITING_USER', 'RESOLVED'],
+  IN_PROGRESS: ['WAITING_USER', 'RESOLVED'],
+  WAITING_USER: ['IN_PROGRESS', 'RESOLVED'],
+  RESOLVED: ['IN_PROGRESS'],
+})[ticket.value?.status] || [])
 
 function formatTime(value) {
   if (!value) return '-'
@@ -51,10 +57,20 @@ async function createTicket() {
     await chat.createSupportTicket(chat.activeSessionId, { description: description.value.trim() })
     successMessage.value = '工单已创建'
   } catch (error) {
-    errorMessage.value = error.message || '创建工单失败'
+    await chat.loadSupportTicket(chat.activeSessionId)
+    if (chat.activeSupportTicket) {
+      successMessage.value = '工单已存在，已加载最新内容'
+    } else {
+      errorMessage.value = error.message || '创建工单失败'
+    }
   } finally {
     saving.value = false
   }
+}
+
+function retryTicket() {
+  errorMessage.value = ''
+  return chat.loadSupportTicket(chat.activeSessionId)
 }
 
 async function updateTicket() {
@@ -82,6 +98,11 @@ async function updateTicket() {
     saving.value = false
   }
 }
+
+async function quickUpdate(nextStatus) {
+  status.value = nextStatus
+  await updateTicket()
+}
 </script>
 
 <template>
@@ -89,6 +110,10 @@ async function updateTicket() {
     <h3>关联工单</h3>
     <p v-if="!chat.activeSessionId" class="empty">选择会话后查看</p>
     <p v-else-if="chat.supportTicketLoading" class="empty">正在加载工单…</p>
+    <div v-else-if="chat.supportTicketError" class="ticket-error">
+      <p class="message error">{{ chat.supportTicketError }}</p>
+      <el-button size="small" @click="retryTicket">重新加载</el-button>
+    </div>
 
     <template v-else-if="ticket">
       <div class="ticket-head">
@@ -101,6 +126,11 @@ async function updateTicket() {
         <el-select v-model="status" class="field" placeholder="选择">
           <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
+        <div class="quick-actions">
+          <el-button v-for="item in quickStatuses" :key="item" size="small" @click="quickUpdate(item)">
+            标记为{{ statusOptions.find((option) => option.value === item)?.label }}
+          </el-button>
+        </div>
         <label>问题描述</label>
         <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit />
         <label>处理结果</label>
@@ -139,11 +169,13 @@ label { display: block; margin: 8px 0 4px; color: var(--color-muted); font-size:
 .ticket-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
 .timestamps { margin: 0 0 8px; color: var(--color-faint); font-size: 11px; }
 .field { width: 100%; }
+.quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .action { width: 100%; margin-top: 10px; }
 .readonly-details { display: grid; grid-template-columns: 64px 1fr; gap: 7px 8px; margin: 0; font-size: 12px; }
 .readonly-details dt { color: var(--color-muted); }
 .readonly-details dd { margin: 0; color: var(--color-ink); white-space: pre-wrap; word-break: break-word; }
 .message { margin: 8px 0 0; font-size: 12px; }
+.ticket-error .message { margin: 0 0 8px; }
 .error { color: var(--color-danger); }
 .success { color: var(--color-success); }
 </style>

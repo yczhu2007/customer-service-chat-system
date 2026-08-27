@@ -1,6 +1,7 @@
 package com.example.customerservice.handler;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.exception.SupportTicketValidationException;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -19,5 +20,17 @@ class WebExceptionAdviceTest {
         );
 
         assertEquals("用户名或密码错误", response.getBody().getMessage());
+    }
+
+    @Test
+    void returnsSafeTicketValidationMessage() {
+        WebExceptionAdvice advice = new WebExceptionAdvice();
+
+        ResponseEntity<Result<Void>> response = advice.handleSupportTicketValidationException(
+                new SupportTicketValidationException("不允许从处理中转换到待处理")
+        );
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("不允许从处理中转换到待处理", response.getBody().getMessage());
     }
 }

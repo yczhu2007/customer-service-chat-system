@@ -5,6 +5,7 @@ import { useChatStore } from '../../stores/chat'
 const chat = useChatStore()
 onMounted(() => chat.loadAgentDashboard())
 async function refresh() { await chat.loadAgentDashboard() }
+function openTickets(status) { chat.filterAgentTickets(status) }
 </script>
 <template>
   <section class="overview-panel">
@@ -16,8 +17,14 @@ async function refresh() { await chat.loadAgentDashboard() }
       <div><strong>{{ chat.agentDashboard?.todayClosedCount ?? 0 }}</strong><span>今日关闭</span></div>
       <div><strong>{{ chat.agentRatingSummary?.averageRating ?? '—' }}</strong><span>平均满意度</span></div>
     </div>
+    <div v-if="chat.agentDashboard" class="ticket-metrics">
+      <button @click="openTickets('OPEN')"><strong>{{ chat.agentDashboard.openTicketCount ?? 0 }}</strong><span>待处理工单</span></button>
+      <button @click="openTickets('IN_PROGRESS')"><strong>{{ chat.agentDashboard.inProgressTicketCount ?? 0 }}</strong><span>处理中工单</span></button>
+      <button @click="openTickets('WAITING_USER')"><strong>{{ chat.agentDashboard.waitingUserTicketCount ?? 0 }}</strong><span>等待用户</span></button>
+    </div>
   </section>
 </template>
 <style scoped>
 .overview-panel{padding:10px 16px;background:var(--color-paper);border-bottom:1px solid var(--color-line)}.overview-header{display:flex;justify-content:space-between;align-items:center}.overview-header h2{margin:0;font-size:14px}.overview-header button{border:1px solid var(--color-line-strong);background:white;border-radius:4px;padding:3px 8px;font-size:11px}.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}.metrics div{padding:7px;border:1px solid var(--color-line);border-radius:6px}.metrics strong,.metrics span{display:block}.metrics strong{font-size:16px;color:var(--color-ink)}.metrics span{margin-top:2px;font-size:10px;color:var(--color-muted)}.error{color:var(--color-danger);font-size:12px}
+.ticket-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}.ticket-metrics button{padding:7px;text-align:left;border:1px solid var(--color-line);border-radius:6px;background:white;cursor:pointer}.ticket-metrics strong,.ticket-metrics span{display:block}.ticket-metrics strong{font-size:15px;color:var(--color-ink)}.ticket-metrics span{margin-top:2px;font-size:10px;color:var(--color-muted)}
 </style>

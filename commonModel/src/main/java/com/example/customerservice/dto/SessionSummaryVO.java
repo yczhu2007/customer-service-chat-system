@@ -16,7 +16,9 @@ public record SessionSummaryVO(
         String lastMessage,
         LocalDateTime lastMessageTime,
         long unreadCount,
-        Integer rating
+        Integer rating,
+        String ticketNo,
+        String ticketStatus
 ) implements Serializable {
     private static final long serialVersionUID = 1L;
 }

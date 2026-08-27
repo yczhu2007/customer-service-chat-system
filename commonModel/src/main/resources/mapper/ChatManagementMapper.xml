@@ -39,6 +39,7 @@
         <result property="archiveStatus" column="archive_status"/>
         <result property="archiveRemark" column="archive_remark"/>
         <result property="archivedAt" column="archived_at"/>
+        <result property="ticketStatus" column="ticket_status"/>
     </resultMap>
 
     <resultMap id="sessionSummaryResult" type="com.example.customerservice.dto.SessionSummaryVO">
@@ -56,6 +57,8 @@
             <arg column="last_message_time" javaType="java.time.LocalDateTime"/>
             <arg column="unread_count" javaType="_long"/>
             <arg column="rating" javaType="java.lang.Integer"/>
+            <arg column="ticket_no" javaType="java.lang.String"/>
+            <arg column="ticket_status" javaType="java.lang.String"/>
         </constructor>
     </resultMap>
 
@@ -117,6 +120,12 @@
             </if>
             <if test="rating != null">
                 AND rating.rating = #{rating}
+            </if>
+            <if test="ticketId != null">
+                AND ticket.id = #{ticketId}
+            </if>
+            <if test="ticketStatus != null and ticketStatus != ''">
+                AND ticket.status = #{ticketStatus}
             </if>
             <if test="fromTime != null">
                 AND session.create_time &gt;= #{fromTime}
@@ -199,6 +208,9 @@
             <when test="viewCode == 'MY_ACTIVE'">
                 session.status = 'ACTIVE'
             </when>
+            <when test="viewCode == 'MY_TICKETS'">
+                ticket.id IS NOT NULL
+            </when>
             <when test="viewCode == 'MY_UNREAD'">
                 COALESCE(unread.unread_count, 0) &gt; 0
             </when>
@@ -268,6 +280,12 @@
         FROM scoped_sessions session
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
         WHERE session.status = 'ACTIVE'
+        UNION ALL
+        SELECT 'MY_TICKETS' AS code,
+               '我的工单' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        JOIN support_ticket ticket ON ticket.session_id = session.id
         UNION ALL
         SELECT 'MY_UNREAD' AS code,
                '我的未读' AS label,
@@ -339,7 +357,11 @@
         SELECT COUNT(*)
         FROM scoped_sessions session
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
+        LEFT JOIN support_ticket ticket ON ticket.session_id = session.id
         WHERE <include refid="agentViewPredicate"/>
+        <if test="ticketStatus != null and ticketStatus != ''">
+            AND ticket.status = #{ticketStatus}
+        </if>
     </select>
 
     <select id="findAgentViewSessions" resultMap="chatSessionListItemResult">
@@ -363,13 +385,26 @@
                COALESCE(unread.unread_count, 0) AS unread_count,
                session.archive_status,
                session.archive_remark,
-               session.archived_at
+               session.archived_at,
+               ticket.status AS ticket_status
         FROM scoped_sessions session
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
         LEFT JOIN latest_message latest ON latest.session_id = session.id
+        LEFT JOIN support_ticket ticket ON ticket.session_id = session.id
         WHERE <include refid="agentViewPredicate"/>
+        <if test="ticketStatus != null and ticketStatus != ''">
+            AND ticket.status = #{ticketStatus}
+        </if>
         ORDER BY session.create_time DESC, session.id DESC
         LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="countAgentTicketsByStatus" resultType="long">
+        SELECT COUNT(*)
+        FROM support_ticket ticket
+        JOIN chat_session session ON session.id = ticket.session_id
+        WHERE session.agent_id = #{agentId}
+          AND ticket.status = #{ticketStatus}
     </select>
 
     <select id="findAgentLoads" resultMap="agentLoadResult">
@@ -399,6 +434,7 @@
         JOIN sys_user customer ON customer.id = session.user_id
         LEFT JOIN sys_user agent ON agent.id = session.agent_id
         LEFT JOIN chat_session_rating rating ON rating.session_id = session.id
+        LEFT JOIN support_ticket ticket ON ticket.session_id = session.id
         <include refid="sessionFilters"/>
     </select>
 
@@ -432,11 +468,14 @@
                    LIMIT 1
                ) AS last_message_time,
                0 AS unread_count,
-               rating.rating
+               rating.rating,
+               CASE WHEN ticket.id IS NULL THEN NULL ELSE CONCAT('TK-', LPAD(ticket.id, 8, '0')) END AS ticket_no,
+               ticket.status AS ticket_status
         FROM chat_session session
         JOIN sys_user customer ON customer.id = session.user_id
         LEFT JOIN sys_user agent ON agent.id = session.agent_id
         LEFT JOIN chat_session_rating rating ON rating.session_id = session.id
+        LEFT JOIN support_ticket ticket ON ticket.session_id = session.id
         <include refid="sessionFilters"/>
         ORDER BY session.create_time DESC, session.id DESC
         LIMIT #{offset}, #{pageSize}

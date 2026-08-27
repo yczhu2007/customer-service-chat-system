@@ -124,7 +124,7 @@ class AgentSessionViewTest {
         );
 
         assertEquals(
-                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED、MY_ARCHIVED_COMPLETED、MY_ARCHIVED_PENDING、MY_ARCHIVED_ON_HOLD、MY_ARCHIVED_OTHER",
+                "坐席会话视图不支持该类型",
                 error.getMessage()
         );
     }
@@ -148,6 +148,7 @@ class AgentSessionViewTest {
                 "findAgentViewSessions",
                 String.class,
                 AgentSessionView.class,
+                String.class,
                 long.class,
                 long.class
         );
@@ -191,6 +192,7 @@ class AgentSessionViewTest {
         assertEquals(
                 List.of(
                         "MY_ACTIVE",
+                        "MY_TICKETS",
                         "MY_UNREAD",
                         "MY_HIGH_PRIORITY",
                         "MY_UNARCHIVED",
@@ -203,7 +205,7 @@ class AgentSessionViewTest {
                 result.stream().map(AgentSessionViewCountVO::code).toList()
         );
         assertEquals(
-                List.of(2L, 3L, 0L, 0L, 1L, 0L, 0L, 0L, 0L),
+                List.of(2L, 0L, 3L, 0L, 0L, 1L, 0L, 0L, 0L, 0L),
                 result.stream().map(AgentSessionViewCountVO::count).toList()
         );
         verify(managementMapper).countAgentSessionViews("A001");
@@ -217,10 +219,10 @@ class AgentSessionViewTest {
         record.setPriority("HIGH");
         record.setCategory("PAYMENT");
         record.setMetadataUpdatedAt(LocalDateTime.of(2026, 8, 21, 10, 0));
-        when(managementMapper.countAgentViewSessions("A001", "MY_ACTIVE"))
+        when(managementMapper.countAgentViewSessions("A001", "MY_ACTIVE", null))
                 .thenReturn(101L);
         when(managementMapper.findAgentViewSessions(
-                "A001", "MY_ACTIVE", 0L, 100L
+                "A001", "MY_ACTIVE", null, 0L, 100L
         )).thenReturn(List.of(record));
         ChatSessionTag tag = new ChatSessionTag();
         tag.setSessionId("S001");
@@ -228,7 +230,7 @@ class AgentSessionViewTest {
         when(tagMapper.selectBySessionIds(List.of("S001"))).thenReturn(List.of(tag));
 
         PageResult<ChatSessionListItemVO> result = service.findAgentViewSessions(
-                "A001", AgentSessionView.MY_ACTIVE, 0L, 500L
+                "A001", AgentSessionView.MY_ACTIVE, null, 0L, 500L
         );
 
         assertEquals(1L, result.getPageNo());
@@ -237,18 +239,18 @@ class AgentSessionViewTest {
         assertEquals(2L, result.getPages());
         assertEquals(List.of("payment"), result.getRecords().get(0).getTags());
         verify(managementMapper).findAgentViewSessions(
-                "A001", "MY_ACTIVE", 0L, 100L
+                "A001", "MY_ACTIVE", null, 0L, 100L
         );
         verify(tagMapper).selectBySessionIds(List.of("S001"));
     }
 
     @Test
     void emptyViewPageReturnsEmptyRecordsWithoutListOrTagQueries() {
-        when(managementMapper.countAgentViewSessions("A001", "MY_UNREAD"))
+        when(managementMapper.countAgentViewSessions("A001", "MY_UNREAD", null))
                 .thenReturn(0L);
 
         PageResult<ChatSessionListItemVO> result = service.findAgentViewSessions(
-                "A001", AgentSessionView.MY_UNREAD, 2L, 20L
+                "A001", AgentSessionView.MY_UNREAD, null, 2L, 20L
         );
 
         assertEquals(2L, result.getPageNo());
@@ -257,7 +259,7 @@ class AgentSessionViewTest {
         assertEquals(0L, result.getPages());
         assertTrue(result.getRecords().isEmpty());
         verify(managementMapper, never()).findAgentViewSessions(
-                "A001", "MY_UNREAD", 20L, 20L
+                "A001", "MY_UNREAD", null, 20L, 20L
         );
         verifyNoInteractions(tagMapper);
     }
@@ -270,11 +272,11 @@ class AgentSessionViewTest {
         );
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.findAgentViewSessions("  ", AgentSessionView.MY_ACTIVE, 1L, 20L)
+                () -> service.findAgentViewSessions("  ", AgentSessionView.MY_ACTIVE, null, 1L, 20L)
         );
         assertThrows(
                 IllegalArgumentException.class,
-                () -> service.findAgentViewSessions("A001", null, 1L, 20L)
+                () -> service.findAgentViewSessions("A001", null, null, 1L, 20L)
         );
 
         verifyNoInteractions(managementMapper, tagMapper);
@@ -394,6 +396,10 @@ class AgentSessionViewTest {
                 Arguments.of(
                         AgentSessionView.MY_ACTIVE,
                         "SESSION.STATUS = 'ACTIVE'"
+                ),
+                Arguments.of(
+                        AgentSessionView.MY_TICKETS,
+                        "TICKET.ID IS NOT NULL"
                 ),
                 Arguments.of(
                         AgentSessionView.MY_UNREAD,

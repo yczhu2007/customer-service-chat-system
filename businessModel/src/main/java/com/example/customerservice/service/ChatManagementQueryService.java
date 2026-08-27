@@ -24,6 +24,7 @@ public interface ChatManagementQueryService {
     PageResult<ChatSessionListItemVO> findAgentViewSessions(
             String agentId,
             AgentSessionView view,
+            String ticketStatus,
             long pageNo,
             long pageSize
     );
@@ -42,6 +43,8 @@ public interface ChatManagementQueryService {
             String status,
             String archiveStatus,
             Integer rating,
+            String ticketNo,
+            String ticketStatus,
             LocalDateTime fromTime,
             LocalDateTime toTime,
             long pageNo,

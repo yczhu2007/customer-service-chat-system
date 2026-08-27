@@ -1,8 +1,10 @@
 package com.example.customerservice.service;
 
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AgentLoadVO;
+import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
@@ -73,24 +75,51 @@ class ChatManagementQueryServiceImplTest {
     }
 
     @Test
+    void agentDashboardIncludesTicketStatusCounts() {
+        when(managementMapper.countAgentTicketsByStatus("A001", "OPEN")).thenReturn(2L);
+        when(managementMapper.countAgentTicketsByStatus("A001", "IN_PROGRESS")).thenReturn(3L);
+        when(managementMapper.countAgentTicketsByStatus("A001", "WAITING_USER")).thenReturn(1L);
+
+        var dashboard = service.findAgentDashboard("A001");
+
+        assertEquals(2L, dashboard.openTicketCount());
+        assertEquals(3L, dashboard.inProgressTicketCount());
+        assertEquals(1L, dashboard.waitingUserTicketCount());
+    }
+
+    @Test
+    void agentTicketViewPassesStatusFilterToPaginationQueries() {
+        ChatSessionListItemVO item = new ChatSessionListItemVO();
+        item.setSessionId("S001");
+        item.setTicketStatus("OPEN");
+        when(managementMapper.countAgentViewSessions("A001", "MY_TICKETS", "OPEN")).thenReturn(1L);
+        when(managementMapper.findAgentViewSessions("A001", "MY_TICKETS", "OPEN", 0L, 20L))
+                .thenReturn(List.of(item));
+
+        var result = service.findAgentViewSessions("A001", AgentSessionView.MY_TICKETS, "OPEN", 1, 20);
+
+        assertEquals("OPEN", result.getRecords().get(0).getTicketStatus());
+    }
+
+    @Test
     void adminSessionSearchUsesBoundedPagination() {
         when(managementMapper.countSessionSummaries(
                 eq("U001"), eq("A001"), eq("CLOSED"),
-                eq("COMPLETED"), eq(5), eq(null), eq(null)))
+                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(null), eq(null)))
                 .thenReturn(1L);
         SessionSummaryVO summary = new SessionSummaryVO(
                 "S001", "U001", "user001", "A001", "agent001",
                 "CLOSED", "新咨询", LocalDateTime.now(), LocalDateTime.now(),
-                "已处理完成", LocalDateTime.now(), 0L, 5
+                "已处理完成", LocalDateTime.now(), 0L, 5, "TK-00000001", "RESOLVED"
         );
         when(managementMapper.findSessionSummaries(
                 eq("U001"), eq("A001"), eq("CLOSED"),
-                eq("COMPLETED"), eq(5), eq(null), eq(null),
+                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(null), eq(null),
                 eq(0L), eq(100L)))
                 .thenReturn(List.of(summary));
 
         PageResult<SessionSummaryVO> result = service.searchSessions(
-                "U001", "A001", "CLOSED", "COMPLETED", 5,
+                "U001", "A001", "CLOSED", "COMPLETED", 5, "TK-00000001", "RESOLVED",
                 null, null, 0, 500
         );
 
@@ -125,6 +154,7 @@ class ChatManagementQueryServiceImplTest {
         assertThrows(IllegalArgumentException.class, () ->
                 service.searchSessions(
                         null, null, null, null, 6,
+                        null, null,
                         null, null, 1, 20
                 ));
         LocalDateTime now = LocalDateTime.now();

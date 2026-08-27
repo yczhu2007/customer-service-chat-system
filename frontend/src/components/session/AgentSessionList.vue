@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, priorityLabel } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, priorityLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
@@ -41,10 +41,19 @@ function selectSession(sessionId) {
 function loadMore() {
   chat.loadAllRemainingAgentSessions()
 }
+
+function filterTickets(value) {
+  chat.filterAgentTickets(value)
+}
 </script>
 
 <template>
   <div class="agent-session-list">
+    <div v-if="chat.activeAgentView === 'MY_TICKETS'" class="ticket-filter">
+      <el-select :model-value="chat.ticketStatusFilter" placeholder="全部工单状态" clearable @change="filterTickets">
+        <el-option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :label="item.label" :value="item.code" />
+      </el-select>
+    </div>
     <div v-if="chat.sessionsLoading && !sessions.length" class="loading">加载中…</div>
     <div v-else-if="!sessions.length" class="empty">暂无会话</div>
     <ul v-else class="session-items">
@@ -65,6 +74,7 @@ function loadMore() {
           </span>
           <span v-if="s.category" class="category-tag" :style="categoryStyle(s.category)">{{ categoryLabel(s.category) }}</span>
           <span v-if="s.archiveStatus" class="archive-tag" :style="archiveStatusStyle(s.archiveStatus)">{{ archiveStatusLabel(s.archiveStatus) }}</span>
+          <span v-if="s.ticketStatus" class="ticket-tag">工单 · {{ ticketStatusLabel(s.ticketStatus) }}</span>
           <span v-if="s.unreadCount > 0" class="unread-badge">{{ s.unreadCount }}</span>
         </div>
         <div v-if="s.lastMessageContent" class="session-preview">
@@ -88,6 +98,8 @@ function loadMore() {
   overflow-y: auto;
   flex: 1;
 }
+.ticket-filter { padding: 0.6rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.ticket-filter :deep(.el-select) { width: 100%; }
 .loading,
 .empty {
   text-align: center;
@@ -142,11 +154,13 @@ function loadMore() {
 }
 .priority-tag,
 .category-tag,
-.archive-tag {
+.archive-tag,
+.ticket-tag {
   font-size: 0.65rem;
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
 }
+.ticket-tag { background: #eef0ff; color: #4f46a5; }
 .priority-urgent {
   background: #fee2e2;
   color: #dc2626;

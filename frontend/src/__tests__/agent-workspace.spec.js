@@ -80,7 +80,7 @@ vi.mock('../api/chat-api', () => ({
       },
     })
   ),
-  findAgentDashboard: vi.fn(() => Promise.resolve({ data: { queueSize: 2, activeSessions: [], todayClosedSessions: 4 } })),
+  findAgentDashboard: vi.fn(() => Promise.resolve({ data: { queueSize: 2, activeSessions: [], todayClosedSessions: 4, openTicketCount: 2, inProgressTicketCount: 3, waitingUserTicketCount: 1 } })),
   findAgentRatingSummary: vi.fn(() => Promise.resolve({ data: { averageRating: 4.5, ratingCount: 8 } })),
   findTransferLogs: vi.fn(() => Promise.resolve({ data: [] })),
   getSupportTicket: vi.fn(() => Promise.resolve({ data: null })),
@@ -147,6 +147,7 @@ import SessionArchiveActions from '../components/session/SessionArchiveActions.v
 import AgentViewNav from '../components/session/AgentViewNav.vue'
 import AgentMessageSearchPanel from '../components/agent/AgentMessageSearchPanel.vue'
 import MessageList from '../components/chat/MessageList.vue'
+import AgentOverviewPanel from '../components/agent/AgentOverviewPanel.vue'
 
 // ─── Store tests ───
 describe('Chat Store - Agent Workspace', () => {
@@ -171,6 +172,24 @@ describe('Chat Store - Agent Workspace', () => {
     expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', { pageNo: 1, pageSize: 20 })
     expect(chat.sessions).toHaveLength(2)
     expect(chat.sessions[0].sessionId).toBe('s1')
+  })
+
+  it('filters the ticket view by ticket status', async () => {
+    const chat = useChatStore()
+
+    await chat.filterAgentTickets('OPEN')
+
+    expect(chat.activeAgentView).toBe('MY_TICKETS')
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_TICKETS', expect.objectContaining({ ticketStatus: 'OPEN' }))
+  })
+
+  it('does not apply the ticket filter to ordinary session views', async () => {
+    const chat = useChatStore()
+    chat.ticketStatusFilter = 'OPEN'
+
+    await chat.loadAgentViewSessions('MY_ACTIVE')
+
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', expect.objectContaining({ ticketStatus: undefined }))
   })
 
   it('opens a searched message in its session and records the message to focus', async () => {
@@ -340,6 +359,16 @@ describe('Chat Store - Agent Workspace', () => {
     expect(findAgentRatingSummary).toHaveBeenCalled()
     expect(chat.agentDashboard.queueSize).toBe(2)
     expect(chat.agentRatingSummary.averageRating).toBe(4.5)
+  })
+
+  it('shows ticket counts on the agent dashboard', async () => {
+    const wrapper = mount(AgentOverviewPanel)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    expect(wrapper.text()).toContain('待处理工单')
+    expect(wrapper.text()).toContain('处理中工单')
+    expect(wrapper.text()).toContain('等待用户')
   })
 
   it('loads transfer logs for the selected session', async () => {

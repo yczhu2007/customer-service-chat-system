@@ -11,6 +11,7 @@ describe('session enum presentation', () => {
   it('keeps one frontend agent view list without the unread view', () => {
     expect(AGENT_VIEW_OPTIONS.map((option) => option.code)).toEqual([
       'MY_ACTIVE',
+      'MY_TICKETS',
       'MY_HIGH_PRIORITY',
       'MY_UNARCHIVED',
       'MY_RECENT_CLOSED',

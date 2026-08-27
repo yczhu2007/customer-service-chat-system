@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { getSupportTicket, createSupportTicket, updateSupportTicket } from '../api/chat-api'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
@@ -62,6 +62,20 @@ describe('会话关联工单', () => {
     expect(chat.activeSupportTicket.ticketNo).toBe('TK-00000003')
   })
 
+  it('starts loading the ticket without waiting for message history', async () => {
+    let finishHistory
+    const chat = useChatStore()
+    chat.loadHistory = vi.fn(() => new Promise((resolve) => { finishHistory = resolve }))
+    chat.loadSupportTicket = vi.fn().mockResolvedValue(null)
+
+    const selection = chat.selectSession('session-1')
+    await Promise.resolve()
+
+    expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1', expect.any(Number))
+    finishHistory()
+    await selection
+  })
+
   it('keeps agent editing and user read-only ticket text in the interface', async () => {
     const component = await readFile(join(process.cwd(), 'src/components/session/SupportTicketPanel.vue'), 'utf8')
 
@@ -94,5 +108,56 @@ describe('会话关联工单', () => {
     expect(userPanel.find('textarea').exists()).toBe(false)
     expect(userPanel.text()).not.toContain('创建工单')
     expect(userPanel.text()).not.toContain('更新工单')
+  })
+
+  it('shows only valid quick status actions for the current ticket state', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+
+    const wrapper = mount(SupportTicketPanel)
+
+    expect(wrapper.text()).toContain('标记为等待用户')
+    expect(wrapper.text()).toContain('标记为已解决')
+    expect(wrapper.text()).not.toContain('标记为待处理')
+  })
+
+  it('shows a retry state instead of a create form when ticket loading fails', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.supportTicketError = '工单加载失败'
+
+    const panel = mount(SupportTicketPanel)
+
+    expect(panel.text()).toContain('工单加载失败')
+    expect(panel.text()).toContain('重新加载')
+    expect(panel.text()).not.toContain('创建工单')
+  })
+
+  it('reloads an existing ticket after a duplicate create conflict', async () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.createSupportTicket = vi.fn().mockRejectedValue(new Error('该会话已创建工单'))
+    chat.loadSupportTicket = vi.fn(async () => {
+      chat.activeSupportTicket = {
+        ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'OPEN',
+        description: '已有工单', version: 0,
+      }
+    })
+    const panel = mount(SupportTicketPanel)
+    await panel.get('textarea').setValue('重复创建')
+
+    await panel.get('button').trigger('click')
+    await flushPromises()
+
+    expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
+    expect(panel.text()).toContain('工单已存在，已加载最新内容')
+    expect(panel.text()).toContain('TK-00000125')
   })
 })

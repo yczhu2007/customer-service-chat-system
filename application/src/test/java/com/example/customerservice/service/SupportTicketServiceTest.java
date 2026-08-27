@@ -1,6 +1,8 @@
 package com.example.customerservice.service;
 
 import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.conditions.Wrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SupportTicket;
@@ -9,6 +11,7 @@ import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.exception.BusinessStateException;
+import com.example.customerservice.exception.SupportTicketValidationException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SupportTicketMapper;
 import com.example.customerservice.mapper.SysUserMapper;
@@ -19,6 +22,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
+import org.mockito.ArgumentCaptor;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -31,6 +35,7 @@ import java.util.Map;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -173,6 +178,66 @@ class SupportTicketServiceTest {
         verify(ticketMapper).update(org.mockito.ArgumentMatchers.<SupportTicket>argThat(
                 saved -> "IN_PROGRESS".equals(saved.getStatus()) && saved.getResolvedAt() == null
         ), any());
+    }
+
+    @Test
+    void assignedAgentCanEditTicketWithoutChangingStatus() {
+        when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "IN_PROGRESS", 0));
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(1);
+
+        SupportTicketVO updated = service.updateTicket(
+                "A001",
+                "TK-00000125",
+                updateRequest("IN_PROGRESS", "补充后的问题描述", null, 0)
+        );
+
+        assertEquals("IN_PROGRESS", updated.getStatus());
+        assertEquals("补充后的问题描述", updated.getDescription());
+    }
+
+    @Test
+    void reopeningTicketWritesNullResolutionAndResolvedTimeToSql() {
+        SupportTicket resolvedTicket = ticket("S001", "RESOLVED", 1);
+        resolvedTicket.setResolution("旧处理结果");
+        resolvedTicket.setResolvedAt(LocalDateTime.of(2026, 8, 26, 11, 0));
+        when(ticketMapper.selectById(125L)).thenReturn(resolvedTicket);
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(1);
+
+        service.updateTicket(
+                "A001",
+                "TK-00000125",
+                updateRequest("IN_PROGRESS", "继续跟进", null, 1)
+        );
+
+        @SuppressWarnings("rawtypes")
+        ArgumentCaptor<Wrapper> wrapperCaptor = ArgumentCaptor.forClass(Wrapper.class);
+        verify(ticketMapper).update(any(SupportTicket.class), wrapperCaptor.capture());
+        @SuppressWarnings("unchecked")
+        LambdaUpdateWrapper<SupportTicket> updateWrapper =
+                (LambdaUpdateWrapper<SupportTicket>) wrapperCaptor.getValue();
+        assertTrue(updateWrapper.getSqlSet().contains("resolution"));
+        assertTrue(updateWrapper.getSqlSet().contains("resolved_at"));
+    }
+
+    @Test
+    void illegalTransitionReturnsAReadableTicketValidationMessage() {
+        when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "IN_PROGRESS", 0));
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+
+        SupportTicketValidationException exception = assertThrows(
+                SupportTicketValidationException.class,
+                () -> service.updateTicket(
+                        "A001",
+                        "TK-00000125",
+                        updateRequest("OPEN", "支付失败", null, 0)
+                )
+        );
+
+        assertEquals("不允许从处理中转换到待处理", exception.getMessage());
     }
 
     @Test

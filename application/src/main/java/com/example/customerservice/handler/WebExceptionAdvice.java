@@ -3,6 +3,7 @@ package com.example.customerservice.handler;
 import com.example.customerservice.common.Result;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
+import com.example.customerservice.exception.SupportTicketValidationException;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthenticatedException;
 import org.apache.shiro.authz.UnauthorizedException;
@@ -22,6 +23,14 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 @RestControllerAdvice
 @Slf4j
 public class WebExceptionAdvice {
+
+    @ExceptionHandler(SupportTicketValidationException.class)
+    public ResponseEntity<Result<Void>> handleSupportTicketValidationException(
+            SupportTicketValidationException exception
+    ) {
+        log.warn("工单请求校验失败：{}", exception.getMessage());
+        return buildResponse(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
 
     @ExceptionHandler(
             MethodArgumentNotValidException.class

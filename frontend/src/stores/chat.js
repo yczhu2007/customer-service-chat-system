@@ -92,6 +92,7 @@ export const useChatStore = defineStore('chat', {
     agentViewCounts: [],
     /** Active agent view code */
     activeAgentView: 'MY_ACTIVE',
+    ticketStatusFilter: '',
     /** Message ID to locate after a result is opened from agent message search. */
     focusedMessageId: null,
     /** Session kept visible while an agent locates a search result outside the current view. */
@@ -231,6 +232,7 @@ export const useChatStore = defineStore('chat', {
       this.activeSupportTicket = null
       this.supportTicketError = null
       const ticketRequestSequence = ++this._supportTicketRequestSequence
+      this.loadSupportTicket(sessionId, ticketRequestSequence)
       this._sentClientMsgIds.clear()
       this.historyCursor = null
       this.historyHasMore = false
@@ -240,7 +242,6 @@ export const useChatStore = defineStore('chat', {
         this.unreadCounts[sessionId] = 0
       }
       await this.loadHistory(sessionId)
-      this.loadSupportTicket(sessionId, ticketRequestSequence)
     },
 
     /**
@@ -928,7 +929,12 @@ export const useChatStore = defineStore('chat', {
       this.sessionsLoading = true
       this.error = null
       try {
-        const result = await listAgentViewSessions(viewCode, { ...params, pageNo, pageSize })
+        const result = await listAgentViewSessions(viewCode, {
+          ...params,
+          ticketStatus: viewCode === 'MY_TICKETS' ? (this.ticketStatusFilter || undefined) : undefined,
+          pageNo,
+          pageSize,
+        })
         if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
         const records = page?.records || []
@@ -987,6 +993,12 @@ export const useChatStore = defineStore('chat', {
       this.pinnedAgentSearchSession = null
       this.activeAgentView = viewCode
       await this.loadAgentViewSessions(viewCode)
+    },
+
+    async filterAgentTickets(ticketStatus) {
+      this.ticketStatusFilter = ticketStatus || ''
+      this.activeAgentView = 'MY_TICKETS'
+      await this.loadAgentViewSessions('MY_TICKETS')
     },
 
     /**

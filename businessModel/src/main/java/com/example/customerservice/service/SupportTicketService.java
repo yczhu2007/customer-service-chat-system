@@ -10,6 +10,7 @@ import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
+import com.example.customerservice.exception.SupportTicketValidationException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SupportTicketMapper;
 import com.example.customerservice.mapper.SysUserMapper;
@@ -84,7 +85,7 @@ public class SupportTicketService {
     @Transactional
     public SupportTicketVO updateTicket(String agentId, String ticketNo, SupportTicketUpdateDTO request) {
         if (request == null) {
-            throw new IllegalArgumentException("工单更新请求不能为空");
+            throw new SupportTicketValidationException("工单更新请求不能为空");
         }
         SupportTicket ticket = ticketMapper.selectById(parseTicketNo(ticketNo));
         if (ticket == null) {
@@ -97,13 +98,15 @@ public class SupportTicketService {
         }
         SupportTicketStatus current = parseStatus(ticket.getStatus());
         SupportTicketStatus target = parseStatus(request.getStatus());
-        if (!current.canTransitionTo(target)) {
-            throw new IllegalArgumentException("不允许从 " + current + " 转换到 " + target);
+        if (current != target && !current.canTransitionTo(target)) {
+            throw new SupportTicketValidationException(
+                    "不允许从" + statusLabel(current) + "转换到" + statusLabel(target)
+            );
         }
         String description = requireDescription(request.getDescription());
         String resolution = normalizeOptionalText(request.getResolution(), "处理结果");
         if (target == SupportTicketStatus.RESOLVED && resolution == null) {
-            throw new IllegalArgumentException("处理结果不能为空");
+            throw new SupportTicketValidationException("处理结果不能为空");
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -111,15 +114,16 @@ public class SupportTicketService {
         next.setId(ticket.getId());
         next.setStatus(target.name());
         next.setDescription(description);
-        next.setResolution(resolution);
         next.setVersion(ticket.getVersion() + 1);
         next.setUpdatedAt(now);
-        next.setResolvedAt(target == SupportTicketStatus.RESOLVED
-                ? now
-                : current == SupportTicketStatus.RESOLVED ? null : ticket.getResolvedAt());
+        LocalDateTime resolvedAt = target == SupportTicketStatus.RESOLVED
+                ? (current == SupportTicketStatus.RESOLVED ? ticket.getResolvedAt() : now)
+                : null;
         int updated = ticketMapper.update(
                 next,
                 Wrappers.<SupportTicket>lambdaUpdate()
+                        .set(SupportTicket::getResolution, resolution)
+                        .set(SupportTicket::getResolvedAt, resolvedAt)
                         .eq(SupportTicket::getId, ticket.getId())
                         .eq(SupportTicket::getVersion, request.getVersion())
         );
@@ -128,6 +132,8 @@ public class SupportTicketService {
         }
         next.setSessionId(ticket.getSessionId());
         next.setCreatedAt(ticket.getCreatedAt());
+        next.setResolution(resolution);
+        next.setResolvedAt(resolvedAt);
         SupportTicketVO view = toView(next, session);
         notifyAfterCommit(session, view, "TICKET_UPDATED");
         return view;
@@ -162,13 +168,13 @@ public class SupportTicketService {
         try {
             return SupportTicketStatus.valueOf(value);
         } catch (IllegalArgumentException | NullPointerException exception) {
-            throw new IllegalArgumentException("工单状态不合法");
+            throw new SupportTicketValidationException("工单状态不合法");
         }
     }
 
     private long parseTicketNo(String ticketNo) {
         if (ticketNo == null || !ticketNo.matches("TK-\\d{8}")) {
-            throw new IllegalArgumentException("工单编号格式不合法");
+            throw new SupportTicketValidationException("工单编号格式不合法");
         }
         return Long.parseLong(ticketNo.substring(3));
     }
@@ -176,7 +182,7 @@ public class SupportTicketService {
     private String requireDescription(String value) {
         String description = normalizeOptionalText(value, "问题描述");
         if (description == null) {
-            throw new IllegalArgumentException("问题描述不能为空");
+            throw new SupportTicketValidationException("问题描述不能为空");
         }
         return description;
     }
@@ -187,9 +193,18 @@ public class SupportTicketService {
         }
         String normalized = value.trim();
         if (normalized.length() > 1000) {
-            throw new IllegalArgumentException(label + "长度不能超过1000个字符");
+            throw new SupportTicketValidationException(label + "长度不能超过1000个字符");
         }
         return normalized;
+    }
+
+    private String statusLabel(SupportTicketStatus status) {
+        return switch (status) {
+            case OPEN -> "待处理";
+            case IN_PROGRESS -> "处理中";
+            case WAITING_USER -> "等待用户";
+            case RESOLVED -> "已解决";
+        };
     }
 
     private SupportTicketVO toView(SupportTicket ticket, ChatSession session) {

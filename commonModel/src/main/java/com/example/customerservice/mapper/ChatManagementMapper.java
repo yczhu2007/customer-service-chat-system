@@ -35,17 +35,21 @@ public interface ChatManagementMapper {
 
     long countAgentViewSessions(
             @Param("agentId") String agentId,
-            @Param("viewCode") String viewCode
+            @Param("viewCode") String viewCode,
+            @Param("ticketStatus") String ticketStatus
     );
 
     List<ChatSessionListItemVO> findAgentViewSessions(
             @Param("agentId") String agentId,
             @Param("viewCode") String viewCode,
+            @Param("ticketStatus") String ticketStatus,
             @Param("offset") long offset,
             @Param("pageSize") long pageSize
     );
 
     List<AgentLoadVO> findAgentLoads(@Param("agentIds") List<String> agentIds);
+
+    long countAgentTicketsByStatus(@Param("agentId") String agentId, @Param("ticketStatus") String ticketStatus);
 
     long countSessionSummaries(
             @Param("userLoginNumber") String userLoginNumber,
@@ -53,6 +57,8 @@ public interface ChatManagementMapper {
             @Param("status") String status,
             @Param("archiveStatus") String archiveStatus,
             @Param("rating") Integer rating,
+            @Param("ticketId") Long ticketId,
+            @Param("ticketStatus") String ticketStatus,
             @Param("fromTime") LocalDateTime fromTime,
             @Param("toTime") LocalDateTime toTime
     );
@@ -63,6 +69,8 @@ public interface ChatManagementMapper {
             @Param("status") String status,
             @Param("archiveStatus") String archiveStatus,
             @Param("rating") Integer rating,
+            @Param("ticketId") Long ticketId,
+            @Param("ticketStatus") String ticketStatus,
             @Param("fromTime") LocalDateTime fromTime,
             @Param("toTime") LocalDateTime toTime,
             @Param("offset") long offset,

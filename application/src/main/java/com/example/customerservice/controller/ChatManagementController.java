@@ -103,7 +103,7 @@ public class ChatManagementController {
         sessionOperations.notifyBothParties(session);
         return Result.success(new SessionSummaryVO(
                 session.getId(), user.getId(), user.getUsername(), agent.getId(), agent.getUsername(),
-                session.getStatus(), session.getTitle(), session.getCreateTime(), session.getEndTime(), null, null, 0L, null
+                session.getStatus(), session.getTitle(), session.getCreateTime(), session.getEndTime(), null, null, 0L, null, null, null
         ));
     }
 
@@ -178,6 +178,7 @@ public class ChatManagementController {
     @GetMapping("/agent/views/{viewCode}/sessions")
     public Result<PageResult<ChatSessionListItemVO>> findAgentViewSessions(
             @PathVariable String viewCode,
+            @RequestParam(required = false) String ticketStatus,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
@@ -190,6 +191,7 @@ public class ChatManagementController {
                 managementQueryService.findAgentViewSessions(
                         currentUser.getUserId(),
                         view,
+                        ticketStatus,
                         pageNo,
                         pageSize
                 )
@@ -247,6 +249,8 @@ public class ChatManagementController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String archiveStatus,
             @RequestParam(required = false) Integer rating,
+            @RequestParam(required = false) String ticketNo,
+            @RequestParam(required = false) String ticketStatus,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime from,
@@ -265,6 +269,8 @@ public class ChatManagementController {
                         status,
                         archiveStatus,
                         rating,
+                        ticketNo,
+                        ticketStatus,
                         from,
                         to,
                         pageNo,

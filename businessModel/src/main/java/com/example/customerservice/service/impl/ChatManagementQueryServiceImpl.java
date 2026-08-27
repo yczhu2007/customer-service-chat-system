@@ -16,6 +16,7 @@ import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.exception.NotFoundException;
+import com.example.customerservice.constant.SupportTicketStatus;
 import com.example.customerservice.mapper.ChatManagementMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.ChatSessionTagMapper;
@@ -68,6 +69,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 null,
                 null,
                 null,
+                null,
+                null,
                 0L,
                 DASHBOARD_SESSION_LIMIT
         );
@@ -75,7 +78,10 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 valueOrZero(redisRepository.sortedSetCardinality(RedisConstants.AGENT_LOAD)),
                 valueOrZero(redisRepository.sortedSetCardinality(RedisConstants.QUEUE_PENDING)),
                 activeSessions == null ? List.of() : List.copyOf(activeSessions),
-                managementMapper.countTodayClosedSessionsByAgent(agentId, dayStart, dayEnd)
+                managementMapper.countTodayClosedSessionsByAgent(agentId, dayStart, dayEnd),
+                managementMapper.countAgentTicketsByStatus(agentId, SupportTicketStatus.OPEN.name()),
+                managementMapper.countAgentTicketsByStatus(agentId, SupportTicketStatus.IN_PROGRESS.name()),
+                managementMapper.countAgentTicketsByStatus(agentId, SupportTicketStatus.WAITING_USER.name())
         );
     }
 
@@ -109,6 +115,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
     public PageResult<ChatSessionListItemVO> findAgentViewSessions(
             String agentId,
             AgentSessionView view,
+            String ticketStatus,
             long pageNo,
             long pageSize
     ) {
@@ -118,11 +125,13 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         }
 
         String normalizedAgentId = agentId.trim();
+        String normalizedTicketStatus = validateTicketStatus(ticketStatus);
         long normalizedPageNo = Math.max(1L, pageNo);
         long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
         long total = managementMapper.countAgentViewSessions(
                 normalizedAgentId,
-                view.getCode()
+                view.getCode(),
+                normalizedTicketStatus
         );
         long pages = total == 0 ? 0 : (total + normalizedPageSize - 1) / normalizedPageSize;
         if (total == 0) {
@@ -138,6 +147,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         List<ChatSessionListItemVO> records = managementMapper.findAgentViewSessions(
                 normalizedAgentId,
                 view.getCode(),
+                normalizedTicketStatus,
                 (normalizedPageNo - 1) * normalizedPageSize,
                 normalizedPageSize
         );
@@ -192,6 +202,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
             String status,
             String archiveStatus,
             Integer rating,
+            String ticketNo,
+            String ticketStatus,
             LocalDateTime fromTime,
             LocalDateTime toTime,
             long pageNo,
@@ -201,6 +213,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
         validateStatus(status);
         validateArchiveStatus(archiveStatus);
+        Long ticketId = parseTicketNo(ticketNo);
+        String normalizedTicketStatus = validateTicketStatus(ticketStatus);
         if (rating != null && (rating < 1 || rating > 5)) {
             throw new IllegalArgumentException("rating必须在1到5之间");
         }
@@ -216,6 +230,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 normalizedStatus,
                 normalizedArchiveStatus,
                 rating,
+                ticketId,
+                normalizedTicketStatus,
                 fromTime,
                 toTime
         );
@@ -228,6 +244,8 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                         normalizedStatus,
                         normalizedArchiveStatus,
                         rating,
+                        ticketId,
+                        normalizedTicketStatus,
                         fromTime,
                         toTime,
                         (normalizedPageNo - 1) * normalizedPageSize,
@@ -350,6 +368,25 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         if (fromTime != null && toTime != null && !fromTime.isBefore(toTime)) {
             throw new IllegalArgumentException("开始时间必须早于结束时间");
         }
+    }
+
+    private String validateTicketStatus(String status) {
+        String normalized = normalize(status);
+        if (normalized == null) return null;
+        try {
+            return SupportTicketStatus.valueOf(normalized).name();
+        } catch (IllegalArgumentException exception) {
+            throw new IllegalArgumentException("工单状态不合法");
+        }
+    }
+
+    private Long parseTicketNo(String ticketNo) {
+        String normalized = normalize(ticketNo);
+        if (normalized == null) return null;
+        if (!normalized.matches("TK-\\d{8}")) {
+            throw new IllegalArgumentException("工单编号格式不合法");
+        }
+        return Long.parseLong(normalized.substring(3));
     }
 
     private String normalize(String value) {

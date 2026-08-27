@@ -263,6 +263,22 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('user004')
   })
 
+  it('searches sessions by ticket number and ticket status', async () => {
+    const { request } = await import('../services/http-client')
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await nextTick()
+    request.mockClear()
+
+    await wrapper.get('.ticket-number').setValue('TK-00000125')
+    await wrapper.get('select[aria-label="工单状态"]').setValue('IN_PROGRESS')
+    await wrapper.get('.btn-primary').trigger('click')
+
+    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+    expect(requestUrl.searchParams.get('ticketNo')).toBe('TK-00000125')
+    expect(requestUrl.searchParams.get('ticketStatus')).toBe('IN_PROGRESS')
+  })
+
   it('lets an administrator open a read-only ticket detail for a session', async () => {
     const { request } = await import('../services/http-client')
     request

@@ -57,12 +57,13 @@ class ChatManagementControllerTest {
         when(managementQueryService.findAgentViewSessions(
                 "A001",
                 AgentSessionView.MY_UNREAD,
+                "OPEN",
                 2,
                 50
         )).thenReturn(page);
 
         Result<PageResult<ChatSessionListItemVO>> result =
-                controller.findAgentViewSessions("MY_UNREAD", 2, 50);
+                controller.findAgentViewSessions("MY_UNREAD", "OPEN", 2, 50);
 
         assertEquals(page, result.getData());
         verify(currentUser).requireRole("AGENT");
@@ -70,6 +71,7 @@ class ChatManagementControllerTest {
         verify(managementQueryService).findAgentViewSessions(
                 "A001",
                 AgentSessionView.MY_UNREAD,
+                "OPEN",
                 2,
                 50
         );
@@ -79,11 +81,11 @@ class ChatManagementControllerTest {
     void invalidViewCodeIsRejectedBeforeServiceCall() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> controller.findAgentViewSessions("queue_all", 1, 20)
+                () -> controller.findAgentViewSessions("queue_all", null, 1, 20)
         );
 
         assertEquals(
-                "坐席会话视图只支持 MY_ACTIVE、MY_UNREAD、MY_HIGH_PRIORITY、MY_UNARCHIVED、MY_RECENT_CLOSED、MY_ARCHIVED_COMPLETED、MY_ARCHIVED_PENDING、MY_ARCHIVED_ON_HOLD、MY_ARCHIVED_OTHER",
+                "坐席会话视图不支持该类型",
                 exception.getMessage()
         );
         verify(currentUser).requireRole("AGENT");
@@ -96,13 +98,14 @@ class ChatManagementControllerTest {
         Method method = ChatManagementController.class.getMethod(
                 "findAgentViewSessions",
                 String.class,
+                String.class,
                 long.class,
                 long.class
         );
 
-        RequestParam pageNo = (RequestParam) method.getParameters()[1]
+        RequestParam pageNo = (RequestParam) method.getParameters()[2]
                 .getAnnotation(RequestParam.class);
-        RequestParam pageSize = (RequestParam) method.getParameters()[2]
+        RequestParam pageSize = (RequestParam) method.getParameters()[3]
                 .getAnnotation(RequestParam.class);
 
         assertEquals("1", pageNo.defaultValue());
