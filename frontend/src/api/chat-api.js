@@ -17,7 +17,7 @@ export const listAgentViews = () => request('/chat/agent/views')
 
 /**
  * List sessions for a specific agent fixed view (AGENT only).
- * Params: { pageNo, pageSize }
+ * Params: { pageNo, pageSize, ticketStatus, ticketKeyword }
  */
 export const listAgentViewSessions = (viewCode, params = {}) => {
   const qs = new URLSearchParams(params).toString()

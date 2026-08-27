@@ -116,6 +116,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
             String agentId,
             AgentSessionView view,
             String ticketStatus,
+            String ticketKeyword,
             long pageNo,
             long pageSize
     ) {
@@ -126,12 +127,17 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
 
         String normalizedAgentId = agentId.trim();
         String normalizedTicketStatus = validateTicketStatus(ticketStatus);
+        String normalizedTicketKeyword = normalize(ticketKeyword);
+        if (normalizedTicketKeyword != null && normalizedTicketKeyword.length() > 100) {
+            throw new IllegalArgumentException("工单搜索内容不能超过100个字符");
+        }
         long normalizedPageNo = Math.max(1L, pageNo);
         long normalizedPageSize = Math.max(1L, Math.min(100L, pageSize));
         long total = managementMapper.countAgentViewSessions(
                 normalizedAgentId,
                 view.getCode(),
-                normalizedTicketStatus
+                normalizedTicketStatus,
+                normalizedTicketKeyword
         );
         long pages = total == 0 ? 0 : (total + normalizedPageSize - 1) / normalizedPageSize;
         if (total == 0) {
@@ -148,6 +154,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 normalizedAgentId,
                 view.getCode(),
                 normalizedTicketStatus,
+                normalizedTicketKeyword,
                 (normalizedPageNo - 1) * normalizedPageSize,
                 normalizedPageSize
         );

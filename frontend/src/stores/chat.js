@@ -93,6 +93,7 @@ export const useChatStore = defineStore('chat', {
     /** Active agent view code */
     activeAgentView: 'MY_ACTIVE',
     ticketStatusFilter: '',
+    ticketKeyword: '',
     /** Message ID to locate after a result is opened from agent message search. */
     focusedMessageId: null,
     /** Session kept visible while an agent locates a search result outside the current view. */
@@ -937,6 +938,9 @@ export const useChatStore = defineStore('chat', {
         if (viewCode === 'MY_TICKETS' && this.ticketStatusFilter) {
           requestParams.ticketStatus = this.ticketStatusFilter
         }
+        if (viewCode === 'MY_TICKETS' && this.ticketKeyword) {
+          requestParams.ticketKeyword = this.ticketKeyword
+        }
         const result = await listAgentViewSessions(viewCode, requestParams)
         if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
@@ -998,8 +1002,9 @@ export const useChatStore = defineStore('chat', {
       await this.loadAgentViewSessions(viewCode)
     },
 
-    async filterAgentTickets(ticketStatus) {
+    async filterAgentTickets(ticketStatus, ticketKeyword = this.ticketKeyword) {
       this.ticketStatusFilter = ticketStatus || ''
+      this.ticketKeyword = (ticketKeyword || '').trim()
       this.activeAgentView = 'MY_TICKETS'
       await this.loadAgentViewSessions('MY_TICKETS')
     },

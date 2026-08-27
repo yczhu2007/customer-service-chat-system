@@ -362,6 +362,12 @@
         <if test="ticketStatus != null and ticketStatus != ''">
             AND ticket.status = #{ticketStatus}
         </if>
+        <if test="ticketKeyword != null and ticketKeyword != ''">
+            AND (
+                CONCAT('TK-', LPAD(ticket.id, 8, '0')) LIKE CONCAT('%', #{ticketKeyword}, '%')
+                OR session.title LIKE CONCAT('%', #{ticketKeyword}, '%')
+            )
+        </if>
     </select>
 
     <select id="findAgentViewSessions" resultMap="chatSessionListItemResult">
@@ -394,6 +400,12 @@
         WHERE <include refid="agentViewPredicate"/>
         <if test="ticketStatus != null and ticketStatus != ''">
             AND ticket.status = #{ticketStatus}
+        </if>
+        <if test="ticketKeyword != null and ticketKeyword != ''">
+            AND (
+                CONCAT('TK-', LPAD(ticket.id, 8, '0')) LIKE CONCAT('%', #{ticketKeyword}, '%')
+                OR session.title LIKE CONCAT('%', #{ticketKeyword}, '%')
+            )
         </if>
         ORDER BY session.create_time DESC, session.id DESC
         LIMIT #{offset}, #{pageSize}

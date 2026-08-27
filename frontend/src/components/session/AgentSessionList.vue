@@ -1,5 +1,5 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, priorityLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
 
@@ -45,11 +45,19 @@ function loadMore() {
 function filterTickets(value) {
   chat.filterAgentTickets(value)
 }
+
+function searchTickets() {
+  chat.filterAgentTickets(chat.ticketStatusFilter, ticketKeyword.value)
+}
+
+const ticketKeyword = ref(chat.ticketKeyword || '')
 </script>
 
 <template>
   <div class="agent-session-list">
     <div v-if="chat.activeAgentView === 'MY_TICKETS'" class="ticket-filter">
+      <el-input v-model="ticketKeyword" class="ticket-keyword" placeholder="工单编号或会话标题" clearable @keyup.enter="searchTickets" />
+      <el-button class="ticket-search-btn" size="small" type="primary" @click="searchTickets">搜索</el-button>
       <el-select :model-value="chat.ticketStatusFilter" placeholder="全部工单状态" clearable @change="filterTickets">
         <el-option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :label="item.label" :value="item.code" />
       </el-select>
@@ -98,8 +106,10 @@ function filterTickets(value) {
   overflow-y: auto;
   flex: 1;
 }
-.ticket-filter { padding: 0.6rem 1rem; border-bottom: 1px solid #f3f4f6; }
-.ticket-filter :deep(.el-select) { width: 100%; }
+.ticket-filter { display: flex; gap: 0.4rem; padding: 0.6rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.ticket-keyword { flex: 1; min-width: 0; }
+.ticket-search-btn { flex: 0 0 auto; }
+.ticket-filter :deep(.el-select) { flex: 0 0 120px; width: 120px; }
 .loading,
 .empty {
   text-align: center;

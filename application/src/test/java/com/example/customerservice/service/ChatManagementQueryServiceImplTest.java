@@ -92,11 +92,11 @@ class ChatManagementQueryServiceImplTest {
         ChatSessionListItemVO item = new ChatSessionListItemVO();
         item.setSessionId("S001");
         item.setTicketStatus("OPEN");
-        when(managementMapper.countAgentViewSessions("A001", "MY_TICKETS", "OPEN")).thenReturn(1L);
-        when(managementMapper.findAgentViewSessions("A001", "MY_TICKETS", "OPEN", 0L, 20L))
+        when(managementMapper.countAgentViewSessions("A001", "MY_TICKETS", "OPEN", "TK-00000125")).thenReturn(1L);
+        when(managementMapper.findAgentViewSessions("A001", "MY_TICKETS", "OPEN", "TK-00000125", 0L, 20L))
                 .thenReturn(List.of(item));
 
-        var result = service.findAgentViewSessions("A001", AgentSessionView.MY_TICKETS, "OPEN", 1, 20);
+        var result = service.findAgentViewSessions("A001", AgentSessionView.MY_TICKETS, "OPEN", "TK-00000125", 1, 20);
 
         assertEquals("OPEN", result.getRecords().get(0).getTicketStatus());
     }

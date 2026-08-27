@@ -25,6 +25,7 @@ public interface ChatManagementQueryService {
             String agentId,
             AgentSessionView view,
             String ticketStatus,
+            String ticketKeyword,
             long pageNo,
             long pageSize
     );

@@ -179,6 +179,7 @@ public class ChatManagementController {
     public Result<PageResult<ChatSessionListItemVO>> findAgentViewSessions(
             @PathVariable String viewCode,
             @RequestParam(required = false) String ticketStatus,
+            @RequestParam(required = false) String ticketKeyword,
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
@@ -192,6 +193,7 @@ public class ChatManagementController {
                         currentUser.getUserId(),
                         view,
                         ticketStatus,
+                        ticketKeyword,
                         pageNo,
                         pageSize
                 )

@@ -36,13 +36,15 @@ public interface ChatManagementMapper {
     long countAgentViewSessions(
             @Param("agentId") String agentId,
             @Param("viewCode") String viewCode,
-            @Param("ticketStatus") String ticketStatus
+            @Param("ticketStatus") String ticketStatus,
+            @Param("ticketKeyword") String ticketKeyword
     );
 
     List<ChatSessionListItemVO> findAgentViewSessions(
             @Param("agentId") String agentId,
             @Param("viewCode") String viewCode,
             @Param("ticketStatus") String ticketStatus,
+            @Param("ticketKeyword") String ticketKeyword,
             @Param("offset") long offset,
             @Param("pageSize") long pageSize
     );

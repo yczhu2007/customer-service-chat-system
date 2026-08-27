@@ -58,12 +58,13 @@ class ChatManagementControllerTest {
                 "A001",
                 AgentSessionView.MY_UNREAD,
                 "OPEN",
+                "TK-00000125",
                 2,
                 50
         )).thenReturn(page);
 
         Result<PageResult<ChatSessionListItemVO>> result =
-                controller.findAgentViewSessions("MY_UNREAD", "OPEN", 2, 50);
+                controller.findAgentViewSessions("MY_UNREAD", "OPEN", "TK-00000125", 2, 50);
 
         assertEquals(page, result.getData());
         verify(currentUser).requireRole("AGENT");
@@ -72,6 +73,7 @@ class ChatManagementControllerTest {
                 "A001",
                 AgentSessionView.MY_UNREAD,
                 "OPEN",
+                "TK-00000125",
                 2,
                 50
         );
@@ -81,7 +83,7 @@ class ChatManagementControllerTest {
     void invalidViewCodeIsRejectedBeforeServiceCall() {
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> controller.findAgentViewSessions("queue_all", null, 1, 20)
+                () -> controller.findAgentViewSessions("queue_all", null, null, 1, 20)
         );
 
         assertEquals(
@@ -99,13 +101,14 @@ class ChatManagementControllerTest {
                 "findAgentViewSessions",
                 String.class,
                 String.class,
+                String.class,
                 long.class,
                 long.class
         );
 
-        RequestParam pageNo = (RequestParam) method.getParameters()[2]
+        RequestParam pageNo = (RequestParam) method.getParameters()[3]
                 .getAnnotation(RequestParam.class);
-        RequestParam pageSize = (RequestParam) method.getParameters()[3]
+        RequestParam pageSize = (RequestParam) method.getParameters()[4]
                 .getAnnotation(RequestParam.class);
 
         assertEquals("1", pageNo.defaultValue());

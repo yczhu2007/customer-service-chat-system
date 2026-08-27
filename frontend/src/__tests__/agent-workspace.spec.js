@@ -193,6 +193,19 @@ describe('Chat Store - Agent Workspace', () => {
     expect(params).not.toHaveProperty('ticketStatus')
   })
 
+  it('searches the ticket view by ticket number or session title', async () => {
+    const chat = useChatStore()
+    chat.activeAgentView = 'MY_TICKETS'
+    const wrapper = mount(AgentSessionList)
+
+    await wrapper.get('.ticket-keyword input').setValue('TK-00000125')
+    await wrapper.get('.ticket-search-btn').trigger('click')
+
+    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_TICKETS', expect.objectContaining({
+      ticketKeyword: 'TK-00000125',
+    }))
+  })
+
   it('opens a searched message in its session and records the message to focus', async () => {
     const chat = useChatStore()
 
