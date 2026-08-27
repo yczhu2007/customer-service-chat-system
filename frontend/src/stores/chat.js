@@ -929,12 +929,15 @@ export const useChatStore = defineStore('chat', {
       this.sessionsLoading = true
       this.error = null
       try {
-        const result = await listAgentViewSessions(viewCode, {
+        const requestParams = {
           ...params,
-          ticketStatus: viewCode === 'MY_TICKETS' ? (this.ticketStatusFilter || undefined) : undefined,
           pageNo,
           pageSize,
-        })
+        }
+        if (viewCode === 'MY_TICKETS' && this.ticketStatusFilter) {
+          requestParams.ticketStatus = this.ticketStatusFilter
+        }
+        const result = await listAgentViewSessions(viewCode, requestParams)
         if (requestSequence !== this._sessionsRequestSequence) return
         const page = result?.data || result
         const records = page?.records || []

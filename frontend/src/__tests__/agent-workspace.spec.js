@@ -189,7 +189,8 @@ describe('Chat Store - Agent Workspace', () => {
 
     await chat.loadAgentViewSessions('MY_ACTIVE')
 
-    expect(listAgentViewSessions).toHaveBeenCalledWith('MY_ACTIVE', expect.objectContaining({ ticketStatus: undefined }))
+    const [, params] = listAgentViewSessions.mock.calls[0]
+    expect(params).not.toHaveProperty('ticketStatus')
   })
 
   it('opens a searched message in its session and records the message to focus', async () => {
@@ -229,13 +230,19 @@ describe('Chat Store - Agent Workspace', () => {
     expect(chat.sessions.map((session) => session.sessionId)).toContain('closed-session')
   })
 
-  it('shows all four archive states in the fixed agent view navigation', async () => {
+  it('keeps ticket and archive views out of the primary session list', async () => {
     const wrapper = mount(AgentViewNav)
 
-    expect(wrapper.text()).toContain('已解决')
-    expect(wrapper.text()).toContain('待处理')
-    expect(wrapper.text()).toContain('暂停')
-    expect(wrapper.text()).toContain('其他')
+    expect(wrapper.find('.session-views').text()).not.toContain('我的工单')
+    expect(wrapper.find('.ticket-views').text()).toContain('我的工单')
+    expect(wrapper.findAll('.archive-view-list')).toHaveLength(0)
+
+    await wrapper.get('.archive-toggle').trigger('click')
+
+    expect(wrapper.find('.archive-view-list').text()).toContain('已解决')
+    expect(wrapper.find('.archive-view-list').text()).toContain('待处理')
+    expect(wrapper.find('.archive-view-list').text()).toContain('暂停')
+    expect(wrapper.find('.archive-view-list').text()).toContain('其他')
   })
 
   it('opens a clicked search result through the store navigation action', async () => {
@@ -361,11 +368,12 @@ describe('Chat Store - Agent Workspace', () => {
     expect(chat.agentRatingSummary.averageRating).toBe(4.5)
   })
 
-  it('shows ticket counts on the agent dashboard', async () => {
+  it('uses one metric-card layout for session and ticket counts', async () => {
     const wrapper = mount(AgentOverviewPanel)
     await new Promise((resolve) => setTimeout(resolve, 0))
     await nextTick()
 
+    expect(wrapper.findAll('.metric-card')).toHaveLength(7)
     expect(wrapper.text()).toContain('待处理工单')
     expect(wrapper.text()).toContain('处理中工单')
     expect(wrapper.text()).toContain('等待用户')
