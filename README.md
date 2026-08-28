@@ -1,42 +1,37 @@
 # Customer Service Chat
 
-一个基于 Spring Boot、Vue 3、MySQL、Redis 和 STOMP 的轻量人工客服聊天项目。系统提供用户咨询、客服接待、会话管理、附件、评价、归档和管理员管理功能；不包含 AI 自动回复或企业级工单平台能力。
+## 项目简介
 
-## 环境
+Customer Service Chat 是一个轻量级人工客服聊天系统。它围绕“用户发起咨询、客服接待处理、管理员维护系统”这一条主流程设计，把实时聊天、排队分配、会话管理和简单工单放在同一个项目中。
 
-- JDK 17
-- MySQL 8
-- Redis
-- Node.js 20 或以上
-- Docker Desktop（仅附件使用 MinIO 时需要）
+项目主要面向小型客服场景，强调基础业务闭环和清晰的角色分工，不包含 AI 自动回复、知识库或大型企业客服平台中的复杂流程。
 
-## 初始化与启动
+## 角色与功能
 
-1. 创建数据库后，依次执行 `sql/user_ddl.sql`、`sql/rbac_ddl.sql`、`sql/chat_ddl.sql`。
-2. 已有数据库需要继续执行：`sql/user_nickname_upgrade.sql`、`sql/chat_session_metadata_upgrade.sql`、`sql/chat_message_reply_upgrade.sql`、`sql/support_ticket_upgrade.sql`。
-3. 如需使用附件存储，复制 `.env.example` 为 `.env`，填写 MinIO 配置后执行 `docker compose up -d`。
-4. 前端开发：进入 `frontend` 后执行 `npm.cmd install` 和 `npm.cmd run dev`。
-5. 整体打包：进入 `frontend` 后执行 `npm.cmd run build:sync`，再在项目根目录执行 `./mvnw.cmd spring-boot:run`。
+### 用户
 
-默认后端地址为 `http://localhost:8080`，打包后的 Vue 前端通过 `/frontend/login` 访问。
+用户可以注册登录、发起咨询、查看排队状态，与客服实时聊天，并查看过去的会话记录。聊天过程中支持发送图片和文件；会话结束后也可以进行满意度评价。对于需要继续处理的问题，用户能够查看该会话关联的工单进度。
 
-## 会话关联工单
+### 客服
 
-每条会话最多关联一张轻量工单。客服可为自己负责的进行中或已结束会话创建工单，并更新状态、问题描述和处理结果；用户和会话负责人可查看，管理员本阶段只读查看。工单状态在前端显示为“待处理、处理中、等待用户、已解决”，后端保存 `OPEN`、`IN_PROGRESS`、`WAITING_USER`、`RESOLVED`。
+客服上线后可以接待分配到自己的咨询，在工作台中查看不同状态的会话。客服可以搜索消息、使用快捷回复、转接会话、维护会话的优先级、分类、标签和归档信息，也可以为自己负责的会话创建并更新轻量工单。
 
-接口如下：
+### 管理员
 
-- `GET /chat/sessions/{sessionId}/ticket`：查看会话工单；未创建时返回空数据。
-- `POST /chat/sessions/{sessionId}/ticket`：当前负责客服创建工单。
-- `PATCH /chat/tickets/{ticketNo}`：当前负责客服更新工单，需携带版本号。
+管理员负责用户、角色和权限管理，并可以查看会话、搜索文字消息、统计归档与评价情况、处理死信消息，以及维护 VIP 技能组。管理员还可以在会话管理中查看关联工单，便于了解问题处理情况。
 
-演示步骤：创建一条已分配的会话；使用负责客服在右侧“关联工单”创建工单；让用户打开同一会话确认只读卡片；客服更新为“处理中”，再填写处理结果后更新为“已解决”；重新打开会话确认工单仍存在。
+## 工单功能
 
-## 验证
+工单不是一个独立的大型模块，而是附属于会话的处理记录：每个会话最多关联一张工单。客服可以记录问题描述、处理状态和处理结果；系统会保留状态变更记录，并展示会话转接带来的负责人变化。
 
-```powershell
-./mvnw.cmd "-Dmaven.repo.local=E:\springboot\demo2\customer-service-chat-system\.m2\repository" -o test
-Set-Location frontend
-npm.cmd test -- --run
-npm.cmd run build:sync
-```
+## 技术构成
+
+- 后端使用 Java、Spring Boot、MyBatis-Plus、Apache Shiro 和 STOMP WebSocket。
+- 前端使用 Vue 3、Vite、Pinia、Vue Router 和 Element Plus。
+- 数据由 MySQL 与 Redis 支撑，图片和文件使用 MinIO 保存。
+
+后端分为 `application`、`businessModel`、`commonModel` 和 `third-party-libs` 四个模块，Vue 前端位于 `frontend` 目录。前端构建完成后可由 Spring Boot 一并提供访问。
+
+## 项目范围
+
+本项目关注人工客服的核心流程：咨询、排队、接待、会话处理、评价、管理和轻量工单。它适合作为实时 Web 应用、权限控制和前后端协作的实践项目，而不是完整商业客服系统的替代品。
