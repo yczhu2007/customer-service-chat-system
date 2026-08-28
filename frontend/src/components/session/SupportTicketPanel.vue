@@ -94,6 +94,7 @@ async function updateTicket() {
     successMessage.value = '工单已更新'
   } catch (error) {
     errorMessage.value = error.message || '更新工单失败'
+    await chat.loadSupportTicket(chat.activeSessionId)
   } finally {
     saving.value = false
   }

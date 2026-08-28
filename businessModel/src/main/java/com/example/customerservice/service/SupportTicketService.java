@@ -243,7 +243,8 @@ public class SupportTicketService {
             notifyParticipant(session.getAgentId(), payload, ticket.getTicketNo(), session.getId());
         };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            notification.run();
+            log.warn("工单操作未处于事务同步上下文，跳过实时通知：工单{}，会话{}",
+                    ticket.getTicketNo(), session.getId());
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

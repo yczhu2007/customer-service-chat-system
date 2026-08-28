@@ -293,6 +293,19 @@ class SupportTicketServiceTest {
         }
     }
 
+    @Test
+    void directInvocationWithoutTransactionDoesNotNotifyBeforeCommit() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(125L);
+            return 1;
+        });
+
+        service.createTicket("A001", "S001", createRequest("直接调用工单"));
+
+        verifyNoInteractions(messagingTemplate);
+    }
+
     private static ChatSession session(String id, String userId, String agentId) {
         ChatSession session = new ChatSession();
         session.setId(id);

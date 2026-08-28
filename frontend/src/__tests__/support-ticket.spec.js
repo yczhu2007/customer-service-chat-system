@@ -126,6 +126,24 @@ describe('会话关联工单', () => {
     expect(wrapper.text()).not.toContain('标记为待处理')
   })
 
+  it('reloads the ticket after a quick update fails', async () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+    chat.updateSupportTicket = vi.fn().mockRejectedValue(new Error('版本冲突'))
+    chat.loadSupportTicket = vi.fn()
+
+    const wrapper = mount(SupportTicketPanel)
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
+  })
+
   it('shows a retry state instead of a create form when ticket loading fails', () => {
     const chat = useChatStore()
     chat.activeSessionId = 'session-1'
