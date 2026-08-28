@@ -31,6 +31,7 @@ public class ChatSessionListItemVO implements Serializable {
     /** 归档时间。 */
     private LocalDateTime archivedAt;
     private String ticketStatus;
+    private String ticketNo;
 
     public String getSessionId() { return sessionId; }
     public void setSessionId(String sessionId) { this.sessionId = sessionId; }
@@ -70,4 +71,6 @@ public class ChatSessionListItemVO implements Serializable {
     public void setArchivedAt(LocalDateTime archivedAt) { this.archivedAt = archivedAt; }
     public String getTicketStatus() { return ticketStatus; }
     public void setTicketStatus(String ticketStatus) { this.ticketStatus = ticketStatus; }
+    public String getTicketNo() { return ticketNo; }
+    public void setTicketNo(String ticketNo) { this.ticketNo = ticketNo; }
 }

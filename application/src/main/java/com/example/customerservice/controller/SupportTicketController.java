@@ -4,6 +4,7 @@ import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
+import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.SupportTicketService;
 import jakarta.validation.Valid;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.validation.annotation.Validated;
+
+import java.util.List;
 
 /** 会话关联工单接口。 */
 @RestController
@@ -42,6 +45,16 @@ public class SupportTicketController {
     ) {
         boolean administrator = currentUser.getRoleCodes().contains("ADMIN");
         return Result.success(supportTicketService.findBySessionId(
+                currentUser.getUserId(), administrator, sessionId
+        ));
+    }
+
+    @GetMapping("/sessions/{sessionId}/ticket/history")
+    public Result<List<SupportTicketStatusHistoryVO>> findTicketHistory(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId
+    ) {
+        boolean administrator = currentUser.getRoleCodes().contains("ADMIN");
+        return Result.success(supportTicketService.findHistoryBySessionId(
                 currentUser.getUserId(), administrator, sessionId
         ));
     }

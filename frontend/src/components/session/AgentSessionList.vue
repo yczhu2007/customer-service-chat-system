@@ -82,7 +82,7 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
           </span>
           <span v-if="s.category" class="category-tag" :style="categoryStyle(s.category)">{{ categoryLabel(s.category) }}</span>
           <span v-if="s.archiveStatus" class="archive-tag" :style="archiveStatusStyle(s.archiveStatus)">{{ archiveStatusLabel(s.archiveStatus) }}</span>
-          <span v-if="s.ticketStatus" class="ticket-tag">工单 · {{ ticketStatusLabel(s.ticketStatus) }}</span>
+          <span v-if="s.ticketStatus" class="ticket-tag">工单 · {{ s.ticketNo }} · {{ ticketStatusLabel(s.ticketStatus) }}</span>
           <span v-if="s.unreadCount > 0" class="unread-badge">{{ s.unreadCount }}</span>
         </div>
         <div v-if="s.lastMessageContent" class="session-preview">

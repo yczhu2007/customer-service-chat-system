@@ -40,6 +40,7 @@
         <result property="archiveRemark" column="archive_remark"/>
         <result property="archivedAt" column="archived_at"/>
         <result property="ticketStatus" column="ticket_status"/>
+        <result property="ticketNo" column="ticket_no"/>
     </resultMap>
 
     <resultMap id="sessionSummaryResult" type="com.example.customerservice.dto.SessionSummaryVO">
@@ -364,8 +365,8 @@
         </if>
         <if test="ticketKeyword != null and ticketKeyword != ''">
             AND (
-                CONCAT('TK-', LPAD(ticket.id, 8, '0')) LIKE CONCAT('%', #{ticketKeyword}, '%')
-                OR session.title LIKE CONCAT('%', #{ticketKeyword}, '%')
+                LOCATE(#{ticketKeyword}, CONCAT('TK-', LPAD(ticket.id, 8, '0'))) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(session.title, '')) &gt; 0
             )
         </if>
     </select>
@@ -392,7 +393,8 @@
                session.archive_status,
                session.archive_remark,
                session.archived_at,
-               ticket.status AS ticket_status
+               ticket.status AS ticket_status,
+               CONCAT('TK-', LPAD(ticket.id, 8, '0')) AS ticket_no
         FROM scoped_sessions session
         LEFT JOIN unread_by_session unread ON unread.session_id = session.id
         LEFT JOIN latest_message latest ON latest.session_id = session.id
@@ -403,11 +405,19 @@
         </if>
         <if test="ticketKeyword != null and ticketKeyword != ''">
             AND (
-                CONCAT('TK-', LPAD(ticket.id, 8, '0')) LIKE CONCAT('%', #{ticketKeyword}, '%')
-                OR session.title LIKE CONCAT('%', #{ticketKeyword}, '%')
+                LOCATE(#{ticketKeyword}, CONCAT('TK-', LPAD(ticket.id, 8, '0'))) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(session.title, '')) &gt; 0
             )
         </if>
-        ORDER BY session.create_time DESC, session.id DESC
+        <choose>
+            <when test="viewCode == 'MY_TICKETS'">
+                ORDER BY CASE WHEN ticket.status = 'RESOLVED' THEN 1 ELSE 0 END,
+                         ticket.updated_at DESC, session.id DESC
+            </when>
+            <otherwise>
+                ORDER BY session.create_time DESC, session.id DESC
+            </otherwise>
+        </choose>
         LIMIT #{offset}, #{pageSize}
     </select>
 
@@ -534,7 +544,7 @@
     </select>
 
     <sql id="messageSearchPredicate">
-        message.recalled = 0 AND message.content LIKE CONCAT('%', #{keyword}, '%')
+        message.recalled = 0 AND message.type = 'TEXT' AND message.content LIKE CONCAT('%', #{keyword}, '%')
         <if test="agentId != null and agentId != ''">
             AND (session.agent_id = #{agentId} OR EXISTS (SELECT 1 FROM chat_session_transfer_log transfer_log WHERE transfer_log.session_id = session.id AND (transfer_log.source_agent_id = #{agentId} OR transfer_log.target_agent_id = #{agentId})))
         </if>

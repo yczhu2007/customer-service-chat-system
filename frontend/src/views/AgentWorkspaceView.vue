@@ -128,7 +128,7 @@ onUnmounted(() => {
         <div class="sidebar-divider" />
         <SessionMetadataEditor />
         <SupportTicketPanel />
-        <TransferLogPanel :session-id="chat.activeSessionId" />
+        <TransferLogPanel v-if="!chat.activeSupportTicket" :session-id="chat.activeSessionId" />
       </el-aside>
     </el-container>
 

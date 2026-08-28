@@ -5,6 +5,7 @@ import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatManagementQueryService;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -113,5 +115,19 @@ class ChatManagementControllerTest {
 
         assertEquals("1", pageNo.defaultValue());
         assertEquals("20", pageSize.defaultValue());
+    }
+
+    @Test
+    void sessionUserCanReadTransferHistoryWithoutAgentOnlyPermission() {
+        List<SessionTransferLogVO> logs = List.of();
+        when(currentUser.getUserId()).thenReturn("U001");
+        when(managementQueryService.findTransferLogs("U001", false, "S001")).thenReturn(logs);
+
+        Result<List<SessionTransferLogVO>> result = controller.findTransferLogs("S001");
+
+        assertEquals(logs, result.getData());
+        verify(currentUser).requireRole("USER");
+        verify(currentUser, never()).requirePermission("chat:session:transfer-log:view");
+        verify(managementQueryService).findTransferLogs("U001", false, "S001");
     }
 }

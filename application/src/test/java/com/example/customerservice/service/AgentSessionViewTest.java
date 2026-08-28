@@ -1,11 +1,13 @@
 package com.example.customerservice.service;
 
 import com.example.customerservice.constant.AgentSessionView;
+import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatSessionTag;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.AgentSessionViewVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.mapper.ChatManagementMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.ChatSessionTagMapper;
@@ -303,7 +305,7 @@ class AgentSessionViewTest {
     }
 
     @Test
-    void ticketKeywordMatchesPartialTicketNumber() throws IOException {
+    void ticketKeywordMatchesPartialTicketNumberLiterally() throws IOException {
         BoundSql boundSql = mappedSql(
                 "countAgentViewSessions",
                 new HashMap<>(Map.of(
@@ -315,9 +317,50 @@ class AgentSessionViewTest {
         String sql = normalizeSql(boundSql.getSql());
 
         assertTrue(
-                sql.contains("CONCAT('TK-', LPAD(TICKET.ID, 8, '0')) LIKE CONCAT('%', ?, '%')"),
+                sql.contains("LOCATE(?, CONCAT('TK-', LPAD(TICKET.ID, 8, '0'))) > 0"),
                 sql
         );
+    }
+
+    @Test
+    void myTicketsExposeTicketNumberAndPrioritizeUnresolvedRecentUpdates() throws IOException {
+        BoundSql boundSql = mappedSql(
+                "findAgentViewSessions",
+                new HashMap<>(Map.of(
+                        "agentId", "A001",
+                        "viewCode", AgentSessionView.MY_TICKETS.getCode(),
+                        "offset", 0L,
+                        "pageSize", 20L
+                ))
+        );
+        String sql = normalizeSql(boundSql.getSql());
+
+        assertTrue(sql.contains("CONCAT('TK-', LPAD(TICKET.ID, 8, '0')) AS TICKET_NO"), sql);
+        assertTrue(sql.contains("ORDER BY CASE WHEN TICKET.STATUS = 'RESOLVED' THEN 1 ELSE 0 END, TICKET.UPDATED_AT DESC"), sql);
+    }
+
+    @Test
+    void sessionUserCanReadExistingTransferLogs() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setUserId("U001");
+        session.setAgentId("A001");
+        List<SessionTransferLogVO> logs = List.of();
+        when(sessionMapper.selectById("S001")).thenReturn(session);
+        when(managementMapper.findTransferLogs("S001")).thenReturn(logs);
+
+        assertEquals(logs, service.findTransferLogs("U001", false, "S001"));
+    }
+
+    @Test
+    void messageSearchOnlyMatchesTextMessages() throws IOException {
+        BoundSql boundSql = mappedSql(
+                "countMessageSearch",
+                new HashMap<>(Map.of("keyword", "1", "agentId", "A001"))
+        );
+        String sql = normalizeSql(boundSql.getSql());
+
+        assertTrue(sql.contains("MESSAGE.TYPE = 'TEXT'"), sql);
     }
 
     @Test

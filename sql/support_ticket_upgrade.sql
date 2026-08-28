@@ -30,3 +30,23 @@ CREATE TABLE IF NOT EXISTS support_ticket
     DEFAULT CHARACTER SET = utf8mb4
     COLLATE = utf8mb4_unicode_ci
     COMMENT = '会话关联轻量工单表';
+
+CREATE TABLE IF NOT EXISTS support_ticket_status_history
+(
+    id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '工单状态历史主键',
+    ticket_id   BIGINT      NOT NULL COMMENT '工单主键',
+    operator_id VARCHAR(64) NOT NULL COMMENT '操作人ID',
+    from_status VARCHAR(20) NULL COMMENT '变更前状态，创建时为空',
+    to_status   VARCHAR(20) NOT NULL COMMENT '变更后状态',
+    created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '操作时间',
+
+    PRIMARY KEY (id),
+    KEY idx_ticket_status_history_time (ticket_id, created_at, id),
+    CONSTRAINT fk_ticket_status_history_ticket
+        FOREIGN KEY (ticket_id) REFERENCES support_ticket (id)
+            ON UPDATE CASCADE ON DELETE CASCADE
+)
+    ENGINE = InnoDB
+    DEFAULT CHARACTER SET = utf8mb4
+    COLLATE = utf8mb4_unicode_ci
+    COMMENT = '工单状态操作历史表';

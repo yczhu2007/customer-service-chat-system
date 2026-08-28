@@ -302,10 +302,13 @@ public class ChatManagementController {
             String sessionId
     ) {
         boolean admin = currentUser.hasRole("ADMIN");
-        if (!admin) {
-            currentUser.requireRole("AGENT");
+        boolean agent = currentUser.hasRole("AGENT");
+        if (!admin && !agent) {
+            currentUser.requireRole("USER");
         }
-        currentUser.requirePermission("chat:session:transfer-log:view");
+        if (agent || admin) {
+            currentUser.requirePermission("chat:session:transfer-log:view");
+        }
         return Result.success(
                 managementQueryService.findTransferLogs(
                         currentUser.getUserId(),
