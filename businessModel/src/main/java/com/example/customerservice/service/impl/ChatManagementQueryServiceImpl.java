@@ -300,6 +300,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                         || requesterId.equals(log.targetAgentId())
         );
         if (!canViewAllSessions
+                && !requesterId.equals(session.getUserId())
                 && !requesterId.equals(session.getAgentId())
                 && !participatedInTransfer) {
             throw new IllegalArgumentException("无权查看该会话的转接记录");

@@ -4,6 +4,7 @@ import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
+import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.SupportTicketService;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Set;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.verify;
@@ -68,5 +70,19 @@ class SupportTicketControllerTest {
         assertEquals(ticket, result.getData());
         verify(currentUser).requireRole("AGENT");
         verify(supportTicketService).updateTicket("A001", "TK-00000125", request);
+    }
+
+    @Test
+    void sessionParticipantCanReadTicketHistory() {
+        SupportTicketStatusHistoryVO history = new SupportTicketStatusHistoryVO();
+        when(currentUser.getUserId()).thenReturn("U001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("USER"));
+        when(supportTicketService.findHistoryBySessionId("U001", false, "S001"))
+                .thenReturn(List.of(history));
+
+        Result<List<SupportTicketStatusHistoryVO>> result = controller.findTicketHistory("S001");
+
+        assertEquals(List.of(history), result.getData());
+        verify(supportTicketService).findHistoryBySessionId("U001", false, "S001");
     }
 }

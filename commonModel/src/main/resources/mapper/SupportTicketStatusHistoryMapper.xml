@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.customerservice.mapper.SupportTicketStatusHistoryMapper">
+    <select id="findRecentByTicketId" resultType="com.example.customerservice.dto.SupportTicketStatusHistoryVO">
+        SELECT history.id,
+               history.from_status,
+               history.to_status,
+               COALESCE(NULLIF(operator_user.nickname, ''), operator_user.username) AS operator_nickname,
+               history.created_at
+        FROM support_ticket_status_history history
+        LEFT JOIN sys_user operator_user ON operator_user.id = history.operator_id
+        WHERE history.ticket_id = #{ticketId}
+        ORDER BY history.created_at ASC, history.id ASC
+        LIMIT 50
+    </select>
+</mapper>

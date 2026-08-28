@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SupportTicket;
+import com.example.customerservice.domain.SupportTicketStatusHistory;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
@@ -14,6 +15,7 @@ import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.SupportTicketValidationException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SupportTicketMapper;
+import com.example.customerservice.mapper.SupportTicketStatusHistoryMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.apache.shiro.authz.UnauthorizedException;
@@ -44,11 +46,13 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 
 @ExtendWith(MockitoExtension.class)
 class SupportTicketServiceTest {
 
     @Mock private SupportTicketMapper ticketMapper;
+    @Mock private SupportTicketStatusHistoryMapper historyMapper;
     @Mock private ChatSessionMapper sessionMapper;
     @Mock private SysUserMapper userMapper;
     @Mock private SimpMessagingTemplate messagingTemplate;
@@ -65,7 +69,7 @@ class SupportTicketServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SupportTicketService(ticketMapper, sessionMapper, userMapper, messagingTemplate);
+        service = new SupportTicketService(ticketMapper, historyMapper, sessionMapper, userMapper, messagingTemplate);
     }
 
     @Test
@@ -83,6 +87,10 @@ class SupportTicketServiceTest {
         assertEquals("OPEN", ticket.getStatus());
         assertEquals("无法完成订单支付", ticket.getDescription());
         verify(ticketMapper).insert(any(SupportTicket.class));
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.<SupportTicketStatusHistory>argThat(history ->
+                history.getFromStatus() == null && "OPEN".equals(history.getToStatus())
+                        && "A001".equals(history.getOperatorId())
+        ));
     }
 
     @Test
@@ -195,6 +203,22 @@ class SupportTicketServiceTest {
 
         assertEquals("IN_PROGRESS", updated.getStatus());
         assertEquals("补充后的问题描述", updated.getDescription());
+        verify(historyMapper, never()).insert(any(SupportTicketStatusHistory.class));
+    }
+
+    @Test
+    void statusChangeWritesOneHistoryRecordAndSessionParticipantCanReadIt() {
+        when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "OPEN", 0));
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(1);
+
+        service.updateTicket("A001", "TK-00000125", updateRequest("IN_PROGRESS", "支付失败", null, 0));
+
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.<SupportTicketStatusHistory>argThat(history ->
+                "OPEN".equals(history.getFromStatus()) && "IN_PROGRESS".equals(history.getToStatus())
+        ));
+        assertThrows(UnauthorizedException.class, () -> service.findHistoryBySessionId("U999", false, "S001"));
     }
 
     @Test
@@ -291,6 +315,19 @@ class SupportTicketServiceTest {
         } finally {
             TransactionSynchronizationManager.clearSynchronization();
         }
+    }
+
+    @Test
+    void directInvocationWithoutTransactionDoesNotNotifyBeforeCommit() {
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(ticketMapper.insert(any(SupportTicket.class))).thenAnswer(invocation -> {
+            invocation.getArgument(0, SupportTicket.class).setId(125L);
+            return 1;
+        });
+
+        service.createTicket("A001", "S001", createRequest("直接调用工单"));
+
+        verifyNoInteractions(messagingTemplate);
     }
 
     private static ChatSession session(String id, String userId, String agentId) {

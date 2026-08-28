@@ -132,6 +132,9 @@ export const findTransferLogs = (sessionId) =>
 export const getSupportTicket = (sessionId) =>
   request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket`)
 
+export const getSupportTicketHistory = (sessionId) =>
+  request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket/history`)
+
 export const createSupportTicket = (sessionId, data) =>
   request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket`, {
     method: 'POST',

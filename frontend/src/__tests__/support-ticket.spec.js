@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
-import { getSupportTicket, createSupportTicket, updateSupportTicket } from '../api/chat-api'
+import { getSupportTicket, getSupportTicketHistory, createSupportTicket, updateSupportTicket } from '../api/chat-api'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import SupportTicketPanel from '../components/session/SupportTicketPanel.vue'
@@ -22,24 +22,28 @@ describe('会话关联工单', () => {
 
   it('uses the documented ticket endpoints', async () => {
     await getSupportTicket('session-1')
+    await getSupportTicketHistory('session-1')
     await createSupportTicket('session-1', { description: '支付失败' })
     await updateSupportTicket('TK-00000125', {
       status: 'IN_PROGRESS', description: '支付失败', version: 0,
     })
 
     expect(fetch).toHaveBeenNthCalledWith(1, '/chat/sessions/session-1/ticket', expect.any(Object))
-    expect(fetch).toHaveBeenNthCalledWith(2, '/chat/sessions/session-1/ticket', expect.objectContaining({ method: 'POST' }))
-    expect(fetch).toHaveBeenNthCalledWith(3, '/chat/tickets/TK-00000125', expect.objectContaining({ method: 'PATCH' }))
+    expect(fetch).toHaveBeenNthCalledWith(2, '/chat/sessions/session-1/ticket/history', expect.any(Object))
+    expect(fetch).toHaveBeenNthCalledWith(3, '/chat/sessions/session-1/ticket', expect.objectContaining({ method: 'POST' }))
+    expect(fetch).toHaveBeenNthCalledWith(4, '/chat/tickets/TK-00000125', expect.objectContaining({ method: 'PATCH' }))
   })
 
-  it('refreshes the active ticket when receiving a ticket event', () => {
+  it('marks a dirty ticket form as stale instead of overwriting it on a ticket event', () => {
     const chat = useChatStore()
     chat.activeSessionId = 'session-1'
+    chat.supportTicketFormDirty = true
     chat.loadSupportTicket = vi.fn()
 
     chat._handleChatEvent({ event: 'TICKET_UPDATED', sessionId: 'session-1' })
 
-    expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
+    expect(chat.supportTicketStale).toBe(true)
+    expect(chat.loadSupportTicket).not.toHaveBeenCalled()
   })
 
   it('does not let an earlier request overwrite a newer request for the same session', async () => {
@@ -126,6 +130,25 @@ describe('会话关联工单', () => {
     expect(wrapper.text()).not.toContain('标记为待处理')
   })
 
+  it('keeps the draft after a non-conflict update failure', async () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+    chat.updateSupportTicket = vi.fn().mockRejectedValue(Object.assign(new Error('网络错误'), { status: 500 }))
+    chat.loadSupportTicket = vi.fn()
+
+    const wrapper = mount(SupportTicketPanel)
+    await wrapper.get('button').trigger('click')
+    await flushPromises()
+
+    expect(chat.loadSupportTicket).not.toHaveBeenCalled()
+    expect(wrapper.find('textarea').element.value).toBe('支付失败')
+  })
+
   it('shows a retry state instead of a create form when ticket loading fails', () => {
     const chat = useChatStore()
     chat.activeSessionId = 'session-1'
@@ -159,5 +182,28 @@ describe('会话关联工单', () => {
     expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
     expect(panel.text()).toContain('工单已存在，已加载最新内容')
     expect(panel.text()).toContain('TK-00000125')
+  })
+
+  it('shows ticket status history and the existing transfer records together', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+    chat.activeSupportTicketHistory = [{
+      id: 1, fromStatus: 'OPEN', toStatus: 'IN_PROGRESS', operatorNickname: '客服一', createdAt: '2026-08-28T10:00:00',
+    }]
+    chat.transferLogs = [{
+      id: 'transfer-1', sourceAgentNickname: '客服一', targetAgentNickname: '客服二', createTime: '2026-08-28T10:01:00',
+    }]
+
+    const wrapper = mount(SupportTicketPanel)
+
+    expect(wrapper.text()).toContain('操作历史')
+    expect(wrapper.text()).toContain('待处理 → 处理中')
+    expect(wrapper.text()).toContain('负责人变更')
+    expect(wrapper.text()).toContain('客服一 → 客服二')
   })
 })

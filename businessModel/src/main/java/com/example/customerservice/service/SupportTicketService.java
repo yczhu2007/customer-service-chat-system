@@ -4,15 +4,18 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.constant.SupportTicketStatus;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SupportTicket;
+import com.example.customerservice.domain.SupportTicketStatusHistory;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
+import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.exception.SupportTicketValidationException;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SupportTicketMapper;
+import com.example.customerservice.mapper.SupportTicketStatusHistoryMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.shiro.authz.UnauthorizedException;
@@ -25,23 +28,27 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 
 @Service
 @Slf4j
 public class SupportTicketService {
 
     private final SupportTicketMapper ticketMapper;
+    private final SupportTicketStatusHistoryMapper historyMapper;
     private final ChatSessionMapper sessionMapper;
     private final SysUserMapper userMapper;
     private final SimpMessagingTemplate messagingTemplate;
 
     public SupportTicketService(
             SupportTicketMapper ticketMapper,
+            SupportTicketStatusHistoryMapper historyMapper,
             ChatSessionMapper sessionMapper,
             SysUserMapper userMapper,
             SimpMessagingTemplate messagingTemplate
     ) {
         this.ticketMapper = ticketMapper;
+        this.historyMapper = historyMapper;
         this.sessionMapper = sessionMapper;
         this.userMapper = userMapper;
         this.messagingTemplate = messagingTemplate;
@@ -77,6 +84,7 @@ public class SupportTicketService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessStateException("该会话已创建工单", exception);
         }
+        writeStatusHistory(ticket.getId(), agentId, null, SupportTicketStatus.OPEN.name(), now);
         SupportTicketVO view = toView(ticket, session);
         notifyAfterCommit(session, view, "TICKET_CREATED");
         return view;
@@ -130,6 +138,9 @@ public class SupportTicketService {
         if (updated != 1) {
             throw new BusinessStateException("工单已被其他操作修改，请刷新后重试");
         }
+        if (current != target) {
+            writeStatusHistory(ticket.getId(), agentId, current.name(), target.name(), now);
+        }
         next.setSessionId(ticket.getSessionId());
         next.setCreatedAt(ticket.getCreatedAt());
         next.setResolution(resolution);
@@ -137,6 +148,24 @@ public class SupportTicketService {
         SupportTicketVO view = toView(next, session);
         notifyAfterCommit(session, view, "TICKET_UPDATED");
         return view;
+    }
+
+    public List<SupportTicketStatusHistoryVO> findHistoryBySessionId(
+            String callerId,
+            boolean administrator,
+            String sessionId
+    ) {
+        ChatSession session = requireSession(sessionId);
+        requireParticipant(session, callerId, administrator);
+        SupportTicket ticket = ticketMapper.selectOne(
+                Wrappers.<SupportTicket>lambdaQuery()
+                        .eq(SupportTicket::getSessionId, sessionId)
+        );
+        if (ticket == null) {
+            return List.of();
+        }
+        List<SupportTicketStatusHistoryVO> history = historyMapper.findRecentByTicketId(ticket.getId());
+        return history == null ? List.of() : List.copyOf(history);
     }
 
     private ChatSession requireSession(String sessionId) {
@@ -207,6 +236,22 @@ public class SupportTicketService {
         };
     }
 
+    private void writeStatusHistory(
+            Long ticketId,
+            String operatorId,
+            String fromStatus,
+            String toStatus,
+            LocalDateTime createdAt
+    ) {
+        SupportTicketStatusHistory history = new SupportTicketStatusHistory();
+        history.setTicketId(ticketId);
+        history.setOperatorId(operatorId);
+        history.setFromStatus(fromStatus);
+        history.setToStatus(toStatus);
+        history.setCreatedAt(createdAt);
+        historyMapper.insert(history);
+    }
+
     private SupportTicketVO toView(SupportTicket ticket, ChatSession session) {
         SupportTicketVO view = new SupportTicketVO();
         view.setTicketNo("TK-%08d".formatted(ticket.getId()));
@@ -243,7 +288,8 @@ public class SupportTicketService {
             notifyParticipant(session.getAgentId(), payload, ticket.getTicketNo(), session.getId());
         };
         if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-            notification.run();
+            log.warn("工单操作未处于事务同步上下文，跳过实时通知：工单{}，会话{}",
+                    ticket.getTicketNo(), session.getId());
             return;
         }
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {

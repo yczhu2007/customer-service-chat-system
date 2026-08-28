@@ -18,6 +18,7 @@ import {
   findAgentRatingSummary,
   findTransferLogs,
   getSupportTicket,
+  getSupportTicketHistory,
   createSupportTicket,
   updateSupportTicket,
 } from '../api/chat-api'
@@ -101,9 +102,13 @@ export const useChatStore = defineStore('chat', {
     /** Metadata for the active session */
     activeMetadata: null,
     activeSupportTicket: null,
+    activeSupportTicketHistory: [],
     supportTicketLoading: false,
     supportTicketError: null,
     _supportTicketRequestSequence: 0,
+    _supportTicketHistoryRequestSequence: 0,
+    supportTicketFormDirty: false,
+    supportTicketStale: false,
     /** User profile for the active session */
     activeUserProfile: null,
     /** Agent online status */
@@ -111,6 +116,7 @@ export const useChatStore = defineStore('chat', {
     agentDashboard: null,
     agentRatingSummary: null,
     transferLogs: [],
+    _transferLogRequestSequence: 0,
   }),
 
   getters: {
@@ -231,9 +237,14 @@ export const useChatStore = defineStore('chat', {
       this.activeSessionId = sessionId
       this.messages = []
       this.activeSupportTicket = null
+      this.activeSupportTicketHistory = []
       this.supportTicketError = null
+      this.supportTicketFormDirty = false
+      this.supportTicketStale = false
       const ticketRequestSequence = ++this._supportTicketRequestSequence
       this.loadSupportTicket(sessionId, ticketRequestSequence)
+      this.loadSupportTicketHistory(sessionId)
+      this.loadTransferLogs(sessionId)
       this._sentClientMsgIds.clear()
       this.historyCursor = null
       this.historyHasMore = false
@@ -628,14 +639,18 @@ export const useChatStore = defineStore('chat', {
       if (latestReceived) this.markRead(this.activeSessionId, latestReceived.id)
     },
 
-    async loadTransferLogs(sessionId) {
+    async loadTransferLogs(sessionId, requestSequence = ++this._transferLogRequestSequence) {
       if (!sessionId) { this.transferLogs = []; return }
       try {
         const result = await findTransferLogs(sessionId)
-        this.transferLogs = result?.data || result || []
+        if (this.activeSessionId === sessionId && requestSequence === this._transferLogRequestSequence) {
+          this.transferLogs = result?.data || result || []
+        }
       } catch (e) {
-        this.transferLogs = []
-        this.error = e.message
+        if (this.activeSessionId === sessionId && requestSequence === this._transferLogRequestSequence) {
+          this.transferLogs = []
+          this.error = e.message
+        }
       }
     },
 
@@ -651,6 +666,8 @@ export const useChatStore = defineStore('chat', {
         if (this.activeSessionId === sessionId && requestSequence === this._supportTicketRequestSequence) {
           this.activeSupportTicket = ticket
           this.supportTicketError = null
+          this.supportTicketFormDirty = false
+          this.supportTicketStale = false
         }
         return ticket
       } catch (e) {
@@ -666,11 +683,34 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
+    async loadSupportTicketHistory(sessionId, requestSequence = ++this._supportTicketHistoryRequestSequence) {
+      if (!sessionId) {
+        this.activeSupportTicketHistory = []
+        return []
+      }
+      try {
+        const result = await getSupportTicketHistory(sessionId)
+        const history = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        if (this.activeSessionId === sessionId && requestSequence === this._supportTicketHistoryRequestSequence) {
+          this.activeSupportTicketHistory = history || []
+        }
+        return history || []
+      } catch (e) {
+        if (this.activeSessionId === sessionId && requestSequence === this._supportTicketHistoryRequestSequence) {
+          this.activeSupportTicketHistory = []
+        }
+        return []
+      }
+    },
+
     async createSupportTicket(sessionId, data) {
       try {
         const result = await createSupportTicket(sessionId, data)
         const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
-        if (this.activeSessionId === sessionId) this.activeSupportTicket = ticket
+        if (this.activeSessionId === sessionId) {
+          this.activeSupportTicket = ticket
+          this.loadSupportTicketHistory(sessionId)
+        }
         return ticket
       } catch (e) {
         this.error = e.message
@@ -682,7 +722,10 @@ export const useChatStore = defineStore('chat', {
       try {
         const result = await updateSupportTicket(ticketNo, data)
         const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
-        if (this.activeSessionId === ticket?.sessionId) this.activeSupportTicket = ticket
+        if (this.activeSessionId === ticket?.sessionId) {
+          this.activeSupportTicket = ticket
+          this.loadSupportTicketHistory(ticket.sessionId)
+        }
         return ticket
       } catch (e) {
         this.error = e.message
@@ -848,13 +891,17 @@ export const useChatStore = defineStore('chat', {
       this.agentViewCounts = []
       this.activeMetadata = null
       this.activeSupportTicket = null
+      this.activeSupportTicketHistory = []
       this.supportTicketLoading = false
       this.supportTicketError = null
+      this.supportTicketFormDirty = false
+      this.supportTicketStale = false
       this.activeUserProfile = null
       this.agentOnline = false
       this.agentDashboard = null
       this.agentRatingSummary = null
       this.transferLogs = []
+      this._transferLogRequestSequence += 1
       this.error = null
     },
 
@@ -1126,7 +1173,14 @@ export const useChatStore = defineStore('chat', {
       }
 
       if (event === 'TICKET_CREATED' || event === 'TICKET_UPDATED') {
-        if (body.sessionId === this.activeSessionId) this.loadSupportTicket(body.sessionId)
+        if (body.sessionId === this.activeSessionId) {
+          this.loadSupportTicketHistory(body.sessionId)
+          if (this.supportTicketFormDirty) {
+            this.supportTicketStale = true
+          } else {
+            this.loadSupportTicket(body.sessionId)
+          }
+        }
         return
       }
 

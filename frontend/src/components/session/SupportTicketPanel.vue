@@ -29,6 +29,11 @@ const quickStatuses = computed(() => ({
   WAITING_USER: ['IN_PROGRESS', 'RESOLVED'],
   RESOLVED: ['IN_PROGRESS'],
 })[ticket.value?.status] || [])
+const selectableStatuses = computed(() => {
+  const allowed = new Set([ticket.value?.status, ...quickStatuses.value])
+  return statusOptions.filter((item) => allowed.has(item.value))
+})
+const history = computed(() => chat.activeSupportTicketHistory || [])
 
 function formatTime(value) {
   if (!value) return '-'
@@ -45,6 +50,14 @@ watch(ticket, (value) => {
   errorMessage.value = ''
   successMessage.value = ''
 }, { immediate: true })
+
+function markDirty() {
+  chat.supportTicketFormDirty = true
+}
+
+function statusText(value) {
+  return statusOptions.find((item) => item.value === value)?.label || '未知状态'
+}
 
 async function createTicket() {
   if (!description.value.trim()) {
@@ -70,7 +83,17 @@ async function createTicket() {
 
 function retryTicket() {
   errorMessage.value = ''
-  return chat.loadSupportTicket(chat.activeSessionId)
+  return refreshTicket()
+}
+
+async function refreshTicket() {
+  chat.supportTicketFormDirty = false
+  chat.supportTicketStale = false
+  await Promise.all([
+    chat.loadSupportTicket(chat.activeSessionId),
+    chat.loadSupportTicketHistory(chat.activeSessionId),
+    chat.loadTransferLogs(chat.activeSessionId),
+  ])
 }
 
 async function updateTicket() {
@@ -93,7 +116,12 @@ async function updateTicket() {
     })
     successMessage.value = '工单已更新'
   } catch (error) {
-    errorMessage.value = error.message || '更新工单失败'
+    if (error.status === 409) {
+      await refreshTicket()
+      errorMessage.value = '工单已被其他操作修改，已加载最新内容'
+    } else {
+      errorMessage.value = error.message || '更新工单失败'
+    }
   } finally {
     saving.value = false
   }
@@ -101,6 +129,7 @@ async function updateTicket() {
 
 async function quickUpdate(nextStatus) {
   status.value = nextStatus
+  markDirty()
   await updateTicket()
 }
 </script>
@@ -120,11 +149,15 @@ async function quickUpdate(nextStatus) {
         <strong>{{ ticket.ticketNo }}</strong>
         <el-tag size="small" effect="plain">{{ statusLabel }}</el-tag>
       </div>
+      <div v-if="chat.supportTicketStale" class="stale-notice">
+        工单已有新更新，当前仍保留未保存内容。
+        <el-button link type="primary" size="small" @click="refreshTicket">刷新</el-button>
+      </div>
       <template v-if="canEdit">
         <p class="timestamps">创建于 {{ formatTime(ticket.createdAt) }} · 更新于 {{ formatTime(ticket.updatedAt) }}</p>
         <label>工单状态</label>
-        <el-select v-model="status" class="field" placeholder="选择">
-          <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+        <el-select v-model="status" class="field" placeholder="选择" @change="markDirty">
+          <el-option v-for="item in selectableStatuses" :key="item.value" :label="item.label" :value="item.value" />
         </el-select>
         <div class="quick-actions">
           <el-button v-for="item in quickStatuses" :key="item" size="small" @click="quickUpdate(item)">
@@ -132,9 +165,9 @@ async function quickUpdate(nextStatus) {
           </el-button>
         </div>
         <label>问题描述</label>
-        <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit />
+        <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit @input="markDirty" />
         <label>处理结果</label>
-        <el-input v-model="resolution" class="field" type="textarea" :rows="2" maxlength="1000" show-word-limit placeholder="解决工单时必填" />
+        <el-input v-model="resolution" class="field" type="textarea" :rows="2" maxlength="1000" show-word-limit placeholder="解决工单时必填" @input="markDirty" />
         <el-button type="primary" :loading="saving" class="action" @click="updateTicket">更新工单</el-button>
       </template>
       <dl v-else class="readonly-details">
@@ -147,11 +180,31 @@ async function quickUpdate(nextStatus) {
         <template v-if="ticket.resolution"><dt>处理结果</dt><dd>{{ ticket.resolution }}</dd></template>
         <dt>更新时间</dt><dd>{{ formatTime(ticket.updatedAt) }}</dd>
       </dl>
+      <div class="ticket-history">
+        <h4>操作历史</h4>
+        <p v-if="!history.length" class="empty">暂无状态变更</p>
+        <ul v-else>
+          <li v-for="item in history" :key="item.id">
+            <span>{{ item.fromStatus ? `${statusText(item.fromStatus)} → ${statusText(item.toStatus)}` : `创建为${statusText(item.toStatus)}` }}</span>
+            <small>{{ item.operatorNickname || '未知用户' }} · {{ formatTime(item.createdAt) }}</small>
+          </li>
+        </ul>
+      </div>
+      <div class="ticket-history">
+        <h4>负责人变更</h4>
+        <p v-if="!chat.transferLogs.length" class="empty">暂无负责人变更</p>
+        <ul v-else>
+          <li v-for="item in chat.transferLogs" :key="item.id">
+            <span>{{ item.sourceAgentNickname || '未知客服' }} → {{ item.targetAgentNickname || '未知客服' }}</span>
+            <small>{{ formatTime(item.createTime) }}<template v-if="item.reason"> · {{ item.reason }}</template></small>
+          </li>
+        </ul>
+      </div>
     </template>
 
     <template v-else-if="canEdit">
       <label>问题描述</label>
-      <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit placeholder="描述需要跟进的问题" />
+      <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit placeholder="描述需要跟进的问题" @input="markDirty" />
       <el-button type="primary" :loading="saving" class="action" @click="createTicket">创建工单</el-button>
     </template>
     <p v-else class="empty">该会话暂未创建工单</p>
@@ -176,6 +229,13 @@ label { display: block; margin: 8px 0 4px; color: var(--color-muted); font-size:
 .readonly-details dd { margin: 0; color: var(--color-ink); white-space: pre-wrap; word-break: break-word; }
 .message { margin: 8px 0 0; font-size: 12px; }
 .ticket-error .message { margin: 0 0 8px; }
+.stale-notice { margin-bottom: 8px; padding: 6px 8px; background: #fff7e6; color: var(--color-muted); font-size: 12px; }
+.ticket-history { margin-top: 12px; }
+.ticket-history h4 { margin: 0 0 6px; color: var(--color-ink); font-size: 12px; }
+.ticket-history ul { margin: 0; padding: 0; list-style: none; }
+.ticket-history li { padding: 5px 0; border-top: 1px solid var(--color-line); font-size: 12px; }
+.ticket-history li span, .ticket-history small { display: block; }
+.ticket-history small { margin-top: 2px; color: var(--color-faint); font-size: 11px; }
 .error { color: var(--color-danger); }
 .success { color: var(--color-success); }
 </style>

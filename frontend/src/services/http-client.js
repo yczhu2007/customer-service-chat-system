@@ -21,7 +21,9 @@ export async function request(path, options = {}) {
       await handleUnauthorized()
     }
     const body = await response.json().catch(() => null)
-    throw new Error(body?.message || `HTTP ${response.status}`)
+    const error = new Error(body?.message || `HTTP ${response.status}`)
+    error.status = response.status
+    throw error
   }
   return response.status === 204 ? null : response.json()
 }
