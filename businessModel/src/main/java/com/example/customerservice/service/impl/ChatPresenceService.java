@@ -315,11 +315,10 @@ public class ChatPresenceService implements ChatPresenceOperations {
                         );
 
 
-        boolean isAgent =
-                roleCodes != null &&
-                        roleCodes.contains(
-                                "AGENT"
-                        );
+        boolean isAgent = chatRedisRepository.sortedSetScore(
+                RedisConstants.AGENT_LOAD,
+                userId
+        ) != null;
         /* Stop new assignments before any session cleanup or reconnect grace handling. */
         if (isAgent) {
             chatRedisRepository.sortedSetRemove(
@@ -585,16 +584,6 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 wsSessionId
         );
 
-        Set<String> roleCodes = sysUserRoleMapper.findRoleCodesByUserId(userId);
-        if (roleCodes != null && roleCodes.contains("AGENT")) {
-            Long removed = chatRedisRepository.sortedSetRemove(
-                    RedisConstants.AGENT_RECONNECT_GRACE,
-                    userId
-            );
-            if (removed != null && removed > 0) {
-                callbacks().restoreAgentOnline(userId);
-            }
-        }
     }
 
     @Override

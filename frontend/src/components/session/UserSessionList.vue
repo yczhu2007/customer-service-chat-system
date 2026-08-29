@@ -1,26 +1,13 @@
 <script setup>
 import { onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, archiveStatusStyle, priorityLabel, statusLabel } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, formatListTime, priorityLabel, statusLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 
 /** Status CSS class */
 function statusClass(status) {
   return (status || '').toLowerCase()
-}
-
-/** Format datetime for display */
-function formatTime(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return ''
-  const now = new Date()
-  const isToday = d.toDateString() === now.toDateString()
-  if (isToday) {
-    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
 /** Truncate long text */
@@ -81,7 +68,7 @@ onMounted(() => {
       >
         <div class="item-header">
           <span class="session-title">{{ session.title || '会话' }}</span>
-          <span class="time">{{ formatTime(session.lastMessageTime || session.createTime) }}</span>
+          <span class="time">{{ formatListTime(session.lastMessageTime || session.createTime) }}</span>
         </div>
         <div class="item-body">
           <span class="last-msg">{{ truncate(preview(session.lastMessageContent)) || '暂无消息' }}</span>

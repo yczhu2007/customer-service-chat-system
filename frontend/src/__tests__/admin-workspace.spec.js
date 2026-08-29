@@ -1,5 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { ElMessageBox } from 'element-plus'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref, nextTick } from 'vue'
 
@@ -122,9 +123,9 @@ describe('ArchiveStatsPanel', () => {
     // Should show total
     expect(wrapper.text()).toContain('42')
     // Should show the status cards
-    expect(wrapper.text()).toContain('已完成')
+    expect(wrapper.text()).toContain('已解决')
     expect(wrapper.text()).toContain('待处理')
-    expect(wrapper.text()).toContain('搁置')
+    expect(wrapper.text()).toContain('暂停')
   })
 })
 
@@ -181,6 +182,25 @@ describe('SessionAuditPanel', () => {
     await nextTick()
 
     expect(wrapper.text()).toContain('暂无数据')
+  })
+
+  it('provides a top scrollbar that stays in sync with the session table', async () => {
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    const topScrollbar = wrapper.get('.table-top-scroll')
+    const table = wrapper.findComponent({ name: 'ElTable' })
+    const setScrollLeft = vi.spyOn(table.vm.$.exposed, 'setScrollLeft')
+
+    topScrollbar.element.scrollLeft = 120
+    await topScrollbar.trigger('scroll')
+    expect(setScrollLeft).toHaveBeenCalledWith(120)
+
+    table.vm.$emit('scroll', { scrollLeft: 72 })
+    await nextTick()
+    expect(topScrollbar.element.scrollLeft).toBe(72)
   })
 
   it('offers a refresh action that reloads the session management list', async () => {
@@ -261,6 +281,50 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('新咨询')
     expect(wrapper.text()).not.toContain('会话 ID')
     expect(wrapper.text()).toContain('user004')
+  })
+
+  it('keeps ticket actions in the scrollable table instead of a fixed overlay', async () => {
+    const { request } = await import('../services/http-client')
+    request.mockResolvedValueOnce({
+      data: {
+        records: [{
+          sessionId: 's1', title: '支付咨询', username: 'user004', agentUsername: 'agent001',
+          status: 'CLOSED', ticketNo: 'TK-00000125', ticketStatus: 'IN_PROGRESS', rating: 5,
+        }],
+        total: 1,
+      },
+    })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    expect(wrapper.text()).toContain('TK-00000125')
+    const actionColumn = wrapper.findAllComponents({ name: 'ElTableColumn' })
+      .find((column) => column.props('label') === '操作')
+    expect(actionColumn.props('fixed')).toBe(false)
+  })
+
+  it('offers an irreversible delete action for active and closed sessions', async () => {
+    const { request } = await import('../services/http-client')
+    request.mockResolvedValueOnce({
+      data: {
+        records: [
+          { sessionId: 's1', status: 'ACTIVE' },
+          { sessionId: 's2', status: 'CLOSED' },
+        ],
+        total: 2,
+      },
+    })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+
+    const deleteButtons = wrapper.findAll('button').filter((button) => button.text() === '删除会话')
+    expect(deleteButtons).toHaveLength(2)
+    expect(deleteButtons.every((button) => button.attributes('disabled') === undefined)).toBe(true)
   })
 
   it('searches sessions by ticket number and ticket status', async () => {
@@ -429,7 +493,8 @@ describe('RoleManagementPanel', () => {
     await nextTick()
 
     expect(findRolePermissions).not.toHaveBeenCalled()
-    expect(wrapper.text()).toContain('请选择需要维护的角色')
+    expect(wrapper.text()).not.toContain('请选择需要维护的角色')
+    expect(wrapper.text()).not.toContain('请先选择角色以查看/编辑其权限')
   })
 
   it('places role CRUD controls beside the selector and leaves only refresh in the header', async () => {
@@ -451,6 +516,13 @@ describe('RoleManagementPanel', () => {
 })
 
 describe('AdminMessageSearchPanel', () => {
+  it('does not render the removed helper text', async () => {
+    const AdminMessageSearchPanel = (await import('../components/admin/AdminMessageSearchPanel.vue')).default
+    const wrapper = mount(AdminMessageSearchPanel)
+
+    expect(wrapper.text()).not.toContain('在全部未撤回聊天消息中搜索')
+  })
+
   it('paginates search results and reloads the selected page', async () => {
     const { searchAdminMessages } = await import('../api/admin-api')
     searchAdminMessages.mockResolvedValue({
@@ -474,6 +546,52 @@ describe('AdminMessageSearchPanel', () => {
     pagination.vm.$emit('current-change', 2)
     await nextTick()
     expect(searchAdminMessages).toHaveBeenLastCalledWith({ keyword: '测试', pageNo: 2, pageSize: 20 })
+  })
+
+  it('formats message role and time in the shared display style', async () => {
+    const { searchAdminMessages } = await import('../api/admin-api')
+    searchAdminMessages.mockResolvedValueOnce({
+      data: {
+        records: [{
+          messageId: 'm1',
+          sessionTitle: '咨询',
+          content: '测试消息',
+          senderUsername: 'agent001',
+          senderRole: 'AGENT',
+          createTime: '2026-08-28T09:05:00',
+        }],
+        total: 1,
+      },
+    })
+    const AdminMessageSearchPanel = (await import('../components/admin/AdminMessageSearchPanel.vue')).default
+    const wrapper = mount(AdminMessageSearchPanel)
+
+    await wrapper.find('.el-input__inner').setValue('测试')
+    await wrapper.find('.el-button--primary').trigger('click')
+    await vi.dynamicImportSettled()
+    await nextTick()
+
+    expect(wrapper.text()).toContain('客服')
+    expect(wrapper.text()).toContain('2026-08-28 09:05')
+  })
+
+  it('uses the shared confirmation dialog before deleting a message', async () => {
+    const { searchAdminMessages } = await import('../api/admin-api')
+    searchAdminMessages.mockResolvedValueOnce({ data: { records: [{ messageId: 'm1', content: '测试消息' }], total: 1 } })
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue()
+    const AdminMessageSearchPanel = (await import('../components/admin/AdminMessageSearchPanel.vue')).default
+    const wrapper = mount(AdminMessageSearchPanel)
+
+    await wrapper.find('.el-input__inner').setValue('测试')
+    await wrapper.find('.el-button--primary').trigger('click')
+    await vi.dynamicImportSettled()
+    await nextTick()
+    await wrapper.findAll('button').find((button) => button.text() === '删除').trigger('click')
+
+    expect(confirm).toHaveBeenCalledWith('确定删除消息 m1 吗？', '删除消息', expect.objectContaining({
+      confirmButtonText: '确认删除', cancelButtonText: '取消', type: 'warning',
+    }))
+    confirm.mockRestore()
   })
 })
 

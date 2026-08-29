@@ -23,6 +23,7 @@ import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.service.ChatManagementQueryService;
 import com.example.customerservice.service.ChatSessionOperations;
+import com.example.customerservice.service.ChatSessionDeletionService;
 import com.example.customerservice.service.ChatSessionQueryService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -60,6 +61,9 @@ public class ChatManagementController {
 
     @Autowired
     private ChatSessionOperations sessionOperations;
+
+    @Autowired
+    private ChatSessionDeletionService sessionDeletionService;
 
     @Autowired
     private ChatSessionMapper sessionMapper;
@@ -141,7 +145,8 @@ public class ChatManagementController {
         if ("ACTIVE".equals(session.getStatus()) && session.getAgentId() != null) {
             sessionOperations.endSessionByAgent(sessionId, session.getAgentId());
         }
-        return Result.successMessage("会话已结束");
+        sessionDeletionService.deleteSession(sessionId);
+        return Result.successMessage("会话已永久删除");
     }
 
     private void requireSessionManagementPermission() {

@@ -1,6 +1,8 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { deleteDeadLetter, findDeadLetters, replayDeadLetter } from '../../api/admin-api'
+import { formatDateTime } from '../../constants/session-ui'
 
 const loading = ref(false)
 const error = ref(null)
@@ -52,16 +54,16 @@ async function executeReplay() {
 }
 
 async function removeDeadLetter(messageId) {
-  if (!window.confirm(`确定删除死信消息 ${messageId} 吗？`)) return
+  try {
+    await ElMessageBox.confirm(`确定删除死信消息 ${messageId} 吗？`, '删除死信消息', {
+      type: 'warning', confirmButtonText: '确认删除', cancelButtonText: '取消',
+    })
+  } catch { return }
   try {
     await deleteDeadLetter(messageId)
+    ElMessage.success('死信消息已删除')
     await loadDeadLetters()
   } catch (e) { error.value = e.message }
-}
-
-function formatDate(dt) {
-  if (!dt) return '-'
-  return new Date(dt).toLocaleString('zh-CN')
 }
 
 function prevPage() {
@@ -92,7 +94,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       <strong>提示：</strong>系统自动保留最近 30 天的死信消息，超过 30 天将自动清理。
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <el-table v-loading="loading" class="data-table" :data="deadLetters" row-key="messageId">
@@ -100,7 +102,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
           <template #default="{ row }"><span class="mono">{{ row.messageId }}</span></template>
         </el-table-column>
         <el-table-column label="失败时间" min-width="180">
-          <template #default="{ row }">{{ formatDate(row.failedAt) }}</template>
+          <template #default="{ row }">{{ formatDateTime(row.failedAt) }}</template>
         </el-table-column>
         <el-table-column label="载荷可用" width="110">
           <template #default="{ row }">
@@ -148,7 +150,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
         <div class="dialog-actions">
           <el-button class="btn" @click="showReplayConfirm = false">取消</el-button>
           <el-button class="btn btn-primary" :loading="replayLoading" @click="executeReplay">
-            {{ replayLoading ? '重放中...' : '确认重放' }}
+            {{ replayLoading ? '重放中…' : '确认重放' }}
           </el-button>
         </div>
       </template>

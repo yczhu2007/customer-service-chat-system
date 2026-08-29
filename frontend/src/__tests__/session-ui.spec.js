@@ -6,6 +6,7 @@ import {
   archiveStatusStyle,
   categoryStyle,
 } from '../constants/session-ui'
+import * as sessionUi from '../constants/session-ui'
 
 describe('session enum presentation', () => {
   it('keeps one frontend agent view list without the unread view', () => {
@@ -36,5 +37,11 @@ describe('session enum presentation', () => {
       .toBe(ARCHIVE_STATUS_OPTIONS.length)
     expect(new Set(CATEGORY_OPTIONS.map((option) => categoryStyle(option.code).color)).size)
       .toBe(CATEGORY_OPTIONS.length)
+  })
+
+  it('formats role and detail time values for every workspace', () => {
+    expect(sessionUi.roleLabel?.('AGENT')).toBe('客服')
+    expect(sessionUi.roleLabel?.('ADMIN')).toBe('管理员')
+    expect(sessionUi.formatDateTime?.('2026-08-28T09:05:00')).toBe('2026-08-28 09:05')
   })
 })

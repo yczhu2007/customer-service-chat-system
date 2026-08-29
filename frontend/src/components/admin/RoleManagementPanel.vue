@@ -266,7 +266,7 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
 
     <section class="role-management-section">
       <h3>选择角色</h3>
-      <div v-if="loading" class="loading">加载中...</div>
+      <div v-if="loading" class="loading">加载中…</div>
       <template v-else>
         <div class="role-management-toolbar">
           <el-select
@@ -290,7 +290,6 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
             <el-button class="btn btn-sm btn-danger" size="small" :disabled="!selectedRole" @click="confirmDeleteRole(selectedRole.id)">删除角色</el-button>
           </div>
         </div>
-        <p v-if="!selectedRole" class="hint">请选择需要维护的角色</p>
       </template>
     </section>
 
@@ -303,8 +302,7 @@ const permTotalPages = () => Math.max(1, Math.ceil(totalPermissions.value / perm
       <p v-if="selectedRoleId" class="hint">
         点击勾选为所选角色分配权限
       </p>
-      <p v-else class="hint">请先选择角色以查看/编辑其权限</p>
-      <div v-if="permissionsLoading" class="loading">加载中...</div>
+      <div v-if="permissionsLoading" class="loading">加载中…</div>
       <el-table v-else class="data-table" :data="permissions" row-key="id">
         <el-table-column label="✓" width="52">
           <template #default="{ row }">

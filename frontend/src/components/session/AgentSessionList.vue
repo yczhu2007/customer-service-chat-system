@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, priorityLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, formatListTime, priorityLabel, statusLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
@@ -14,19 +14,6 @@ function priorityClass(priority) {
   if (priority === 'HIGH') return 'priority-high'
   if (priority === 'NORMAL') return 'priority-normal'
   return 'priority-low'
-}
-
-/** Format relative or short time */
-function formatTime(ts) {
-  if (!ts) return ''
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return ''
-  const now = new Date()
-  const isToday = d.toDateString() === now.toDateString()
-  if (isToday) {
-    return d.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-  }
-  return d.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' })
 }
 
 function preview(content) {
@@ -74,9 +61,10 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
       >
         <div class="session-top">
           <span class="session-title">{{ s.title || '会话' }}</span>
-          <span class="session-time">{{ formatTime(s.lastMessageTime || s.createTime) }}</span>
+          <span class="session-time">{{ formatListTime(s.lastMessageTime || s.createTime) }}</span>
         </div>
         <div class="session-bottom">
+          <span v-if="s.status" class="session-status">{{ statusLabel(s.status) }}</span>
           <span v-if="s.priority" class="priority-tag" :class="priorityClass(s.priority)">
             {{ priorityLabel(s.priority) }}
           </span>
@@ -163,6 +151,7 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
   flex-wrap: wrap;
 }
 .priority-tag,
+.session-status,
 .category-tag,
 .archive-tag,
 .ticket-tag {
@@ -170,6 +159,7 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
   padding: 0.05rem 0.35rem;
   border-radius: 3px;
 }
+.session-status { background: #e7f4ee; color: #1f8a5f; }
 .ticket-tag { background: #eef0ff; color: #4f46a5; }
 .priority-urgent {
   background: #fee2e2;

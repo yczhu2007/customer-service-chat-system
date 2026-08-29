@@ -1,6 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mount } from '@vue/test-utils'
+import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import MessageComposer from '../components/chat/MessageComposer.vue'
@@ -248,6 +249,64 @@ describe('User Workspace', () => {
 
     expect(wrapper.find('.filter-row').exists()).toBe(false)
     expect(wrapper.find('select.archive-select').exists()).toBe(false)
+  })
+
+  it('uses the shared compact date format in the user session list', () => {
+    const chat = useChatStore()
+    chat.sessions = [{ sessionId: 's1', title: '历史会话', status: 'CLOSED', createTime: '2026-01-02T09:05:00' }]
+
+    const wrapper = mount(UserSessionList)
+
+    expect(wrapper.get('.time').text()).toBe('01-02')
+  })
+
+  it('uses the shared confirmation dialog before cancelling queue entry', async () => {
+    const chat = useChatStore()
+    chat.queueStatus = { myPosition: 1 }
+    chat.connectStomp = vi.fn()
+    chat.loadQueueStatus = vi.fn()
+    chat.loadSessions = vi.fn()
+    chat.cancelQueue = vi.fn(() => Promise.resolve())
+    const confirm = vi.spyOn(ElMessageBox, 'confirm').mockResolvedValue()
+    const UserWorkspaceView = (await import('../views/UserWorkspaceView.vue')).default
+    const wrapper = mount(UserWorkspaceView, {
+      global: { stubs: { ChatWindow: true, UserSessionList: true, SessionRatingForm: true, ConnectionStatus: true, SupportTicketPanel: true } },
+    })
+
+    await wrapper.get('.cancel-queue-btn').trigger('click')
+
+    expect(confirm).toHaveBeenCalledWith('确定取消排队吗？', '取消排队', expect.objectContaining({
+      confirmButtonText: '确认取消', cancelButtonText: '取消', type: 'warning',
+    }))
+    expect(chat.cancelQueue).toHaveBeenCalledOnce()
+    wrapper.unmount()
+    confirm.mockRestore()
+  })
+
+  it('keeps the ticket panel and rating form in an independent right sidebar', async () => {
+    const chat = useChatStore()
+    chat.connectStomp = vi.fn()
+    chat.loadQueueStatus = vi.fn()
+    chat.loadSessions = vi.fn()
+    chat.sessions = [{ sessionId: 's1', status: 'CLOSED' }]
+    chat.activeSessionId = 's1'
+    const UserWorkspaceView = (await import('../views/UserWorkspaceView.vue')).default
+    const wrapper = mount(UserWorkspaceView, {
+      global: {
+        stubs: {
+          ChatWindow: { template: '<div class="chat-window" />' },
+          UserSessionList: true,
+          SessionRatingForm: { template: '<section class="rating-form" />' },
+          ConnectionStatus: true,
+          SupportTicketPanel: { template: '<section class="ticket-panel" />' },
+        },
+      },
+    })
+
+    expect(wrapper.get('.center-panel > .user-chat-window').exists()).toBe(true)
+    expect(wrapper.get('.right-panel > .user-ticket-panel').exists()).toBe(true)
+    expect(wrapper.get('.right-panel > .user-rating-form').exists()).toBe(true)
+    wrapper.unmount()
   })
 
   it('uses one authoritative consultation state for idle, queued and active users', () => {

@@ -54,6 +54,12 @@ export const PRIORITY_LABELS = {
   URGENT: '紧急',
 }
 
+export const ROLE_LABELS = {
+  USER: '用户',
+  AGENT: '客服',
+  ADMIN: '管理员',
+}
+
 const TAG_LABELS = {
   vip: 'VIP',
   urgent: '紧急',
@@ -83,6 +89,30 @@ export function categoryLabel(category) {
 
 export function priorityLabel(priority) {
   return PRIORITY_LABELS[priority] || priority || ''
+}
+
+export function roleLabel(role) {
+  return ROLE_LABELS[role] || role || ''
+}
+
+export function formatDateTime(value) {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  const twoDigits = (number) => String(number).padStart(2, '0')
+  return `${date.getFullYear()}-${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())} ${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`
+}
+
+export function formatListTime(value) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  const now = new Date()
+  const twoDigits = (number) => String(number).padStart(2, '0')
+  if (date.toDateString() === now.toDateString()) {
+    return `${twoDigits(date.getHours())}:${twoDigits(date.getMinutes())}`
+  }
+  return `${twoDigits(date.getMonth() + 1)}-${twoDigits(date.getDate())}`
 }
 
 export function tagLabel(tag) {

@@ -226,7 +226,7 @@ const totalPages = () => Math.max(1, Math.ceil(total.value / pageSize.value))
       </div>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <el-table v-loading="loading" class="data-table" :data="users" row-key="id">

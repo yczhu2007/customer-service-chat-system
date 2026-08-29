@@ -90,7 +90,7 @@ async function handleRemove(agentLoginNumber) {
     <div v-if="actionSuccess" class="success-msg">{{ actionSuccess }}</div>
     <div v-if="actionError" class="error-msg">{{ actionError }}</div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <div v-if="agents.size === 0" class="empty">暂无 VIP 技能组客服</div>

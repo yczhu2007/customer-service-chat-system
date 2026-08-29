@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watch, onMounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { formatDateTime } from '../../constants/session-ui'
 
 const props = defineProps({
   sessionId: { type: String, required: true },
@@ -86,7 +87,7 @@ onMounted(() => {
         <el-rate :model-value="existingRating.rating" disabled text-color="#f59e0b" disabled-void-color="#d1d5db" />
       </div>
       <p v-if="existingRating.comment" class="rated-comment">{{ existingRating.comment }}</p>
-      <p class="rated-time">评价时间: {{ existingRating.createTime }}</p>
+      <p class="rated-time">评价时间：{{ formatDateTime(existingRating.createTime) }}</p>
     </div>
 
     <!-- Just submitted -->

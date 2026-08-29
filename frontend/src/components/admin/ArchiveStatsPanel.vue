@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { findArchiveStats } from '../../api/admin-api'
+import { archiveStatusLabel } from '../../constants/session-ui'
 
 const loading = ref(false)
 const error = ref(null)
@@ -22,10 +23,10 @@ async function loadStats() {
 onMounted(loadStats)
 
 const statusCards = [
-  { key: 'completed', label: '已完成 (COMPLETED)', color: '#238636' },
-  { key: 'pending', label: '待处理 (PENDING)', color: '#b7791f' },
-  { key: 'onHold', label: '搁置 (ON_HOLD)', color: '#4f6f9f' },
-  { key: 'other', label: '其他 (OTHER)', color: '#6b7280' },
+  { key: 'completed', status: 'COMPLETED', color: '#238636' },
+  { key: 'pending', status: 'PENDING', color: '#b7791f' },
+  { key: 'onHold', status: 'ON_HOLD', color: '#4f6f9f' },
+  { key: 'other', status: 'OTHER', color: '#6b7280' },
   { key: 'unarchived', label: '未归档', color: '#94a3b8' },
 ]
 
@@ -37,11 +38,11 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
     <div class="panel-header">
       <h2>归档统计</h2>
       <button class="btn" @click="loadStats" :disabled="loading">
-        {{ loading ? '刷新中...' : '刷新' }}
+        {{ loading ? '刷新中…' : '刷新' }}
       </button>
     </div>
 
-    <div v-if="loading && !stats" class="loading">加载中...</div>
+    <div v-if="loading && !stats" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else-if="stats">
       <div class="total-card">
@@ -58,7 +59,7 @@ const total = () => statusCards.reduce((sum, card) => sum + (stats.value?.[card.
         >
           <div class="card-body">
             <div class="card-count">{{ stats[card.key] ?? 0 }}</div>
-            <div class="card-label">{{ card.label }}</div>
+            <div class="card-label">{{ card.label || archiveStatusLabel(card.status) }}</div>
           </div>
         </div>
       </div>

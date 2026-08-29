@@ -2,7 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useAuthStore } from '../../stores/auth'
 import { useChatStore } from '../../stores/chat'
-import { categoryLabel, priorityLabel } from '../../constants/session-ui'
+import { categoryLabel, formatDateTime, priorityLabel } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const auth = useAuthStore()
@@ -34,14 +34,6 @@ const selectableStatuses = computed(() => {
   return statusOptions.filter((item) => allowed.has(item.value))
 })
 const history = computed(() => chat.activeSupportTicketHistory || [])
-
-function formatTime(value) {
-  if (!value) return '-'
-  const time = new Date(value)
-  return Number.isNaN(time.getTime()) ? '-' : time.toLocaleString('zh-CN', {
-    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit',
-  })
-}
 
 watch(ticket, (value) => {
   description.value = value?.description || ''
@@ -154,7 +146,7 @@ async function quickUpdate(nextStatus) {
         <el-button link type="primary" size="small" @click="refreshTicket">刷新</el-button>
       </div>
       <template v-if="canEdit">
-        <p class="timestamps">创建于 {{ formatTime(ticket.createdAt) }} · 更新于 {{ formatTime(ticket.updatedAt) }}</p>
+        <p class="timestamps">创建于 {{ formatDateTime(ticket.createdAt) }} · 更新于 {{ formatDateTime(ticket.updatedAt) }}</p>
         <label>工单状态</label>
         <el-select v-model="status" class="field" placeholder="选择" @change="markDirty">
           <el-option v-for="item in selectableStatuses" :key="item.value" :label="item.label" :value="item.value" />
@@ -178,7 +170,7 @@ async function quickUpdate(nextStatus) {
         <template v-if="ticket.agentNickname"><dt>负责客服</dt><dd>{{ ticket.agentNickname }}</dd></template>
         <dt>问题描述</dt><dd>{{ ticket.description }}</dd>
         <template v-if="ticket.resolution"><dt>处理结果</dt><dd>{{ ticket.resolution }}</dd></template>
-        <dt>更新时间</dt><dd>{{ formatTime(ticket.updatedAt) }}</dd>
+        <dt>更新时间</dt><dd>{{ formatDateTime(ticket.updatedAt) }}</dd>
       </dl>
       <div class="ticket-history">
         <h4>操作历史</h4>
@@ -186,7 +178,7 @@ async function quickUpdate(nextStatus) {
         <ul v-else>
           <li v-for="item in history" :key="item.id">
             <span>{{ item.fromStatus ? `${statusText(item.fromStatus)} → ${statusText(item.toStatus)}` : `创建为${statusText(item.toStatus)}` }}</span>
-            <small>{{ item.operatorNickname || '未知用户' }} · {{ formatTime(item.createdAt) }}</small>
+            <small>{{ item.operatorNickname || '未知用户' }} · {{ formatDateTime(item.createdAt) }}</small>
           </li>
         </ul>
       </div>
@@ -196,7 +188,7 @@ async function quickUpdate(nextStatus) {
         <ul v-else>
           <li v-for="item in chat.transferLogs" :key="item.id">
             <span>{{ item.sourceAgentNickname || '未知客服' }} → {{ item.targetAgentNickname || '未知客服' }}</span>
-            <small>{{ formatTime(item.createTime) }}<template v-if="item.reason"> · {{ item.reason }}</template></small>
+            <small>{{ formatDateTime(item.createTime) }}<template v-if="item.reason"> · {{ item.reason }}</template></small>
           </li>
         </ul>
       </div>

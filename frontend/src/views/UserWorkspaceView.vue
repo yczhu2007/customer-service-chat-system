@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
 import ChatWindow from '../components/chat/ChatWindow.vue'
@@ -42,7 +43,16 @@ function refreshQueue() {
 }
 
 async function cancelQueue() {
-  if (!inQueue.value || !window.confirm('确认取消排队吗？')) return
+  if (!inQueue.value) return
+  try {
+    await ElMessageBox.confirm('确定取消排队吗？', '取消排队', {
+      type: 'warning',
+      confirmButtonText: '确认取消',
+      cancelButtonText: '取消',
+    })
+  } catch {
+    return
+  }
   await chat.cancelQueue()
 }
 
@@ -107,16 +117,19 @@ onUnmounted(() => {
     </el-aside>
 
     <el-main class="center-panel">
-      <ChatWindow />
+      <ChatWindow class="user-chat-window" />
+    </el-main>
 
-      <SupportTicketPanel />
+    <el-aside class="right-panel">
+      <SupportTicketPanel class="user-ticket-panel" />
 
       <!-- Rating form (shown at bottom when session is closed) -->
       <SessionRatingForm
         v-if="showRating"
+        class="user-rating-form"
         :session-id="activeSession.sessionId"
       />
-    </el-main>
+    </el-aside>
   </el-container>
 </template>
 
@@ -212,6 +225,15 @@ onUnmounted(() => {
   flex-direction: column;
   min-width: 0;
   min-height: 0;
+}
+.right-panel {
+  width: 280px;
+  min-width: 240px;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-paper);
+  border-left: 1px solid var(--color-line);
+  overflow-y: auto;
 }
 .queue-notice { margin: .5rem 0 0; color: var(--color-muted); font-size: .8rem; line-height: 1.4; }
 </style>

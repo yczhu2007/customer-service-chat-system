@@ -178,9 +178,7 @@ public class ChatController {
 
         if (
                 roleCodes == null ||
-                        !roleCodes.contains("USER") ||
-                        roleCodes.contains("AGENT") ||
-                        roleCodes.contains("ADMIN")
+                        !roleCodes.contains("USER")
         ) {
             throw new IllegalArgumentException(
                     "只有普通用户可以发起咨询"

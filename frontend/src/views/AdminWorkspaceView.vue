@@ -118,6 +118,23 @@ function switchTab(key) {
 :deep(.data-table th) { color: var(--color-muted); font-size: 12px; font-weight: 600; }
 :deep(.data-table th), :deep(.data-table td) { border-bottom-color: var(--color-line); }
 :deep(.panel-header h2), :deep(.tab-content h2) { color: var(--color-ink); font-size: 19px; }
+:deep(.btn) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 32px;
+  padding: 0.4rem 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+:deep(.btn-sm) { min-height: 28px; padding: 0.25rem 0.5rem; }
+:deep(.panel-actions),
+:deep(.header-actions),
+:deep(.actions),
+:deep(.search-row),
+:deep(.user-query),
+:deep(.tag-input-row) { align-items: center; }
 :deep(.btn-primary) { border-color: var(--color-primary); background: var(--color-primary); color: #fff; }
 :deep(.btn-primary:hover:not(:disabled)) { border-color: var(--color-primary-hover); background: var(--color-primary-hover); color: #fff; }
 :deep(.btn-danger) { border-color: var(--color-danger); background: transparent; color: var(--color-danger); }

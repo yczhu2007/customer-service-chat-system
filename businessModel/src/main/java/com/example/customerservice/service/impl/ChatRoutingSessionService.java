@@ -396,7 +396,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     }
     @Override
     public String findIdleAgent(String userId) {
-        return findIdleAgent(userId, null);
+        return findIdleAgent(userId, userId);
     }
 
     String findIdleAgent(

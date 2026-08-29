@@ -29,7 +29,7 @@ onMounted(loadDashboard)
       <button class="btn refresh-dashboard" :disabled="loading" @click="loadDashboard">刷新</button>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
       <div class="summary-cards">

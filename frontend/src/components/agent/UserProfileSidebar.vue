@@ -1,24 +1,11 @@
 <script setup>
 import { computed } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { formatDateTime } from '../../constants/session-ui'
 
 const chat = useChatStore()
 
 const profile = computed(() => chat.activeUserProfile)
-
-/** Format datetime for display */
-function formatTime(ts) {
-  if (!ts) return '-'
-  const d = new Date(ts)
-  if (isNaN(d.getTime())) return '-'
-  return d.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-}
 
 /** VIP level badge */
 function vipBadge(level) {
@@ -62,7 +49,7 @@ function vipBadge(level) {
         </div>
         <div class="info-item">
           <span class="info-label">最近会话</span>
-          <span class="info-value">{{ formatTime(profile.lastSessionTime) }}</span>
+          <span class="info-value">{{ formatDateTime(profile.lastSessionTime) }}</span>
         </div>
       </div>
     </template>

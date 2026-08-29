@@ -1,1 +1,1 @@
-<template><p aria-live="polite">Loading…</p></template>
+<template><p aria-live="polite">加载中…</p></template>

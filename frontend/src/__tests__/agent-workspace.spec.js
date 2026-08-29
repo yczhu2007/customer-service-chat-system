@@ -350,6 +350,15 @@ describe('Chat Store - Agent Workspace', () => {
     expect(chat.loadAllRemainingAgentSessions).toHaveBeenCalledOnce()
   })
 
+  it('shows the shared session status label in the agent session list', () => {
+    const chat = useChatStore()
+    chat.sessions = [{ sessionId: 's1', title: '当前会话', status: 'ACTIVE' }]
+
+    const wrapper = mount(AgentSessionList)
+
+    expect(wrapper.get('.session-status').text()).toBe('进行中')
+  })
+
   it('refreshes both the current view sessions and all view counts from the sidebar button', async () => {
     const chat = useChatStore()
     chat.refreshAgentViews = vi.fn()

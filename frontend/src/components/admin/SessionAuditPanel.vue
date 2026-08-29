@@ -1,9 +1,10 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
 import { getSupportTicket } from '../../api/chat-api'
-import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, priorityLabel, statusLabel, tagLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, formatDateTime, priorityLabel, statusLabel, tagLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
 const loading = ref(false)
@@ -27,6 +28,10 @@ const ticketLoading = ref(false)
 const ticketError = ref(null)
 const selectedTicket = ref(null)
 const ticketSessionId = ref(null)
+const sessionTable = ref(null)
+const topTableScroll = ref(null)
+const tableScrollWidth = ref(0)
+let tableResizeObserver
 
 // Filters
 const filters = ref({
@@ -80,10 +85,37 @@ async function loadSessions() {
     error.value = e.message
   } finally {
     loading.value = false
+    await nextTick()
+    refreshTableScrollWidth()
+    observeTableSize()
   }
 }
 
 onMounted(loadSessions)
+onBeforeUnmount(() => tableResizeObserver?.disconnect())
+
+function refreshTableScrollWidth() {
+  const tableElement = sessionTable.value?.$el?.querySelector('.el-table__body')
+  tableScrollWidth.value = Math.max(tableElement?.scrollWidth ?? 0, tableElement?.clientWidth ?? 0, topTableScroll.value?.clientWidth ?? 0)
+}
+
+function observeTableSize() {
+  const tableElement = sessionTable.value?.$el
+  if (!tableElement || typeof ResizeObserver === 'undefined') return
+  tableResizeObserver?.disconnect()
+  tableResizeObserver = new ResizeObserver(refreshTableScrollWidth)
+  tableResizeObserver.observe(tableElement)
+}
+
+function syncTableScroll(event) {
+  sessionTable.value?.setScrollLeft(event.target.scrollLeft)
+}
+
+function syncTopScroll({ scrollLeft }) {
+  if (topTableScroll.value && topTableScroll.value.scrollLeft !== scrollLeft) {
+    topTableScroll.value.scrollLeft = scrollLeft
+  }
+}
 
 function applyFilters() {
   pageNo.value = 1
@@ -109,13 +141,6 @@ async function toggleTransferLogs(sessionId) {
     try { const result = await findTransferLogs(sessionId); transferLogs.value[sessionId] = result?.data || [] }
     catch (e) { error.value = e.message }
   }
-}
-
-function formatDate(dt) {
-  if (!dt) return '-'
-  const value = new Date(dt)
-  const pad = (number) => String(number).padStart(2, '0')
-  return `${value.getFullYear()}/${pad(value.getMonth() + 1)}/${pad(value.getDate())} ${pad(value.getHours())}:${pad(value.getMinutes())}`
 }
 
 function ratingStars(rating) {
@@ -171,10 +196,15 @@ async function saveSessionMetadata() {
   } catch (e) { formError.value = e.message } finally { saving.value = false }
 }
 
-async function endSession(row) {
-  if (!window.confirm(`确定结束会话 ${row.sessionId} 吗？`)) return
+async function deleteSession(row) {
+  try {
+    await ElMessageBox.confirm(`确定永久删除会话 ${row.sessionId} 吗？关联消息、工单、评价和附件将无法恢复。`, '删除会话', {
+      type: 'warning', confirmButtonText: '永久删除', cancelButtonText: '取消',
+    })
+  } catch { return }
   try {
     await deleteAdminSession(row.sessionId)
+    ElMessage.success('会话已永久删除')
     await loadSessions()
   } catch (e) { error.value = e.message }
 }
@@ -242,10 +272,13 @@ function removeTag(tag) {
       <button class="btn" @click="clearFilters">清空</button>
     </div>
 
-    <div v-if="loading" class="loading">加载中...</div>
+    <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>
     <template v-else>
-      <el-table v-loading="loading" class="data-table" :data="sessions" row-key="sessionId">
+      <div ref="topTableScroll" class="table-top-scroll" aria-label="会话表格横向滚动条" @scroll="syncTableScroll">
+        <div class="table-top-scroll-content" :style="{ width: `${tableScrollWidth}px` }"></div>
+      </div>
+      <el-table ref="sessionTable" v-loading="loading" class="data-table" :data="sessions" row-key="sessionId" @scroll="syncTopScroll">
         <el-table-column label="会话" min-width="170">
           <template #default="{ row }">{{ row.title || '新咨询' }}</template>
         </el-table-column>
@@ -265,10 +298,10 @@ function removeTag(tag) {
           <template #default="{ row }"><span class="rating-cell" :title="row.rating + '/5'">{{ ratingStars(row.rating) }}</span></template>
         </el-table-column>
         <el-table-column label="创建时间" min-width="145">
-          <template #default="{ row }">{{ formatDate(row.createTime) }}</template>
+          <template #default="{ row }">{{ formatDateTime(row.createTime) }}</template>
         </el-table-column>
         <el-table-column label="结束时间" min-width="145">
-          <template #default="{ row }">{{ formatDate(row.endTime) }}</template>
+          <template #default="{ row }">{{ formatDateTime(row.endTime) }}</template>
         </el-table-column>
         <el-table-column label="转接记录" min-width="170">
           <template #default="{ row }">
@@ -278,16 +311,16 @@ function removeTag(tag) {
             <div v-if="expandedSessionId === row.sessionId" class="transfer-details">
               <div v-if="!transferLogs[row.sessionId]?.length" class="empty">暂无转接记录</div>
               <div v-for="log in transferLogs[row.sessionId]" :key="log.id">
-                {{ log.sourceAgentNickname || '未知客服' }} → {{ log.targetAgentNickname || '未知客服' }}，{{ formatDate(log.createTime) }}
+                {{ log.sourceAgentNickname || '未知客服' }} → {{ log.targetAgentNickname || '未知客服' }}，{{ formatDateTime(log.createTime) }}
               </div>
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="250" fixed="right">
+        <el-table-column label="操作" min-width="250">
           <template #default="{ row }">
             <el-button class="open-ticket" size="small" @click="openTicket(row)">工单</el-button>
             <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
-            <el-button size="small" type="danger" :disabled="row.status !== 'ACTIVE'" @click="endSession(row)">结束会话</el-button>
+            <el-button size="small" type="danger" @click="deleteSession(row)">删除会话</el-button>
           </template>
         </el-table-column>
         <template #empty><div class="empty">暂无数据</div></template>
@@ -337,7 +370,7 @@ function removeTag(tag) {
           <dt>负责客服</dt><dd>{{ selectedTicket.agentNickname || '-' }}</dd>
           <dt>问题描述</dt><dd>{{ selectedTicket.description || '-' }}</dd>
           <template v-if="selectedTicket.resolution"><dt>处理结果</dt><dd>{{ selectedTicket.resolution }}</dd></template>
-          <dt>更新时间</dt><dd>{{ formatDate(selectedTicket.updatedAt) }}</dd>
+          <dt>更新时间</dt><dd>{{ formatDateTime(selectedTicket.updatedAt) }}</dd>
         </dl>
       </div>
     </el-dialog>
@@ -358,11 +391,11 @@ function removeTag(tag) {
 .tag-list { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .filters {
   display: flex;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 1rem;
   align-items: center;
-  overflow-x: auto;
+  overflow: visible;
   padding-bottom: 0.25rem;
 }
 .filters input,
@@ -377,7 +410,11 @@ function removeTag(tag) {
   border-radius: 4px;
   font-size: 0.9rem;
 }
-.date-field { min-width: 200px; }
+.user-login-number,
+.agent-login-number,
+.ticket-number { width: 150px; }
+.filters select { width: 130px; }
+.date-field { min-width: 0; width: 180px; }
 .rating-field { width: 92px; }
 .data-table {
   width: 100%;
@@ -431,6 +468,15 @@ function removeTag(tag) {
   color: #dc2626;
 }
 .data-table { width: 100%; }
+.table-top-scroll {
+  height: 14px;
+  margin-bottom: 0.35rem;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.table-top-scroll-content { height: 1px; }
+.table-top-scroll::-webkit-scrollbar { height: 8px; }
+.table-top-scroll::-webkit-scrollbar-thumb { border-radius: 4px; background: var(--color-line-strong); }
 .pagination {
   display: flex;
   justify-content: center;

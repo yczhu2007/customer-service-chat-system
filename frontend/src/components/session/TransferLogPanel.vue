@@ -1,11 +1,11 @@
 <script setup>
 import { watch } from 'vue'
 import { useChatStore } from '../../stores/chat'
+import { formatDateTime } from '../../constants/session-ui'
 
 const props = defineProps({ sessionId: { type: String, default: null } })
 const chat = useChatStore()
 watch(() => props.sessionId, (id) => chat.loadTransferLogs(id), { immediate: true })
-function formatTime(value) { return value ? new Date(value).toLocaleString('zh-CN') : '' }
 </script>
 <template>
   <section class="transfer-panel">
@@ -14,7 +14,7 @@ function formatTime(value) { return value ? new Date(value).toLocaleString('zh-C
     <div v-else-if="!chat.transferLogs.length" class="empty">暂无转接记录</div>
     <ul v-else><li v-for="log in chat.transferLogs" :key="log.id">
       <div>{{ log.sourceAgentNickname || '未知客服' }} → {{ log.targetAgentNickname || '未知客服' }}</div>
-      <small>{{ formatTime(log.createTime) }}<span v-if="log.reason"> · {{ log.reason }}</span></small>
+      <small>{{ formatDateTime(log.createTime) }}<span v-if="log.reason"> · {{ log.reason }}</span></small>
     </li></ul>
   </section>
 </template>
