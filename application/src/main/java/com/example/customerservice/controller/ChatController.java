@@ -98,6 +98,8 @@ public class ChatController {
     @Autowired
     private SimpMessagingTemplate messagingTemplate;
 
+    @Autowired
+    private HttpServletRequest httpServletRequest;
 
     @PostMapping("/login")
     public Result<LoginResponse> login(
@@ -439,23 +441,19 @@ public class ChatController {
     public Result<ChatSessionMetadataVO> getSessionMetadata(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        Set<String> roleCodes = currentUser.getRoleCodes();
         String actorId = currentUser.getUserId();
-        if (roleCodes != null && roleCodes.contains("ADMIN")) {
+        String workspaceRole = resolveWorkspaceRole("AGENT", "USER", "ADMIN");
+        if ("ADMIN".equals(workspaceRole)) {
             currentUser.requireRole("ADMIN");
             currentUser.requirePermission("chat:session:audit:view");
             return Result.success(
                     chatSessionQueryService.getSessionMetadata(actorId, true, sessionId)
             );
         }
-        if (roleCodes != null
-                && (roleCodes.contains("USER") || roleCodes.contains("AGENT"))) {
-            currentUser.requirePermission("chat:session:view-own");
-            return Result.success(
-                    chatSessionQueryService.getSessionMetadata(actorId, false, sessionId)
-            );
-        }
-        throw new IllegalArgumentException("只有普通用户、客服或管理员可以查看会话元数据");
+        currentUser.requirePermission("chat:session:view-own");
+        return Result.success(
+                chatSessionQueryService.getSessionMetadata(actorId, false, sessionId)
+        );
     }
 
     /** 客服更新自己参与会话的元数据。 */
@@ -464,10 +462,7 @@ public class ChatController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody ChatSessionMetadataUpdateDTO request
     ) {
-        Set<String> roleCodes = currentUser.getRoleCodes();
-        if (roleCodes != null && roleCodes.contains("ADMIN")) {
-            throw new IllegalArgumentException("管理员不能更新会话元数据");
-        }
+        resolveWorkspaceRole("AGENT");
         currentUser.requireRole("AGENT");
         currentUser.requirePermission("chat:session:metadata:update");
         return Result.success(
@@ -988,13 +983,29 @@ public class ChatController {
     }
 
     private SessionParticipantType resolveSessionParticipantType() {
+        return SessionParticipantType.valueOf(resolveWorkspaceRole("USER", "AGENT"));
+    }
+
+    private String resolveWorkspaceRole(String... allowedRoles) {
         Set<String> roleCodes = currentUser.getRoleCodes();
-        if (roleCodes.contains("AGENT")) {
-            return SessionParticipantType.AGENT;
+        String workspaceRole = httpServletRequest == null
+                ? null
+                : httpServletRequest.getHeader("X-Workspace-Role");
+        if (workspaceRole != null && !workspaceRole.isBlank()) {
+            for (String allowedRole : allowedRoles) {
+                if (allowedRole.equals(workspaceRole) && roleCodes != null && roleCodes.contains(workspaceRole)) {
+                    return workspaceRole;
+                }
+            }
+            throw new IllegalArgumentException("当前工作台角色无效");
         }
-        if (roleCodes.contains("USER")) {
-            return SessionParticipantType.USER;
+        if (roleCodes != null) {
+            for (String allowedRole : allowedRoles) {
+                if (roleCodes.contains(allowedRole)) {
+                    return allowedRole;
+                }
+            }
         }
-        throw new IllegalArgumentException("只有普通用户或客服可以查看自己的会话列表");
+        throw new IllegalArgumentException("当前工作台没有执行此操作所需角色");
     }
 }

@@ -149,6 +149,13 @@ export const updateSupportTicket = (ticketNo, data) =>
     body: JSON.stringify(data),
   })
 
+export const submitSupportTicketUserFeedback = (ticketNo, data) =>
+  request(`/chat/tickets/${encodeURIComponent(ticketNo)}/user-feedback`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+
 /**
  * Get session metadata (title, priority, category, tags).
  */

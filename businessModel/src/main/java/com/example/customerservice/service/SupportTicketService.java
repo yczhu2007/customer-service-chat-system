@@ -150,6 +150,31 @@ public class SupportTicketService {
         return view;
     }
 
+    @Transactional
+    public SupportTicketVO confirmResolution(String userId, String ticketNo, int version) {
+        SupportTicket ticket = requireResolvedTicketForUser(userId, ticketNo, version);
+        LocalDateTime now = LocalDateTime.now();
+        SupportTicket next = copyTicketForUpdate(ticket, ticket.getStatus(), ticket.getResolution(), ticket.getResolvedAt(), now, now);
+        updateByVersion(next, version);
+        ChatSession session = requireSession(ticket.getSessionId());
+        SupportTicketVO view = toView(next, session);
+        notifyAfterCommit(session, view, "TICKET_UPDATED");
+        return view;
+    }
+
+    @Transactional
+    public SupportTicketVO requestFurtherHandling(String userId, String ticketNo, int version) {
+        SupportTicket ticket = requireResolvedTicketForUser(userId, ticketNo, version);
+        LocalDateTime now = LocalDateTime.now();
+        SupportTicket next = copyTicketForUpdate(ticket, SupportTicketStatus.IN_PROGRESS.name(), ticket.getResolution(), null, null, now);
+        updateByVersion(next, version);
+        writeStatusHistory(ticket.getId(), userId, SupportTicketStatus.RESOLVED.name(), SupportTicketStatus.IN_PROGRESS.name(), now);
+        ChatSession session = requireSession(ticket.getSessionId());
+        SupportTicketVO view = toView(next, session);
+        notifyAfterCommit(session, view, "TICKET_UPDATED");
+        return view;
+    }
+
     public List<SupportTicketStatusHistoryVO> findHistoryBySessionId(
             String callerId,
             boolean administrator,
@@ -191,6 +216,61 @@ public class SupportTicketService {
             return;
         }
         throw new UnauthorizedException("只有当前负责客服可以操作工单");
+    }
+
+    private SupportTicket requireResolvedTicketForUser(String userId, String ticketNo, int version) {
+        SupportTicket ticket = ticketMapper.selectById(parseTicketNo(ticketNo));
+        if (ticket == null) {
+            throw new NotFoundException("工单不存在");
+        }
+        ChatSession session = requireSession(ticket.getSessionId());
+        if (!session.getUserId().equals(userId)) {
+            throw new UnauthorizedException("只有会话用户可以确认工单结果");
+        }
+        if (!ticket.getVersion().equals(version)) {
+            throw new BusinessStateException("工单已被其他操作修改，请刷新后重试");
+        }
+        if (parseStatus(ticket.getStatus()) != SupportTicketStatus.RESOLVED) {
+            throw new SupportTicketValidationException("只有已解决工单可以进行用户确认");
+        }
+        return ticket;
+    }
+
+    private SupportTicket copyTicketForUpdate(
+            SupportTicket ticket,
+            String status,
+            String resolution,
+            LocalDateTime resolvedAt,
+            LocalDateTime userConfirmedAt,
+            LocalDateTime updatedAt
+    ) {
+        SupportTicket next = new SupportTicket();
+        next.setId(ticket.getId());
+        next.setSessionId(ticket.getSessionId());
+        next.setStatus(status);
+        next.setDescription(ticket.getDescription());
+        next.setResolution(resolution);
+        next.setVersion(ticket.getVersion() + 1);
+        next.setCreatedAt(ticket.getCreatedAt());
+        next.setUpdatedAt(updatedAt);
+        next.setResolvedAt(resolvedAt);
+        next.setUserConfirmedAt(userConfirmedAt);
+        return next;
+    }
+
+    private void updateByVersion(SupportTicket ticket, int version) {
+        int updated = ticketMapper.update(
+                ticket,
+                Wrappers.<SupportTicket>lambdaUpdate()
+                        .set(SupportTicket::getResolution, ticket.getResolution())
+                        .set(SupportTicket::getResolvedAt, ticket.getResolvedAt())
+                        .set(SupportTicket::getUserConfirmedAt, ticket.getUserConfirmedAt())
+                        .eq(SupportTicket::getId, ticket.getId())
+                        .eq(SupportTicket::getVersion, version)
+        );
+        if (updated != 1) {
+            throw new BusinessStateException("工单已被其他操作修改，请刷新后重试");
+        }
     }
 
     private SupportTicketStatus parseStatus(String value) {
@@ -263,6 +343,7 @@ public class SupportTicketService {
         view.setCreatedAt(ticket.getCreatedAt());
         view.setUpdatedAt(ticket.getUpdatedAt());
         view.setResolvedAt(ticket.getResolvedAt());
+        view.setUserConfirmedAt(ticket.getUserConfirmedAt());
         view.setTitle(session.getTitle());
         view.setPriority(session.getPriority());
         view.setCategory(session.getCategory());

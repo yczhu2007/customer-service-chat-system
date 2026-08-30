@@ -28,6 +28,7 @@ const ticketLoading = ref(false)
 const ticketError = ref(null)
 const selectedTicket = ref(null)
 const ticketSessionId = ref(null)
+const focusedSessionId = ref(null)
 const sessionTable = ref(null)
 const topTableScroll = ref(null)
 const tableScrollWidth = ref(0)
@@ -42,6 +43,7 @@ const filters = ref({
   rating: '',
   ticketNo: '',
   ticketStatus: '',
+  hasTicket: false,
   from: '',
   to: '',
 })
@@ -75,6 +77,7 @@ async function loadSessions() {
     if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
     if (filters.value.ticketNo) qs.set('ticketNo', filters.value.ticketNo)
     if (filters.value.ticketStatus) qs.set('ticketStatus', filters.value.ticketStatus)
+    if (filters.value.hasTicket) qs.set('hasTicket', 'true')
     if (filters.value.from) qs.set('from', normalizeDateTime(filters.value.from))
     if (filters.value.to) qs.set('to', normalizeDateTime(filters.value.to))
 
@@ -123,7 +126,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', ticketNo: '', ticketStatus: '', from: '', to: '' }
+  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', ticketNo: '', ticketStatus: '', hasTicket: false, from: '', to: '' }
   pageNo.value = 1
   loadSessions()
 }
@@ -226,6 +229,26 @@ async function openTicket(row) {
   }
 }
 
+async function copyTicketNo() {
+  try {
+    await navigator.clipboard.writeText(selectedTicket.value.ticketNo)
+    ElMessage.success('工单编号已复制')
+  } catch {
+    ticketError.value = '复制工单编号失败'
+  }
+}
+
+async function locateTicketSession() {
+  showTicketDialog.value = false
+  focusedSessionId.value = ticketSessionId.value
+  await nextTick()
+  sessionTable.value?.$el?.querySelector('.focused-session-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+}
+
+function rowClassName({ row }) {
+  return row.sessionId === focusedSessionId.value ? 'focused-session-row' : ''
+}
+
 function addTag() {
   const tag = tagInput.value.trim()
   if (!tag || editForm.value.tags.includes(tag)) return
@@ -258,6 +281,7 @@ function removeTag(tag) {
         <option value="">全部工单状态</option>
         <option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :value="item.code">{{ item.label }}</option>
       </select>
+      <label class="only-ticket-filter"><input v-model="filters.hasTicket" class="only-ticket-sessions" type="checkbox" /> 仅有工单会话</label>
       <select v-model="filters.status" aria-label="Status">
         <option v-for="s in statusOptions" :key="s" :value="s">{{ s ? statusLabel(s) : '全部状态' }}</option>
       </select>
@@ -278,7 +302,7 @@ function removeTag(tag) {
       <div ref="topTableScroll" class="table-top-scroll" aria-label="会话表格横向滚动条" @scroll="syncTableScroll">
         <div class="table-top-scroll-content" :style="{ width: `${tableScrollWidth}px` }"></div>
       </div>
-      <el-table ref="sessionTable" v-loading="loading" class="data-table" :data="sessions" row-key="sessionId" @scroll="syncTopScroll">
+      <el-table ref="sessionTable" v-loading="loading" class="data-table" :data="sessions" row-key="sessionId" :row-class-name="rowClassName" @scroll="syncTopScroll">
         <el-table-column label="会话" min-width="170">
           <template #default="{ row }">{{ row.title || '新咨询' }}</template>
         </el-table-column>
@@ -364,7 +388,7 @@ function removeTag(tag) {
         <p v-if="ticketError" class="error">{{ ticketError }}</p>
         <p v-else-if="!ticketLoading && !selectedTicket" class="empty">该会话暂未创建工单</p>
         <dl v-else-if="selectedTicket">
-          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }}</dd>
+          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }} <el-button class="copy-ticket-no" link type="primary" size="small" @click="copyTicketNo">复制</el-button></dd>
           <dt>工单状态</dt><dd>{{ ticketStatusLabel(selectedTicket.status) }}</dd>
           <dt>会话标题</dt><dd>{{ selectedTicket.title || '新咨询' }}</dd>
           <dt>负责客服</dt><dd>{{ selectedTicket.agentNickname || '-' }}</dd>
@@ -373,6 +397,10 @@ function removeTag(tag) {
           <dt>更新时间</dt><dd>{{ formatDateTime(selectedTicket.updatedAt) }}</dd>
         </dl>
       </div>
+      <template #footer>
+        <el-button class="locate-ticket-session" @click="locateTicketSession">定位关联会话</el-button>
+        <el-button @click="showTicketDialog = false">关闭</el-button>
+      </template>
     </el-dialog>
   </section>
 </template>
@@ -398,6 +426,7 @@ function removeTag(tag) {
   overflow: visible;
   padding-bottom: 0.25rem;
 }
+
 .filters input,
 .filters select,
 .filters button {
@@ -414,6 +443,8 @@ function removeTag(tag) {
 .agent-login-number,
 .ticket-number { width: 150px; }
 .filters select { width: 130px; }
+.only-ticket-filter { display: inline-flex; align-items: center; gap: 4px; color: #4b5563; font-size: 0.85rem; white-space: nowrap; }
+.only-ticket-filter input { margin: 0; }
 .date-field { min-width: 0; width: 180px; }
 .rating-field { width: 92px; }
 .data-table {
@@ -484,6 +515,7 @@ function removeTag(tag) {
 }
 .data-table :deep(.el-table__header-wrapper th.el-table__cell) { padding: 0.5rem 0.75rem; background: #f9fafb; color: inherit; font-weight: 600; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell) { padding: 0.5rem 0.75rem; vertical-align: top; }
+.data-table :deep(.focused-session-row > td.el-table__cell) { background: #eff6ff; }
 .data-table :deep(.el-table__inner-wrapper::before) { background-color: #e5e7eb; }
 .status-cell { display: inline-block; white-space: nowrap; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell:nth-child(4)) { white-space: nowrap; }

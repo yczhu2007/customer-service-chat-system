@@ -20,7 +20,7 @@ const consultationButtonLabel = computed(() => {
   if (chat.consultationState === 'STARTING') return '正在提交…'
   if (chat.consultationState === 'QUEUED') return '排队中'
   if (chat.consultationState === 'ACTIVE') return '咨询进行中'
-  return chat.hasClosedConsultation ? '重新咨询' : '发起咨询'
+  return '发起咨询'
 })
 
 /** Queue status display */

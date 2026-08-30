@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useAuthStore } from '../../stores/auth'
 import { useChatStore } from '../../stores/chat'
 import { categoryLabel, formatDateTime, priorityLabel } from '../../constants/session-ui'
@@ -17,11 +18,16 @@ const description = ref('')
 const resolution = ref('')
 const status = ref('OPEN')
 const saving = ref(false)
+const feedbackSaving = ref(false)
 const errorMessage = ref('')
 const successMessage = ref('')
+const copied = ref(false)
+let copiedTimer
 
 const ticket = computed(() => chat.activeSupportTicket)
 const canEdit = computed(() => chat.activeSession?.agentId === auth.userId && auth.role === 'AGENT')
+const canUserRespond = computed(() => ticket.value?.status === 'RESOLVED' && chat.activeSession?.userId === auth.userId && auth.role === 'USER')
+const canConfirmResolution = computed(() => canUserRespond.value && !ticket.value?.userConfirmedAt)
 const statusLabel = computed(() => statusOptions.find((item) => item.value === ticket.value?.status)?.label || '未知状态')
 const quickStatuses = computed(() => ({
   OPEN: ['IN_PROGRESS', 'WAITING_USER', 'RESOLVED'],
@@ -124,6 +130,38 @@ async function quickUpdate(nextStatus) {
   markDirty()
   await updateTicket()
 }
+
+async function copyTicketNo() {
+  try {
+    await navigator.clipboard.writeText(ticket.value.ticketNo)
+    successMessage.value = '工单编号已复制'
+    copied.value = true
+    window.clearTimeout(copiedTimer)
+    copiedTimer = window.setTimeout(() => {
+      copied.value = false
+    }, 3000)
+    ElMessage.success('工单编号已复制')
+  } catch {
+    errorMessage.value = '复制工单编号失败'
+  }
+}
+
+onBeforeUnmount(() => {
+  window.clearTimeout(copiedTimer)
+})
+
+async function respondToResolution(action) {
+  feedbackSaving.value = true
+  errorMessage.value = ''
+  try {
+    await chat.respondToTicketResolution(ticket.value.ticketNo, action, ticket.value.version)
+    successMessage.value = action === 'CONFIRM' ? '已确认工单解决' : '已申请继续处理'
+  } catch (error) {
+    errorMessage.value = error.message || '提交工单反馈失败'
+  } finally {
+    feedbackSaving.value = false
+  }
+}
 </script>
 
 <template>
@@ -139,7 +177,11 @@ async function quickUpdate(nextStatus) {
     <template v-else-if="ticket">
       <div class="ticket-head">
         <strong>{{ ticket.ticketNo }}</strong>
-        <el-tag size="small" effect="plain">{{ statusLabel }}</el-tag>
+        <div class="ticket-head-actions">
+          <el-button class="copy-ticket-no" link type="primary" size="small" @click="copyTicketNo">复制工单号</el-button>
+          <span v-if="copied" class="copy-success" role="status">已复制</span>
+          <el-tag size="small" effect="plain">{{ statusLabel }}</el-tag>
+        </div>
       </div>
       <div v-if="chat.supportTicketStale" class="stale-notice">
         工单已有新更新，当前仍保留未保存内容。
@@ -160,7 +202,7 @@ async function quickUpdate(nextStatus) {
         <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit @input="markDirty" />
         <label>处理结果</label>
         <el-input v-model="resolution" class="field" type="textarea" :rows="2" maxlength="1000" show-word-limit placeholder="解决工单时必填" @input="markDirty" />
-        <el-button type="primary" :loading="saving" class="action" @click="updateTicket">更新工单</el-button>
+        <el-button type="primary" :loading="saving" class="action update-ticket" @click="updateTicket">更新工单</el-button>
       </template>
       <dl v-else class="readonly-details">
         <dt>会话标题</dt><dd>{{ ticket.title || '新咨询' }}</dd>
@@ -171,7 +213,12 @@ async function quickUpdate(nextStatus) {
         <dt>问题描述</dt><dd>{{ ticket.description }}</dd>
         <template v-if="ticket.resolution"><dt>处理结果</dt><dd>{{ ticket.resolution }}</dd></template>
         <dt>更新时间</dt><dd>{{ formatDateTime(ticket.updatedAt) }}</dd>
+        <template v-if="ticket.userConfirmedAt"><dt>用户确认</dt><dd>{{ formatDateTime(ticket.userConfirmedAt) }}</dd></template>
       </dl>
+      <div v-if="canUserRespond" class="user-ticket-actions">
+        <el-button v-if="canConfirmResolution" class="confirm-resolution" type="primary" size="small" :loading="feedbackSaving" @click="respondToResolution('CONFIRM')">确认已解决</el-button>
+        <el-button class="reopen-ticket" size="small" :loading="feedbackSaving" @click="respondToResolution('REOPEN')">申请继续处理</el-button>
+      </div>
       <div class="ticket-history">
         <h4>操作历史</h4>
         <p v-if="!history.length" class="empty">暂无状态变更</p>
@@ -197,7 +244,7 @@ async function quickUpdate(nextStatus) {
     <template v-else-if="canEdit">
       <label>问题描述</label>
       <el-input v-model="description" class="field" type="textarea" :rows="3" maxlength="1000" show-word-limit placeholder="描述需要跟进的问题" @input="markDirty" />
-      <el-button type="primary" :loading="saving" class="action" @click="createTicket">创建工单</el-button>
+      <el-button type="primary" :loading="saving" class="action create-ticket" @click="createTicket">创建工单</el-button>
     </template>
     <p v-else class="empty">该会话暂未创建工单</p>
 
@@ -211,11 +258,14 @@ async function quickUpdate(nextStatus) {
 h3 { margin: 0 0 8px; font-size: 13px; color: var(--color-ink); }
 label { display: block; margin: 8px 0 4px; color: var(--color-muted); font-size: 12px; }
 .empty { margin: 0; color: var(--color-faint); font-size: 12px; }
-.ticket-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+.ticket-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 12px; }
+.ticket-head-actions { display: flex; align-items: center; gap: 6px; }
+.copy-success { color: var(--color-success); font-size: 12px; white-space: nowrap; }
 .timestamps { margin: 0 0 8px; color: var(--color-faint); font-size: 11px; }
 .field { width: 100%; }
 .quick-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
 .action { width: 100%; margin-top: 10px; }
+.user-ticket-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .readonly-details { display: grid; grid-template-columns: 64px 1fr; gap: 7px 8px; margin: 0; font-size: 12px; }
 .readonly-details dt { color: var(--color-muted); }
 .readonly-details dd { margin: 0; color: var(--color-ink); white-space: pre-wrap; word-break: break-word; }

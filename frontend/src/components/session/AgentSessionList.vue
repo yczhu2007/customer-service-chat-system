@@ -43,7 +43,7 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
 <template>
   <div class="agent-session-list">
     <div v-if="chat.activeAgentView === 'MY_TICKETS'" class="ticket-filter">
-      <el-input v-model="ticketKeyword" class="ticket-keyword" placeholder="工单编号或会话标题" clearable @keyup.enter="searchTickets" />
+      <el-input v-model="ticketKeyword" class="ticket-keyword" placeholder="工单号、会话标题、问题或处理结果" clearable @keyup.enter="searchTickets" />
       <el-button class="ticket-search-btn" size="small" type="primary" @click="searchTickets">搜索</el-button>
       <el-select :model-value="chat.ticketStatusFilter" placeholder="全部工单状态" clearable @change="filterTickets">
         <el-option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :label="item.label" :value="item.code" />

@@ -309,6 +309,21 @@ describe('User Workspace', () => {
     wrapper.unmount()
   })
 
+  it('keeps the consultation action labeled as a new consultation when history is closed', async () => {
+    const chat = useChatStore()
+    chat.connectStomp = vi.fn()
+    chat.loadQueueStatus = vi.fn()
+    chat.loadSessions = vi.fn()
+    chat.sessions = [{ sessionId: 's1', status: 'CLOSED' }]
+    const UserWorkspaceView = (await import('../views/UserWorkspaceView.vue')).default
+    const wrapper = mount(UserWorkspaceView, {
+      global: { stubs: { ChatWindow: true, UserSessionList: true, SessionRatingForm: true, ConnectionStatus: true, SupportTicketPanel: true } },
+    })
+
+    expect(wrapper.get('.consult-btn').text()).toBe('发起咨询')
+    wrapper.unmount()
+  })
+
   it('uses one authoritative consultation state for idle, queued and active users', () => {
     const chat = useChatStore()
     expect(chat.consultationState).toBe('IDLE')

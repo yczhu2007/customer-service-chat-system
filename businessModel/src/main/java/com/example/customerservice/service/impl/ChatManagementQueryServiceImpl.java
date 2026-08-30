@@ -71,6 +71,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 null,
                 null,
                 null,
+                null,
                 0L,
                 DASHBOARD_SESSION_LIMIT
         );
@@ -211,6 +212,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
             Integer rating,
             String ticketNo,
             String ticketStatus,
+            Boolean hasTicket,
             LocalDateTime fromTime,
             LocalDateTime toTime,
             long pageNo,
@@ -239,6 +241,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 rating,
                 ticketId,
                 normalizedTicketStatus,
+                Boolean.TRUE.equals(hasTicket),
                 fromTime,
                 toTime
         );
@@ -253,6 +256,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                         rating,
                         ticketId,
                         normalizedTicketStatus,
+                        Boolean.TRUE.equals(hasTicket),
                         fromTime,
                         toTime,
                         (normalizedPageNo - 1) * normalizedPageSize,

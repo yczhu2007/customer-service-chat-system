@@ -15,6 +15,7 @@ export async function request(path, options = {}) {
   const auth = useAuthStore()
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+  if (auth.activeRole) headers['X-Workspace-Role'] = auth.activeRole
   const response = await fetch(path, { ...options, headers })
   if (!response.ok) {
     if (response.status === 401) {

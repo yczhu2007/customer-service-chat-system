@@ -15,6 +15,7 @@ public class SupportTicketVO implements Serializable {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime resolvedAt;
+    private LocalDateTime userConfirmedAt;
     private String title;
     private String priority;
     private String category;
@@ -38,6 +39,8 @@ public class SupportTicketVO implements Serializable {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public LocalDateTime getResolvedAt() { return resolvedAt; }
     public void setResolvedAt(LocalDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
+    public LocalDateTime getUserConfirmedAt() { return userConfirmedAt; }
+    public void setUserConfirmedAt(LocalDateTime userConfirmedAt) { this.userConfirmedAt = userConfirmedAt; }
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
     public String getPriority() { return priority; }

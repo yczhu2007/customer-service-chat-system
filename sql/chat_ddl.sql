@@ -125,6 +125,7 @@ CREATE TABLE IF NOT EXISTS support_ticket
     created_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '创建时间',
     updated_at  DATETIME(6)   NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6) COMMENT '更新时间',
     resolved_at DATETIME(6)   NULL COMMENT '解决时间',
+    user_confirmed_at DATETIME(6) NULL COMMENT '用户确认解决时间',
 
     PRIMARY KEY (id),
     UNIQUE KEY uk_support_ticket_session (session_id),

@@ -25,6 +25,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Validator;
 
 import java.security.Principal;
@@ -54,6 +55,7 @@ class ChatControllerTest {
     @Mock private Validator validator;
     @Mock private SysUserMapper sysUserMapper;
     @Mock private SysUserRoleMapper sysUserRoleMapper;
+    @Mock private HttpServletRequest httpServletRequest;
     @InjectMocks private ChatController controller;
 
     @Test
@@ -171,13 +173,13 @@ class ChatControllerTest {
     }
 
     @Test
-    void dualRoleSessionEndpointPrefersAgentScope() {
+    void dualRoleSessionEndpointUsesUserScopeByDefault() {
         PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
         when(currentUser.getRoleCodes()).thenReturn(Set.of("USER", "AGENT"));
         when(currentUser.getUserId()).thenReturn("UA001");
         when(chatSessionQueryService.findMySessions(
                 "UA001",
-                SessionParticipantType.AGENT,
+                SessionParticipantType.USER,
                 null,
                 null,
                 1,
@@ -188,7 +190,7 @@ class ChatControllerTest {
 
         verify(chatSessionQueryService).findMySessions(
                 "UA001",
-                SessionParticipantType.AGENT,
+                SessionParticipantType.USER,
                 null,
                 null,
                 1,
@@ -244,6 +246,22 @@ class ChatControllerTest {
     }
 
     @Test
+    void adminAgentReadsMetadataUsingAgentWorkspaceScope() {
+        ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN", "AGENT"));
+        when(currentUser.getUserId()).thenReturn("AA001");
+        when(httpServletRequest.getHeader("X-Workspace-Role")).thenReturn("AGENT");
+        when(chatSessionQueryService.getSessionMetadata("AA001", false, "S001"))
+                .thenReturn(metadata);
+
+        Result<ChatSessionMetadataVO> result = controller.getSessionMetadata("S001");
+
+        assertEquals(metadata, result.getData());
+        verify(currentUser).requirePermission("chat:session:view-own");
+        verify(chatSessionQueryService).getSessionMetadata("AA001", false, "S001");
+    }
+
+    @Test
     void unsupportedRoleCannotReadSessionMetadata() {
         when(currentUser.getRoleCodes()).thenReturn(Set.of("SUPERVISOR"));
 
@@ -259,6 +277,7 @@ class ChatControllerTest {
     void agentCanUpdateSessionMetadata() {
         ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
         ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
         when(currentUser.getUserId()).thenReturn("A001");
         when(chatSessionQueryService.updateSessionMetadata("A001", "S001", request))
                 .thenReturn(metadata);
@@ -270,6 +289,22 @@ class ChatControllerTest {
         verify(currentUser).requireRole("AGENT");
         verify(currentUser).requirePermission("chat:session:metadata:update");
         verify(chatSessionQueryService).updateSessionMetadata("A001", "S001", request);
+    }
+
+    @Test
+    void adminAgentCanUpdateSessionMetadataFromAgentWorkspace() {
+        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
+        ChatSessionMetadataVO metadata = metadata("S001");
+        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN", "AGENT"));
+        when(currentUser.getUserId()).thenReturn("AA001");
+        when(chatSessionQueryService.updateSessionMetadata("AA001", "S001", request))
+                .thenReturn(metadata);
+
+        Result<ChatSessionMetadataVO> result = controller.updateSessionMetadata("S001", request);
+
+        assertEquals(metadata, result.getData());
+        verify(currentUser).requireRole("AGENT");
+        verify(chatSessionQueryService).updateSessionMetadata("AA001", "S001", request);
     }
 
     @Test

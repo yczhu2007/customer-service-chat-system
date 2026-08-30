@@ -46,6 +46,7 @@ public interface ChatManagementQueryService {
             Integer rating,
             String ticketNo,
             String ticketStatus,
+            Boolean hasTicket,
             LocalDateTime fromTime,
             LocalDateTime toTime,
             long pageNo,

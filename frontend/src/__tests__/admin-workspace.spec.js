@@ -343,6 +343,20 @@ describe('SessionAuditPanel', () => {
     expect(requestUrl.searchParams.get('ticketStatus')).toBe('IN_PROGRESS')
   })
 
+  it('offers a quick filter that limits session management to sessions with tickets', async () => {
+    const { request } = await import('../services/http-client')
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel)
+    await nextTick()
+    request.mockClear()
+
+    await wrapper.get('input.only-ticket-sessions').setValue(true)
+    await wrapper.get('.btn-primary').trigger('click')
+
+    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+    expect(requestUrl.searchParams.get('hasTicket')).toBe('true')
+  })
+
   it('lets an administrator open a read-only ticket detail for a session', async () => {
     const { request } = await import('../services/http-client')
     request
@@ -596,9 +610,33 @@ describe('AdminMessageSearchPanel', () => {
 })
 
 describe('VipSkillPanel', () => {
+  it('replaces a VIP skill member by adding the new agent before removing the old one', async () => {
+    const { addVipSkill, findVipSkillAgents, removeVipSkill } = await import('../api/admin-api')
+    findVipSkillAgents
+      .mockResolvedValueOnce({ data: ['agent-old'] })
+      .mockResolvedValueOnce({ data: ['agent-new'] })
+    addVipSkill.mockResolvedValueOnce()
+    removeVipSkill.mockResolvedValueOnce()
+    const VipSkillPanel = (await import('../components/admin/VipSkillPanel.vue')).default
+    const wrapper = mount(VipSkillPanel)
+
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await nextTick()
+    await wrapper.find('button.edit-vip-agent').trigger('click')
+    await wrapper.find('.edit-vip-agent-input').setValue('agent-new')
+    await wrapper.find('button.save-vip-agent').trigger('click')
+    await nextTick()
+
+    expect(addVipSkill).toHaveBeenCalledWith('agent-new')
+    expect(removeVipSkill).toHaveBeenCalledWith('agent-old')
+    expect(addVipSkill.mock.invocationCallOrder[0]).toBeLessThan(removeVipSkill.mock.invocationCallOrder[0])
+    expect(wrapper.text()).toContain('已将 agent-old 替换为 agent-new')
+    expect(wrapper.text()).toContain('agent-new')
+  })
+
   it('paginates a large VIP agent list on the client', async () => {
     const { findVipSkillAgents } = await import('../api/admin-api')
-    findVipSkillAgents.mockResolvedValue({
+    findVipSkillAgents.mockReset().mockResolvedValue({
       data: Array.from({ length: 21 }, (_, index) => `agent-${index + 1}`),
     })
     const VipSkillPanel = (await import('../components/admin/VipSkillPanel.vue')).default

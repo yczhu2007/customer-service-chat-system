@@ -3,6 +3,7 @@ package com.example.customerservice.controller;
 import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
+import com.example.customerservice.dto.SupportTicketUserFeedbackDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.security.CurrentUser;
@@ -79,5 +80,17 @@ public class SupportTicketController {
         return Result.success(supportTicketService.updateTicket(
                 currentUser.getUserId(), ticketNo, request
         ));
+    }
+
+    @PostMapping("/tickets/{ticketNo}/user-feedback")
+    public Result<SupportTicketVO> submitUserFeedback(
+            @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
+            @Valid @RequestBody SupportTicketUserFeedbackDTO request
+    ) {
+        currentUser.requireRole("USER");
+        SupportTicketVO ticket = "CONFIRM".equals(request.getAction())
+                ? supportTicketService.confirmResolution(currentUser.getUserId(), ticketNo, request.getVersion())
+                : supportTicketService.requestFurtherHandling(currentUser.getUserId(), ticketNo, request.getVersion());
+        return Result.success(ticket);
     }
 }

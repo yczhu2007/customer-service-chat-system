@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { flushPromises, mount } from '@vue/test-utils'
+import { ElMessage } from 'element-plus'
 import { getSupportTicket, getSupportTicketHistory, createSupportTicket, updateSupportTicket } from '../api/chat-api'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
@@ -142,7 +143,7 @@ describe('会话关联工单', () => {
     chat.loadSupportTicket = vi.fn()
 
     const wrapper = mount(SupportTicketPanel)
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('button.update-ticket').trigger('click')
     await flushPromises()
 
     expect(chat.loadSupportTicket).not.toHaveBeenCalled()
@@ -163,7 +164,7 @@ describe('会话关联工单', () => {
     chat.loadTransferLogs = vi.fn()
 
     const wrapper = mount(SupportTicketPanel)
-    await wrapper.get('button').trigger('click')
+    await wrapper.get('button.update-ticket').trigger('click')
     await flushPromises()
 
     expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
@@ -197,7 +198,7 @@ describe('会话关联工单', () => {
     const panel = mount(SupportTicketPanel)
     await panel.get('textarea').setValue('重复创建')
 
-    await panel.get('button').trigger('click')
+    await panel.get('button.create-ticket').trigger('click')
     await flushPromises()
 
     expect(chat.loadSupportTicket).toHaveBeenCalledWith('session-1')
@@ -226,5 +227,57 @@ describe('会话关联工单', () => {
     expect(wrapper.text()).toContain('待处理 → 处理中')
     expect(wrapper.text()).toContain('负责人变更')
     expect(wrapper.text()).toContain('客服一 → 客服二')
+  })
+
+  it('lets a user confirm a resolved ticket or request further handling', async () => {
+    const chat = useChatStore()
+    const auth = useAuthStore()
+    auth.login({ token: 'test-token', userId: 'user-1', role: 'USER' })
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', userId: 'user-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'RESOLVED',
+      description: '支付失败', resolution: '已修复', version: 0,
+    }
+    chat.respondToTicketResolution = vi.fn().mockResolvedValue()
+
+    const wrapper = mount(SupportTicketPanel)
+    expect(wrapper.text()).toContain('确认已解决')
+    expect(wrapper.text()).toContain('申请继续处理')
+
+    await wrapper.get('button.confirm-resolution').trigger('click')
+    expect(chat.respondToTicketResolution).toHaveBeenCalledWith('TK-00000125', 'CONFIRM', 0)
+  })
+
+  it('offers a copy action for the displayed ticket number', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+
+    const wrapper = mount(SupportTicketPanel)
+    expect(wrapper.find('button.copy-ticket-no').exists()).toBe(true)
+  })
+
+  it('shows a global success message after copying a ticket number', async () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'IN_PROGRESS',
+      description: '支付失败', version: 0,
+    }
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockResolvedValue() } })
+    const success = vi.spyOn(ElMessage, 'success')
+
+    const wrapper = mount(SupportTicketPanel)
+    await wrapper.get('button.copy-ticket-no').trigger('click')
+    await flushPromises()
+
+    expect(success).toHaveBeenCalledWith('工单编号已复制')
+    expect(wrapper.get('.copy-success').text()).toBe('已复制')
   })
 })

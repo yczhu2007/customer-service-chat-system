@@ -207,6 +207,36 @@ class SupportTicketServiceTest {
     }
 
     @Test
+    void sessionUserCanConfirmAResolvedTicketAndRequestFurtherHandling() {
+        SupportTicket resolvedTicket = ticket("S001", "RESOLVED", 0);
+        resolvedTicket.setResolution("已修复");
+        when(ticketMapper.selectById(125L)).thenReturn(resolvedTicket);
+        when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));
+        when(userMapper.selectById("A001")).thenReturn(user("A001", "客服一"));
+        when(ticketMapper.update(any(SupportTicket.class), any())).thenReturn(1);
+
+        SupportTicketVO confirmed = service.confirmResolution("U001", "TK-00000125", 0);
+
+        assertEquals("RESOLVED", confirmed.getStatus());
+        org.junit.jupiter.api.Assertions.assertNotNull(confirmed.getUserConfirmedAt());
+
+        SupportTicket confirmedTicket = ticket("S001", "RESOLVED", 1);
+        confirmedTicket.setResolution("已修复");
+        confirmedTicket.setUserConfirmedAt(confirmed.getUserConfirmedAt());
+        when(ticketMapper.selectById(125L)).thenReturn(confirmedTicket);
+
+        SupportTicketVO reopened = service.requestFurtherHandling("U001", "TK-00000125", 1);
+
+        assertEquals("IN_PROGRESS", reopened.getStatus());
+        assertEquals("已修复", reopened.getResolution());
+        assertNull(reopened.getUserConfirmedAt());
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.<SupportTicketStatusHistory>argThat(history ->
+                "RESOLVED".equals(history.getFromStatus()) && "IN_PROGRESS".equals(history.getToStatus())
+                        && "U001".equals(history.getOperatorId())
+        ));
+    }
+
+    @Test
     void statusChangeWritesOneHistoryRecordAndSessionParticipantCanReadIt() {
         when(ticketMapper.selectById(125L)).thenReturn(ticket("S001", "OPEN", 0));
         when(sessionMapper.selectById("S001")).thenReturn(session("S001", "U001", "A001"));

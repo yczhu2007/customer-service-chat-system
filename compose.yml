@@ -1,4 +1,19 @@
 services:
+  redis:
+    image: redis:8-alpine
+    container_name: customer-service-chat-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - customer_service_chat_redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
   minio:
     image: minio/minio:RELEASE.2025-06-13T11-33-47Z
     container_name: customer-service-chat-minio
@@ -19,4 +34,6 @@ services:
       retries: 20
 
 volumes:
+  customer_service_chat_redis_data:
+    name: customer-service-chat-redis-data
   customer_service_chat_minio_data:

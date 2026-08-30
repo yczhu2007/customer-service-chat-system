@@ -21,6 +21,7 @@ import {
   getSupportTicketHistory,
   createSupportTicket,
   updateSupportTicket,
+  submitSupportTicketUserFeedback,
 } from '../api/chat-api'
 import { createStompClient } from '../services/stomp-client'
 import { handleUnauthorized } from '../services/http-client'
@@ -139,9 +140,6 @@ export const useChatStore = defineStore('chat', {
     },
     canStartConsultation() {
       return this.consultationState === 'IDLE'
-    },
-    hasClosedConsultation(state) {
-      return state.sessions.some((session) => session.status === 'CLOSED')
     },
   },
 
@@ -721,6 +719,21 @@ export const useChatStore = defineStore('chat', {
     async updateSupportTicket(ticketNo, data) {
       try {
         const result = await updateSupportTicket(ticketNo, data)
+        const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        if (this.activeSessionId === ticket?.sessionId) {
+          this.activeSupportTicket = ticket
+          this.loadSupportTicketHistory(ticket.sessionId)
+        }
+        return ticket
+      } catch (e) {
+        this.error = e.message
+        throw e
+      }
+    },
+
+    async respondToTicketResolution(ticketNo, action, version) {
+      try {
+        const result = await submitSupportTicketUserFeedback(ticketNo, { action, version })
         const ticket = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
         if (this.activeSessionId === ticket?.sessionId) {
           this.activeSupportTicket = ticket

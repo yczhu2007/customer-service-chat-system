@@ -340,6 +340,21 @@ class AgentSessionViewTest {
     }
 
     @Test
+    void ticketSearchAlsoMatchesProblemDescriptionAndResolution() throws IOException {
+        BoundSql boundSql = mappedSql(
+                "findAgentViewSessions",
+                new HashMap<>(Map.of(
+                        "agentId", "A001", "viewCode", "MY_TICKETS", "ticketStatus", "",
+                        "ticketKeyword", "退款", "offset", 0L, "pageSize", 20L
+                ))
+        );
+        String sql = normalizeSql(boundSql.getSql());
+
+        assertTrue(sql.contains("LOCATE(?, COALESCE(TICKET.DESCRIPTION, '')) > 0"), sql);
+        assertTrue(sql.contains("LOCATE(?, COALESCE(TICKET.RESOLUTION, '')) > 0"), sql);
+    }
+
+    @Test
     void sessionUserCanReadExistingTransferLogs() {
         ChatSession session = new ChatSession();
         session.setId("S001");

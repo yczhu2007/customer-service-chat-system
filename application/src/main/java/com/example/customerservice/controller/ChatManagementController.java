@@ -258,6 +258,7 @@ public class ChatManagementController {
             @RequestParam(required = false) Integer rating,
             @RequestParam(required = false) String ticketNo,
             @RequestParam(required = false) String ticketStatus,
+            @RequestParam(required = false) Boolean hasTicket,
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime from,
@@ -278,6 +279,7 @@ public class ChatManagementController {
                         rating,
                         ticketNo,
                         ticketStatus,
+                        hasTicket,
                         from,
                         to,
                         pageNo,

@@ -9,6 +9,8 @@ const newAgentLoginNumber = ref('')
 const actionLoading = ref(false)
 const actionError = ref(null)
 const actionSuccess = ref(null)
+const editingAgentLoginNumber = ref('')
+const editAgentLoginNumber = ref('')
 const pageNo = ref(1)
 const pageSize = ref(20)
 const agentList = computed(() => Array.from(agents.value))
@@ -66,6 +68,42 @@ async function handleRemove(agentLoginNumber) {
     actionLoading.value = false
   }
 }
+
+function beginEdit(agentLoginNumber) {
+  editingAgentLoginNumber.value = agentLoginNumber
+  editAgentLoginNumber.value = agentLoginNumber
+  actionError.value = null
+  actionSuccess.value = null
+}
+
+function cancelEdit() {
+  editingAgentLoginNumber.value = ''
+  editAgentLoginNumber.value = ''
+}
+
+async function handleUpdate() {
+  const previousLoginNumber = editingAgentLoginNumber.value
+  const nextLoginNumber = editAgentLoginNumber.value.trim()
+  if (!previousLoginNumber || !nextLoginNumber) return
+  if (previousLoginNumber === nextLoginNumber) {
+    cancelEdit()
+    return
+  }
+  actionLoading.value = true
+  actionError.value = null
+  actionSuccess.value = null
+  try {
+    await addVipSkill(nextLoginNumber)
+    await removeVipSkill(previousLoginNumber)
+    actionSuccess.value = `已将 ${previousLoginNumber} 替换为 ${nextLoginNumber}`
+    cancelEdit()
+    await loadAgents()
+  } catch (e) {
+    actionError.value = e.message
+  } finally {
+    actionLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -96,14 +134,16 @@ async function handleRemove(agentLoginNumber) {
       <div v-if="agents.size === 0" class="empty">暂无 VIP 技能组客服</div>
       <div v-else class="agent-list">
         <div v-for="agentLoginNumber in visibleAgents" :key="agentLoginNumber" class="agent-card">
-          <span class="agent-id">{{ agentLoginNumber }}</span>
-          <button
-            class="btn btn-sm btn-danger"
-            :disabled="actionLoading"
-            @click="handleRemove(agentLoginNumber)"
-          >
-            移除
-          </button>
+          <template v-if="editingAgentLoginNumber === agentLoginNumber">
+            <input v-model="editAgentLoginNumber" class="edit-vip-agent-input" maxlength="64" aria-label="新的客服登录编号" @keyup.enter="handleUpdate" />
+            <button class="btn btn-sm btn-primary save-vip-agent" :disabled="actionLoading || !editAgentLoginNumber.trim()" @click="handleUpdate">保存</button>
+            <button class="btn btn-sm" :disabled="actionLoading" @click="cancelEdit">取消</button>
+          </template>
+          <template v-else>
+            <span class="agent-id">{{ agentLoginNumber }}</span>
+            <button class="btn btn-sm edit-vip-agent" :disabled="actionLoading" @click="beginEdit(agentLoginNumber)">编辑</button>
+            <button class="btn btn-sm btn-danger" :disabled="actionLoading" @click="handleRemove(agentLoginNumber)">移除</button>
+          </template>
         </div>
       </div>
       <el-pagination
@@ -155,6 +195,13 @@ async function handleRemove(agentLoginNumber) {
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   padding: 0.75rem 1rem;
+}
+.edit-vip-agent-input {
+  min-width: 160px;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font: inherit;
 }
 .pagination {
   display: flex;

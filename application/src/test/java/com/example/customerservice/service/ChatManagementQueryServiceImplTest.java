@@ -105,7 +105,7 @@ class ChatManagementQueryServiceImplTest {
     void adminSessionSearchUsesBoundedPagination() {
         when(managementMapper.countSessionSummaries(
                 eq("U001"), eq("A001"), eq("CLOSED"),
-                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(null), eq(null)))
+                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(false), eq(null), eq(null)))
                 .thenReturn(1L);
         SessionSummaryVO summary = new SessionSummaryVO(
                 "S001", "U001", "user001", "A001", "agent001",
@@ -114,12 +114,12 @@ class ChatManagementQueryServiceImplTest {
         );
         when(managementMapper.findSessionSummaries(
                 eq("U001"), eq("A001"), eq("CLOSED"),
-                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(null), eq(null),
+                eq("COMPLETED"), eq(5), eq(1L), eq("RESOLVED"), eq(false), eq(null), eq(null),
                 eq(0L), eq(100L)))
                 .thenReturn(List.of(summary));
 
         PageResult<SessionSummaryVO> result = service.searchSessions(
-                "U001", "A001", "CLOSED", "COMPLETED", 5, "TK-00000001", "RESOLVED",
+                "U001", "A001", "CLOSED", "COMPLETED", 5, "TK-00000001", "RESOLVED", false,
                 null, null, 0, 500
         );
 
@@ -155,7 +155,7 @@ class ChatManagementQueryServiceImplTest {
                 service.searchSessions(
                         null, null, null, null, 6,
                         null, null,
-                        null, null, 1, 20
+                        false, null, null, 1, 20
                 ));
         LocalDateTime now = LocalDateTime.now();
         assertThrows(IllegalArgumentException.class, () ->

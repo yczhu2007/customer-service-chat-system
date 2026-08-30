@@ -128,6 +128,9 @@
             <if test="ticketStatus != null and ticketStatus != ''">
                 AND ticket.status = #{ticketStatus}
             </if>
+            <if test="hasTicket != null and hasTicket">
+                AND ticket.id IS NOT NULL
+            </if>
             <if test="fromTime != null">
                 AND session.create_time &gt;= #{fromTime}
             </if>
@@ -367,6 +370,8 @@
             AND (
                 LOCATE(#{ticketKeyword}, CONCAT('TK-', LPAD(ticket.id, 8, '0'))) &gt; 0
                 OR LOCATE(#{ticketKeyword}, COALESCE(session.title, '')) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(ticket.description, '')) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(ticket.resolution, '')) &gt; 0
             )
         </if>
     </select>
@@ -407,6 +412,8 @@
             AND (
                 LOCATE(#{ticketKeyword}, CONCAT('TK-', LPAD(ticket.id, 8, '0'))) &gt; 0
                 OR LOCATE(#{ticketKeyword}, COALESCE(session.title, '')) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(ticket.description, '')) &gt; 0
+                OR LOCATE(#{ticketKeyword}, COALESCE(ticket.resolution, '')) &gt; 0
             )
         </if>
         <choose>

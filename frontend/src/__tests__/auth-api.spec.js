@@ -31,6 +31,17 @@ describe('authentication API', () => {
     }))
   })
 
+  it('sends the active workspace role with authenticated requests', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 'session-token', userId: 'user-1', roles: ['USER', 'AGENT'], activeRole: 'USER' })
+
+    await getProfile()
+
+    expect(fetch).toHaveBeenCalledWith('/account/profile', expect.objectContaining({
+      headers: expect.objectContaining({ 'X-Workspace-Role': 'USER' }),
+    }))
+  })
+
   it('supports account registration and password recovery endpoints', async () => {
     await register({ username: 'new_user', password: 'password123' })
     await resetPassword({ username: 'new_user', recoveryCode: '1111-2222-3333-4444', newPassword: 'password123' })

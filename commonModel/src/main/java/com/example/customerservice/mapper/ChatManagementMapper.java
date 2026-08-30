@@ -61,6 +61,7 @@ public interface ChatManagementMapper {
             @Param("rating") Integer rating,
             @Param("ticketId") Long ticketId,
             @Param("ticketStatus") String ticketStatus,
+            @Param("hasTicket") Boolean hasTicket,
             @Param("fromTime") LocalDateTime fromTime,
             @Param("toTime") LocalDateTime toTime
     );
@@ -73,6 +74,7 @@ public interface ChatManagementMapper {
             @Param("rating") Integer rating,
             @Param("ticketId") Long ticketId,
             @Param("ticketStatus") String ticketStatus,
+            @Param("hasTicket") Boolean hasTicket,
             @Param("fromTime") LocalDateTime fromTime,
             @Param("toTime") LocalDateTime toTime,
             @Param("offset") long offset,

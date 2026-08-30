@@ -18,6 +18,7 @@ public class SupportTicket {
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime resolvedAt;
+    private LocalDateTime userConfirmedAt;
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -37,4 +38,6 @@ public class SupportTicket {
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
     public LocalDateTime getResolvedAt() { return resolvedAt; }
     public void setResolvedAt(LocalDateTime resolvedAt) { this.resolvedAt = resolvedAt; }
+    public LocalDateTime getUserConfirmedAt() { return userConfirmedAt; }
+    public void setUserConfirmedAt(LocalDateTime userConfirmedAt) { this.userConfirmedAt = userConfirmedAt; }
 }
