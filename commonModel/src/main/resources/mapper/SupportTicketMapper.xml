@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.example.customerservice.mapper.SupportTicketMapper">
+    <sql id="adminTicketFrom">
+        FROM support_ticket t
+        INNER JOIN chat_session s ON s.id = t.session_id
+        INNER JOIN sys_user u ON u.id = s.user_id
+        LEFT JOIN sys_user a ON a.id = s.agent_id
+    </sql>
+
+    <sql id="adminTicketWhere">
+        <where>
+            <if test="query.keyword != null">
+                AND (
+                    CONCAT('TK-', LPAD(t.id, 8, '0')) LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR s.title LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR t.description LIKE CONCAT('%', #{query.keyword}, '%')
+                    OR t.resolution LIKE CONCAT('%', #{query.keyword}, '%')
+                )
+            </if>
+            <if test="query.status != null">AND t.status = #{query.status}</if>
+            <if test="query.priority != null">AND s.priority = #{query.priority}</if>
+            <if test="query.category != null">AND s.category = #{query.category}</if>
+            <if test="query.agentKeyword != null">
+                AND (a.username LIKE CONCAT('%', #{query.agentKeyword}, '%') OR a.nickname LIKE CONCAT('%', #{query.agentKeyword}, '%'))
+            </if>
+            <if test="query.createdFrom != null">AND t.created_at <![CDATA[>=]]> #{query.createdFrom}</if>
+            <if test="query.createdTo != null">AND t.created_at <![CDATA[<=]]> #{query.createdTo}</if>
+        </where>
+    </sql>
+
+    <select id="countAdminTickets" resultType="long">
+        SELECT COUNT(*)
+        <include refid="adminTicketFrom" />
+        <include refid="adminTicketWhere" />
+    </select>
+
+    <select id="findAdminTickets" resultType="com.example.customerservice.dto.AdminSupportTicketListItemVO">
+        SELECT
+            CONCAT('TK-', LPAD(t.id, 8, '0')) AS ticket_no,
+            t.session_id,
+            t.status,
+            s.priority,
+            s.category,
+            s.title,
+            COALESCE(NULLIF(u.nickname, ''), u.username) AS user_nickname,
+            COALESCE(NULLIF(a.nickname, ''), a.username) AS agent_nickname,
+            t.created_at,
+            t.updated_at
+        <include refid="adminTicketFrom" />
+        <include refid="adminTicketWhere" />
+        ORDER BY t.updated_at DESC, t.id DESC
+        LIMIT #{offset}, #{pageSize}
+    </select>
+
+    <select id="findAdminTicketStatusCounts" resultType="com.example.customerservice.dto.SupportTicketStatusCountVO">
+        SELECT t.status, COUNT(*) AS count
+        <include refid="adminTicketFrom" />
+        <include refid="adminTicketWhere" />
+        GROUP BY t.status
+    </select>
+</mapper>

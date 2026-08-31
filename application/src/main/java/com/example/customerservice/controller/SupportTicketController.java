@@ -2,6 +2,9 @@ package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
+import com.example.customerservice.dto.AdminSupportTicketListItemVO;
+import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketUserFeedbackDTO;
 import com.example.customerservice.dto.SupportTicketVO;
@@ -95,6 +98,22 @@ public class SupportTicketController {
     ) {
         return Result.success(supportTicketService.findHistoryPageBySessionId(
                 currentUser.getUserId(), isAdministratorWorkspace(), sessionId, pageNo, pageSize));
+    }
+
+    @GetMapping("/admin/tickets")
+    public Result<PageResult<AdminSupportTicketListItemVO>> findAdminTickets(
+            @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
+    ) {
+        currentUser.requireRole("ADMIN");
+        return Result.success(supportTicketService.findAdminTickets(query));
+    }
+
+    @GetMapping("/admin/tickets/status-counts")
+    public Result<List<SupportTicketStatusCountVO>> findAdminTicketStatusCounts(
+            @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
+    ) {
+        currentUser.requireRole("ADMIN");
+        return Result.success(supportTicketService.findAdminTicketStatusCounts(query));
     }
 
     @PostMapping("/tickets/{ticketNo}/user-feedback")

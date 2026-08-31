@@ -7,6 +7,9 @@ import com.example.customerservice.domain.SupportTicket;
 import com.example.customerservice.domain.SupportTicketStatusHistory;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
+import com.example.customerservice.dto.AdminSupportTicketListItemVO;
+import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
@@ -64,6 +67,24 @@ public class SupportTicketService {
                         .eq(SupportTicket::getSessionId, sessionId)
         );
         return ticket == null ? null : toView(ticket, session);
+    }
+
+    public PageResult<AdminSupportTicketListItemVO> findAdminTickets(AdminSupportTicketQueryDTO query) {
+        AdminSupportTicketQueryDTO normalized = normalizeAdminTicketQuery(query);
+        long total = ticketMapper.countAdminTickets(normalized);
+        long pages = total == 0 ? 0 : (total + normalized.getPageSize() - 1) / normalized.getPageSize();
+        List<AdminSupportTicketListItemVO> records = total == 0 ? List.of() : ticketMapper.findAdminTickets(
+                normalized,
+                (normalized.getPageNo() - 1) * normalized.getPageSize(),
+                normalized.getPageSize()
+        );
+        return new PageResult<>(normalized.getPageNo(), normalized.getPageSize(), total, pages,
+                records == null ? List.of() : List.copyOf(records));
+    }
+
+    public List<SupportTicketStatusCountVO> findAdminTicketStatusCounts(AdminSupportTicketQueryDTO query) {
+        List<SupportTicketStatusCountVO> counts = ticketMapper.findAdminTicketStatusCounts(normalizeAdminTicketQuery(query));
+        return counts == null ? List.of() : List.copyOf(counts);
     }
 
     @Transactional
@@ -227,6 +248,26 @@ public class SupportTicketService {
             throw new NotFoundException("会话不存在");
         }
         return session;
+    }
+
+    private AdminSupportTicketQueryDTO normalizeAdminTicketQuery(AdminSupportTicketQueryDTO query) {
+        AdminSupportTicketQueryDTO source = query == null ? new AdminSupportTicketQueryDTO() : query;
+        AdminSupportTicketQueryDTO normalized = new AdminSupportTicketQueryDTO();
+        normalized.setKeyword(normalizeOptionalText(source.getKeyword(), "关键词"));
+        normalized.setStatus(normalizeOptionalText(source.getStatus(), "工单状态"));
+        if (normalized.getStatus() != null) parseStatus(normalized.getStatus());
+        normalized.setPriority(normalizeOptionalText(source.getPriority(), "优先级"));
+        normalized.setCategory(normalizeOptionalText(source.getCategory(), "分类"));
+        normalized.setAgentKeyword(normalizeOptionalText(source.getAgentKeyword(), "负责客服"));
+        normalized.setCreatedFrom(source.getCreatedFrom());
+        normalized.setCreatedTo(source.getCreatedTo());
+        if (normalized.getCreatedFrom() != null && normalized.getCreatedTo() != null
+                && normalized.getCreatedFrom().isAfter(normalized.getCreatedTo())) {
+            throw new SupportTicketValidationException("创建时间范围不合法");
+        }
+        normalized.setPageNo(Math.max(1L, source.getPageNo()));
+        normalized.setPageSize(Math.max(1L, Math.min(50L, source.getPageSize())));
+        return normalized;
     }
 
     private void requireParticipant(ChatSession session, String callerId, boolean administrator) {

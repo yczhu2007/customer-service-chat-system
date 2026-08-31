@@ -2,6 +2,10 @@ package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
+import com.example.customerservice.dto.AdminSupportTicketListItemVO;
+import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
+import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
@@ -56,6 +60,22 @@ class SupportTicketControllerTest {
         assertEquals(ticket, result.getData());
         verify(currentUser).requireRole("AGENT");
         verify(supportTicketService).createTicket("A001", "S001", request);
+    }
+
+    @Test
+    void administratorCanListTicketsAndReadFilteredStatusCounts() {
+        AdminSupportTicketQueryDTO query = new AdminSupportTicketQueryDTO();
+        PageResult<AdminSupportTicketListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
+        List<SupportTicketStatusCountVO> counts = List.of(new SupportTicketStatusCountVO("OPEN", 1));
+        when(supportTicketService.findAdminTickets(query)).thenReturn(page);
+        when(supportTicketService.findAdminTicketStatusCounts(query)).thenReturn(counts);
+
+        assertEquals(page, controller.findAdminTickets(query).getData());
+        assertEquals(counts, controller.findAdminTicketStatusCounts(query).getData());
+
+        verify(currentUser, org.mockito.Mockito.times(2)).requireRole("ADMIN");
+        verify(supportTicketService).findAdminTickets(query);
+        verify(supportTicketService).findAdminTicketStatusCounts(query);
     }
 
     @Test

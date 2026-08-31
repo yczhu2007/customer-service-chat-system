@@ -9,6 +9,10 @@ import com.example.customerservice.domain.SupportTicket;
 import com.example.customerservice.domain.SupportTicketStatusHistory;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
+import com.example.customerservice.dto.AdminSupportTicketListItemVO;
+import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
+import com.example.customerservice.dto.PageResult;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.exception.BusinessStateException;
@@ -32,6 +36,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import org.springframework.dao.DuplicateKeyException;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -91,6 +96,30 @@ class SupportTicketServiceTest {
                 history.getFromStatus() == null && "OPEN".equals(history.getToStatus())
                         && "A001".equals(history.getOperatorId())
         ));
+    }
+
+    @Test
+    void administratorTicketQueryReturnsTheRequestedPageAndMatchingStatusCounts() {
+        AdminSupportTicketQueryDTO query = new AdminSupportTicketQueryDTO();
+        query.setKeyword("支付");
+        query.setStatus("IN_PROGRESS");
+        query.setPageNo(2);
+        query.setPageSize(20);
+        AdminSupportTicketListItemVO row = new AdminSupportTicketListItemVO();
+        row.setTicketNo("TK-00000125");
+        when(ticketMapper.countAdminTickets(any(AdminSupportTicketQueryDTO.class))).thenReturn(21L);
+        when(ticketMapper.findAdminTickets(any(AdminSupportTicketQueryDTO.class), eq(20L), eq(20L)))
+                .thenReturn(List.of(row));
+        when(ticketMapper.findAdminTicketStatusCounts(any(AdminSupportTicketQueryDTO.class)))
+                .thenReturn(List.of(new SupportTicketStatusCountVO("IN_PROGRESS", 21L)));
+
+        PageResult<AdminSupportTicketListItemVO> page = service.findAdminTickets(query);
+
+        assertEquals(2L, page.getPageNo());
+        assertEquals(2L, page.getPages());
+        assertEquals(21L, page.getTotal());
+        assertEquals("TK-00000125", page.getRecords().get(0).getTicketNo());
+        assertEquals(21L, service.findAdminTicketStatusCounts(query).get(0).getCount());
     }
 
     @Test
