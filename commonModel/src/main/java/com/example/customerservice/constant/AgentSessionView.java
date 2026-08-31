@@ -8,6 +8,7 @@ import java.util.Locale;
 public enum AgentSessionView {
     MY_ACTIVE("MY_ACTIVE", "我的处理中"),
     MY_TICKETS("MY_TICKETS", "我的工单"),
+    MY_PARTICIPATED_TICKETS("MY_PARTICIPATED_TICKETS", "我参与过的工单"),
     MY_UNREAD("MY_UNREAD", "我的未读"),
     MY_HIGH_PRIORITY("MY_HIGH_PRIORITY", "我的高优先级"),
     MY_UNARCHIVED("MY_UNARCHIVED", "我的未归档"),

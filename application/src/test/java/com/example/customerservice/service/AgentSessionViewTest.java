@@ -196,6 +196,7 @@ class AgentSessionViewTest {
                 List.of(
                         "MY_ACTIVE",
                         "MY_TICKETS",
+                        "MY_PARTICIPATED_TICKETS",
                         "MY_UNREAD",
                         "MY_HIGH_PRIORITY",
                         "MY_UNARCHIVED",
@@ -208,7 +209,7 @@ class AgentSessionViewTest {
                 result.stream().map(AgentSessionViewCountVO::code).toList()
         );
         assertEquals(
-                List.of(2L, 0L, 3L, 0L, 0L, 1L, 0L, 0L, 0L, 0L),
+                List.of(2L, 0L, 0L, 3L, 0L, 0L, 1L, 0L, 0L, 0L, 0L),
                 result.stream().map(AgentSessionViewCountVO::count).toList()
         );
         verify(managementMapper).countAgentSessionViews("A001");
@@ -412,7 +413,7 @@ class AgentSessionViewTest {
         assertTrue(fixedViewCountSql.contains("SELECT 'MY_UNREAD' AS CODE"));
         assertTrue(unreadCountSql.contains("COALESCE(UNREAD.UNREAD_COUNT, 0) > 0"));
         assertTrue(unreadListSql.contains("COALESCE(UNREAD.UNREAD_COUNT, 0) > 0"));
-        assertParameterProperties(fixedViewCounts, "agentId", "agentId", "agentId");
+        assertParameterProperties(fixedViewCounts, "agentId", "agentId", "agentId", "agentId", "agentId", "agentId");
         assertParameterProperties(unreadCount, "agentId", "agentId", "agentId");
         assertParameterProperties(
                 unreadList,

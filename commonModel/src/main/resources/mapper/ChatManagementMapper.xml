@@ -223,6 +223,16 @@
             <when test="viewCode == 'MY_TICKETS'">
                 ticket.id IS NOT NULL
             </when>
+            <when test="viewCode == 'MY_PARTICIPATED_TICKETS'">
+                ticket.id IS NOT NULL
+                AND (
+                    EXISTS (SELECT 1 FROM support_ticket_status_history history
+                            WHERE history.ticket_id = ticket.id AND history.operator_id = #{agentId})
+                    OR EXISTS (SELECT 1 FROM chat_session_transfer_log transfer_log
+                               WHERE transfer_log.session_id = session.id
+                                 AND (transfer_log.source_agent_id = #{agentId} OR transfer_log.target_agent_id = #{agentId}))
+                )
+            </when>
             <when test="viewCode == 'MY_UNREAD'">
                 COALESCE(unread.unread_count, 0) &gt; 0
             </when>
@@ -298,6 +308,17 @@
                COUNT(*) AS count
         FROM scoped_sessions session
         JOIN support_ticket ticket ON ticket.session_id = session.id
+        UNION ALL
+        SELECT 'MY_PARTICIPATED_TICKETS' AS code,
+               '我参与过的工单' AS label,
+               COUNT(*) AS count
+        FROM scoped_sessions session
+        JOIN support_ticket ticket ON ticket.session_id = session.id
+        WHERE EXISTS (SELECT 1 FROM support_ticket_status_history history
+                      WHERE history.ticket_id = ticket.id AND history.operator_id = #{agentId})
+           OR EXISTS (SELECT 1 FROM chat_session_transfer_log transfer_log
+                      WHERE transfer_log.session_id = session.id
+                        AND (transfer_log.source_agent_id = #{agentId} OR transfer_log.target_agent_id = #{agentId}))
         UNION ALL
         SELECT 'MY_UNREAD' AS code,
                '我的未读' AS label,

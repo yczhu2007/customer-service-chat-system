@@ -102,7 +102,7 @@ onUnmounted(() => {
 
     <el-dialog v-model="showMessageSearch" title="消息搜索" width="680px" append-to-body><AgentMessageSearchPanel @selected="showMessageSearch = false" /></el-dialog>
 
-    <el-container class="workspace-body">
+    <el-container class="workspace-content">
       <!-- Left sidebar: view nav + session list -->
       <el-aside class="left-sidebar">
         <AgentViewNav />
@@ -114,34 +114,38 @@ onUnmounted(() => {
         <AgentSessionList />
       </el-aside>
 
-      <!-- Center: chat window -->
-      <el-main class="chat-area">
-        <AgentChatWindow
-          :quick-reply-content="pendingQuickReply"
-          @quick-reply-inserted="pendingQuickReply = ''"
-        />
-      </el-main>
+      <el-container direction="vertical" class="workspace-main-column">
+        <el-container class="workspace-body">
+          <!-- Center: chat window -->
+          <el-main class="chat-area">
+            <AgentChatWindow
+              :quick-reply-content="pendingQuickReply"
+              @quick-reply-inserted="pendingQuickReply = ''"
+            />
+          </el-main>
 
-      <!-- Right sidebar: metadata + user profile -->
-      <el-aside class="right-sidebar">
-        <UserProfileSidebar />
-        <div class="sidebar-divider" />
-        <SessionMetadataEditor />
-        <SupportTicketPanel />
-        <TransferLogPanel v-if="!chat.activeSupportTicket" :session-id="chat.activeSessionId" />
-      </el-aside>
+          <!-- Right sidebar: metadata + user profile -->
+          <el-aside class="right-sidebar">
+            <UserProfileSidebar />
+            <div class="sidebar-divider" />
+            <SessionMetadataEditor />
+            <SupportTicketPanel />
+            <TransferLogPanel v-if="!chat.activeSupportTicket" :session-id="chat.activeSessionId" />
+          </el-aside>
+        </el-container>
+
+        <!-- Bottom panel: quick replies + archive actions -->
+        <el-footer class="workspace-footer">
+          <div class="footer-section quick-reply-section">
+            <QuickReplyPanel @insert="onQuickReplyInsert" />
+          </div>
+          <div class="footer-divider" />
+          <div class="footer-section archive-section">
+            <SessionArchiveActions />
+          </div>
+        </el-footer>
+      </el-container>
     </el-container>
-
-    <!-- Bottom panel: quick replies + archive actions -->
-    <el-footer class="workspace-footer">
-      <div class="footer-section quick-reply-section">
-        <QuickReplyPanel @insert="onQuickReplyInsert" />
-      </div>
-      <div class="footer-divider" />
-      <div class="footer-section archive-section">
-        <SessionArchiveActions />
-      </div>
-    </el-footer>
   </el-container>
 </template>
 
@@ -233,7 +237,20 @@ onUnmounted(() => {
   color: var(--color-success);
 }
 
-/* ─── Body layout ─── */
+/* ─── Content layout ─── */
+.workspace-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+.workspace-main-column {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
 .workspace-body {
   flex: 1;
   display: flex;

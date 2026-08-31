@@ -223,7 +223,7 @@ describe('会话关联工单', () => {
 
     const wrapper = mount(SupportTicketPanel)
 
-    expect(wrapper.text()).toContain('操作历史')
+    expect(wrapper.text()).toContain('处理时间线')
     expect(wrapper.text()).toContain('待处理 → 处理中')
     expect(wrapper.text()).toContain('负责人变更')
     expect(wrapper.text()).toContain('客服一 → 客服二')

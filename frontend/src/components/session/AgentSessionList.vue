@@ -1,12 +1,18 @@
 <script setup>
 import { computed, ref } from 'vue'
 import { useChatStore } from '../../stores/chat'
-import { archiveStatusLabel, archiveStatusStyle, categoryLabel, categoryStyle, formatListTime, priorityLabel, statusLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
+import { archiveStatusLabel, archiveStatusStyle, CATEGORY_OPTIONS, categoryLabel, categoryStyle, formatListTime, priorityLabel, statusLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
 
 const chat = useChatStore()
 const emit = defineEmits(['select'])
 
-const sessions = computed(() => chat.sortedSessions)
+const ticketPriority = ref('')
+const ticketCategory = ref('')
+const priorityOptions = ['LOW', 'NORMAL', 'HIGH', 'URGENT']
+const sessions = computed(() => chat.sortedSessions.filter((session) =>
+  (!ticketPriority.value || session.priority === ticketPriority.value)
+  && (!ticketCategory.value || session.category === ticketCategory.value)
+))
 
 /** Priority badge styling */
 function priorityClass(priority) {
@@ -42,11 +48,19 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
 
 <template>
   <div class="agent-session-list">
-    <div v-if="chat.activeAgentView === 'MY_TICKETS'" class="ticket-filter">
-      <el-input v-model="ticketKeyword" class="ticket-keyword" placeholder="工单号、会话标题、问题或处理结果" clearable @keyup.enter="searchTickets" />
-      <el-button class="ticket-search-btn" size="small" type="primary" @click="searchTickets">搜索</el-button>
+    <div v-if="['MY_TICKETS', 'MY_PARTICIPATED_TICKETS'].includes(chat.activeAgentView)" class="ticket-filter">
+      <div class="ticket-search-group">
+        <el-input v-model="ticketKeyword" class="ticket-keyword" placeholder="工单号、会话标题、问题或处理结果" clearable @keyup.enter="searchTickets" />
+        <el-button class="ticket-search-btn" size="small" type="primary" @click="searchTickets">搜索</el-button>
+      </div>
       <el-select :model-value="chat.ticketStatusFilter" placeholder="全部工单状态" clearable @change="filterTickets">
         <el-option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :label="item.label" :value="item.code" />
+      </el-select>
+      <el-select v-model="ticketPriority" class="ticket-priority" placeholder="全部优先级" clearable>
+        <el-option v-for="item in priorityOptions" :key="item" :label="priorityLabel(item)" :value="item" />
+      </el-select>
+      <el-select v-model="ticketCategory" class="ticket-category" placeholder="全部分类" clearable>
+        <el-option v-for="item in CATEGORY_OPTIONS" :key="item.code" :label="item.label" :value="item.code" />
       </el-select>
     </div>
     <div v-if="chat.sessionsLoading && !sessions.length" class="loading">加载中…</div>
@@ -94,10 +108,11 @@ const ticketKeyword = ref(chat.ticketKeyword || '')
   overflow-y: auto;
   flex: 1;
 }
-.ticket-filter { display: flex; gap: 0.4rem; padding: 0.6rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.ticket-filter { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.6rem 1rem; border-bottom: 1px solid #f3f4f6; }
+.ticket-search-group { display: flex; flex: 1 1 100%; gap: 0.4rem; min-width: 0; }
 .ticket-keyword { flex: 1; min-width: 0; }
 .ticket-search-btn { flex: 0 0 auto; }
-.ticket-filter :deep(.el-select) { flex: 0 0 120px; width: 120px; }
+.ticket-filter :deep(.el-select) { flex: 1 1 120px; width: 120px; }
 .loading,
 .empty {
   text-align: center;

@@ -6,6 +6,7 @@ import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketUserFeedbackDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
+import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.SupportTicketService;
 import jakarta.validation.Valid;
@@ -84,6 +85,16 @@ public class SupportTicketController {
         return Result.success(supportTicketService.updateTicket(
                 currentUser.getUserId(), ticketNo, request
         ));
+    }
+
+    @GetMapping("/sessions/{sessionId}/ticket/history/page")
+    public Result<PageResult<SupportTicketStatusHistoryVO>> findTicketHistoryPage(
+            @PathVariable @NotBlank @Size(max = 64) String sessionId,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "1") long pageNo,
+            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") long pageSize
+    ) {
+        return Result.success(supportTicketService.findHistoryPageBySessionId(
+                currentUser.getUserId(), isAdministratorWorkspace(), sessionId, pageNo, pageSize));
     }
 
     @PostMapping("/tickets/{ticketNo}/user-feedback")

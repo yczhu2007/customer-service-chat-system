@@ -203,7 +203,11 @@ class SupportTicketServiceTest {
 
         assertEquals("IN_PROGRESS", updated.getStatus());
         assertEquals("补充后的问题描述", updated.getDescription());
-        verify(historyMapper, never()).insert(any(SupportTicketStatusHistory.class));
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.<SupportTicketStatusHistory>argThat(history ->
+                "CONTENT_UPDATED".equals(history.getActionType())
+                        && "IN_PROGRESS".equals(history.getFromStatus())
+                        && "IN_PROGRESS".equals(history.getToStatus())
+        ));
     }
 
     @Test

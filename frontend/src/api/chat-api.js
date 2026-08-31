@@ -135,6 +135,9 @@ export const getSupportTicket = (sessionId) =>
 export const getSupportTicketHistory = (sessionId) =>
   request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket/history`)
 
+export const getSupportTicketHistoryPage = (sessionId, pageNo = 1, pageSize = 20) =>
+  request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket/history/page?pageNo=${pageNo}&pageSize=${pageSize}`)
+
 export const createSupportTicket = (sessionId, data) =>
   request(`/chat/sessions/${encodeURIComponent(sessionId)}/ticket`, {
     method: 'POST',

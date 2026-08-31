@@ -8,6 +8,7 @@ export const STATUS_LABELS = {
 export const AGENT_VIEW_OPTIONS = [
   { code: 'MY_ACTIVE', label: '处理中' },
   { code: 'MY_TICKETS', label: '我的工单' },
+  { code: 'MY_PARTICIPATED_TICKETS', label: '我参与过的工单' },
   { code: 'MY_HIGH_PRIORITY', label: '高优先级' },
   { code: 'MY_UNARCHIVED', label: '未归档' },
   { code: 'MY_RECENT_CLOSED', label: '最近关闭' },

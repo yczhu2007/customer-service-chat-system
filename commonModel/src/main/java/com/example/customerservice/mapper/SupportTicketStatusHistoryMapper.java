@@ -9,4 +9,7 @@ import java.util.List;
 
 public interface SupportTicketStatusHistoryMapper extends BaseMapper<SupportTicketStatusHistory> {
     List<SupportTicketStatusHistoryVO> findRecentByTicketId(@Param("ticketId") Long ticketId);
+    long countByTicketId(@Param("ticketId") Long ticketId);
+    List<SupportTicketStatusHistoryVO> findByTicketId(
+            @Param("ticketId") Long ticketId, @Param("offset") long offset, @Param("pageSize") long pageSize);
 }

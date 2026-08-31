@@ -206,6 +206,17 @@ describe('Chat Store - Agent Workspace', () => {
     }))
   })
 
+  it('keeps the ticket keyword input and search button in one responsive group', () => {
+    const chat = useChatStore()
+    chat.activeAgentView = 'MY_TICKETS'
+
+    const wrapper = mount(AgentSessionList)
+
+    expect(wrapper.find('.ticket-search-group').exists()).toBe(true)
+    expect(wrapper.get('.ticket-search-group').find('.ticket-keyword').exists()).toBe(true)
+    expect(wrapper.get('.ticket-search-group').find('.ticket-search-btn').exists()).toBe(true)
+  })
+
   it('opens a searched message in its session and records the message to focus', async () => {
     const chat = useChatStore()
 
@@ -371,6 +382,18 @@ describe('Chat Store - Agent Workspace', () => {
     await wrapper.get('.refresh-btn').trigger('click')
 
     expect(chat.refreshAgentViews).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the ticket sidebar full-height while the footer starts below the chat column', () => {
+    const wrapper = mount(AgentWorkspaceView, { global: { stubs: {
+      AgentViewNav: true, AgentSessionList: true, AgentChatWindow: true, SessionMetadataEditor: true,
+      SessionArchiveActions: true, UserProfileSidebar: true, QuickReplyPanel: true, ConnectionStatus: true,
+      AgentOverviewPanel: true, TransferLogPanel: true,
+    } } })
+
+    expect(wrapper.get('.workspace-content > .left-sidebar').exists()).toBe(true)
+    expect(wrapper.get('.workspace-main-column > .workspace-footer').exists()).toBe(true)
+    expect(wrapper.get('.workspace-main-column > .workspace-footer .quick-reply-section').exists()).toBe(true)
   })
 
   it('switches active agent view and refreshes sessions', async () => {

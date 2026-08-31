@@ -40,6 +40,20 @@ const selectableStatuses = computed(() => {
   return statusOptions.filter((item) => allowed.has(item.value))
 })
 const history = computed(() => chat.activeSupportTicketHistory || [])
+const timeline = computed(() => [
+  ...history.value.map((item) => ({
+    id: `history-${item.id}`,
+    text: historyText(item),
+    operator: item.operatorNickname || '未知用户',
+    time: item.createdAt,
+  })),
+  ...(chat.transferLogs || []).map((item) => ({
+    id: `transfer-${item.id}`,
+    text: `${item.sourceAgentNickname || '未知客服'} → ${item.targetAgentNickname || '未知客服'}（负责人变更）`,
+    operator: '',
+    time: item.createTime,
+  })),
+].sort((left, right) => new Date(left.time) - new Date(right.time)))
 
 watch(ticket, (value) => {
   description.value = value?.description || ''
@@ -60,6 +74,7 @@ function statusText(value) {
 function historyText(item) {
   if (item.actionType === 'USER_CONFIRMED') return '用户确认已解决'
   if (item.actionType === 'REOPENED') return '用户申请继续处理'
+  if (item.actionType === 'CONTENT_UPDATED') return '更新了工单内容'
   return item.fromStatus ? `${statusText(item.fromStatus)} → ${statusText(item.toStatus)}` : `创建为${statusText(item.toStatus)}`
 }
 
@@ -226,24 +241,15 @@ async function respondToResolution(action) {
         <el-button class="reopen-ticket" size="small" :loading="feedbackSaving" @click="respondToResolution('REOPEN')">申请继续处理</el-button>
       </div>
       <div class="ticket-history">
-        <h4>操作历史</h4>
-        <p v-if="!history.length" class="empty">暂无状态变更</p>
+        <h4>处理时间线</h4>
+        <p v-if="!timeline.length" class="empty">暂无处理记录</p>
         <ul v-else>
-          <li v-for="item in history" :key="item.id">
-            <span>{{ historyText(item) }}</span>
-            <small>{{ item.operatorNickname || '未知用户' }} · {{ formatDateTime(item.createdAt) }}</small>
+          <li v-for="item in timeline" :key="item.id">
+            <span>{{ item.text }}</span>
+            <small><template v-if="item.operator">{{ item.operator }} · </template>{{ formatDateTime(item.time) }}</small>
           </li>
         </ul>
-      </div>
-      <div class="ticket-history">
-        <h4>负责人变更</h4>
-        <p v-if="!chat.transferLogs.length" class="empty">暂无负责人变更</p>
-        <ul v-else>
-          <li v-for="item in chat.transferLogs" :key="item.id">
-            <span>{{ item.sourceAgentNickname || '未知客服' }} → {{ item.targetAgentNickname || '未知客服' }}</span>
-            <small>{{ formatDateTime(item.createTime) }}<template v-if="item.reason"> · {{ item.reason }}</template></small>
-          </li>
-        </ul>
+        <el-button v-if="chat.supportTicketHistoryHasMore" class="load-more-ticket-history" link type="primary" size="small" @click="chat.loadMoreSupportTicketHistory">加载更早记录</el-button>
       </div>
     </template>
 

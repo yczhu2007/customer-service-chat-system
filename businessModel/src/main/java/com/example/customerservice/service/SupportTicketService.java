@@ -10,6 +10,7 @@ import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
+import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.exception.SupportTicketValidationException;
@@ -29,6 +30,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @Slf4j
@@ -138,8 +140,12 @@ public class SupportTicketService {
         if (updated != 1) {
             throw new BusinessStateException("工单已被其他操作修改，请刷新后重试");
         }
+        boolean contentChanged = !Objects.equals(ticket.getDescription(), description)
+                || !Objects.equals(ticket.getResolution(), resolution);
         if (current != target) {
             writeStatusHistory(ticket.getId(), agentId, "STATUS_CHANGED", current.name(), target.name(), now);
+        } else if (contentChanged) {
+            writeStatusHistory(ticket.getId(), agentId, "CONTENT_UPDATED", current.name(), target.name(), now);
         }
         next.setSessionId(ticket.getSessionId());
         next.setCreatedAt(ticket.getCreatedAt());
@@ -192,6 +198,24 @@ public class SupportTicketService {
         }
         List<SupportTicketStatusHistoryVO> history = historyMapper.findRecentByTicketId(ticket.getId());
         return history == null ? List.of() : List.copyOf(history);
+    }
+
+    public PageResult<SupportTicketStatusHistoryVO> findHistoryPageBySessionId(
+            String callerId, boolean administrator, String sessionId, long pageNo, long pageSize
+    ) {
+        ChatSession session = requireSession(sessionId);
+        requireParticipant(session, callerId, administrator);
+        SupportTicket ticket = ticketMapper.selectOne(Wrappers.<SupportTicket>lambdaQuery()
+                .eq(SupportTicket::getSessionId, sessionId));
+        long normalizedPageNo = Math.max(1L, pageNo);
+        long normalizedPageSize = Math.max(1L, Math.min(50L, pageSize));
+        if (ticket == null) return new PageResult<>(normalizedPageNo, normalizedPageSize, 0, 0, List.of());
+        long total = historyMapper.countByTicketId(ticket.getId());
+        long pages = total == 0 ? 0 : (total + normalizedPageSize - 1) / normalizedPageSize;
+        List<SupportTicketStatusHistoryVO> records = total == 0 ? List.of()
+                : historyMapper.findByTicketId(ticket.getId(), (normalizedPageNo - 1) * normalizedPageSize, normalizedPageSize);
+        return new PageResult<>(normalizedPageNo, normalizedPageSize, total, pages,
+                records == null ? List.of() : List.copyOf(records));
     }
 
     private ChatSession requireSession(String sessionId) {

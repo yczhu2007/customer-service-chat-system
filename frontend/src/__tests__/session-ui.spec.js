@@ -13,6 +13,7 @@ describe('session enum presentation', () => {
     expect(AGENT_VIEW_OPTIONS.map((option) => option.code)).toEqual([
       'MY_ACTIVE',
       'MY_TICKETS',
+      'MY_PARTICIPATED_TICKETS',
       'MY_HIGH_PRIORITY',
       'MY_UNARCHIVED',
       'MY_RECENT_CLOSED',

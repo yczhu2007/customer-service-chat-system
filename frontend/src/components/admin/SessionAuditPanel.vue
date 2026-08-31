@@ -1,5 +1,5 @@
 <script setup>
-import { nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
@@ -51,6 +51,10 @@ const filters = ref({
 })
 
 const statusOptions = ['', 'ACTIVE', 'CLOSED']
+const ticketSummary = computed(() => ['OPEN', 'IN_PROGRESS', 'WAITING_USER', 'RESOLVED'].map((status) => ({
+  status,
+  count: sessions.value.filter((session) => session.ticketStatus === status).length,
+})))
 
 function normalizeDateTime(value) {
   const normalized = value.trim()
@@ -276,6 +280,9 @@ function removeTag(tag) {
 
 <template>
   <section class="session-audit">
+    <div class="ticket-summary" aria-label="当前页工单统计">
+      <span v-for="item in ticketSummary" :key="item.status">{{ ticketStatusLabel(item.status) }} {{ item.count }}</span>
+    </div>
     <div class="panel-header">
       <h2>会话管理</h2>
       <div class="header-actions">

@@ -19,6 +19,7 @@ import {
   findTransferLogs,
   getSupportTicket,
   getSupportTicketHistory,
+  getSupportTicketHistoryPage,
   createSupportTicket,
   updateSupportTicket,
   submitSupportTicketUserFeedback,
@@ -104,6 +105,8 @@ export const useChatStore = defineStore('chat', {
     activeMetadata: null,
     activeSupportTicket: null,
     activeSupportTicketHistory: [],
+    supportTicketHistoryPageNo: 0,
+    supportTicketHistoryHasMore: false,
     supportTicketLoading: false,
     supportTicketError: null,
     _supportTicketRequestSequence: 0,
@@ -236,6 +239,8 @@ export const useChatStore = defineStore('chat', {
       this.messages = []
       this.activeSupportTicket = null
       this.activeSupportTicketHistory = []
+      this.supportTicketHistoryPageNo = 0
+      this.supportTicketHistoryHasMore = false
       this.supportTicketError = null
       this.supportTicketFormDirty = false
       this.supportTicketStale = false
@@ -687,10 +692,13 @@ export const useChatStore = defineStore('chat', {
         return []
       }
       try {
-        const result = await getSupportTicketHistory(sessionId)
-        const history = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        const result = await getSupportTicketHistoryPage(sessionId, 1, 20)
+        const page = result && Object.prototype.hasOwnProperty.call(result, 'data') ? result.data : result
+        const history = page?.records || []
         if (this.activeSessionId === sessionId && requestSequence === this._supportTicketHistoryRequestSequence) {
-          this.activeSupportTicketHistory = history || []
+          this.activeSupportTicketHistory = history
+          this.supportTicketHistoryPageNo = page?.pageNo || 1
+          this.supportTicketHistoryHasMore = (page?.pageNo || 1) < (page?.pages || 0)
         }
         return history || []
       } catch (e) {
@@ -729,6 +737,15 @@ export const useChatStore = defineStore('chat', {
         this.error = e.message
         throw e
       }
+    },
+
+    async loadMoreSupportTicketHistory() {
+      if (!this.activeSessionId || !this.supportTicketHistoryHasMore) return
+      const result = await getSupportTicketHistoryPage(this.activeSessionId, this.supportTicketHistoryPageNo + 1, 20)
+      const page = result?.data || result
+      this.activeSupportTicketHistory.push(...(page?.records || []))
+      this.supportTicketHistoryPageNo = page?.pageNo || this.supportTicketHistoryPageNo
+      this.supportTicketHistoryHasMore = this.supportTicketHistoryPageNo < (page?.pages || 0)
     },
 
     async respondToTicketResolution(ticketNo, action, version) {
@@ -905,6 +922,8 @@ export const useChatStore = defineStore('chat', {
       this.activeMetadata = null
       this.activeSupportTicket = null
       this.activeSupportTicketHistory = []
+      this.supportTicketHistoryPageNo = 0
+      this.supportTicketHistoryHasMore = false
       this.supportTicketLoading = false
       this.supportTicketError = null
       this.supportTicketFormDirty = false
@@ -995,10 +1014,10 @@ export const useChatStore = defineStore('chat', {
           pageNo,
           pageSize,
         }
-        if (viewCode === 'MY_TICKETS' && this.ticketStatusFilter) {
+        if (['MY_TICKETS', 'MY_PARTICIPATED_TICKETS'].includes(viewCode) && this.ticketStatusFilter) {
           requestParams.ticketStatus = this.ticketStatusFilter
         }
-        if (viewCode === 'MY_TICKETS' && this.ticketKeyword) {
+        if (['MY_TICKETS', 'MY_PARTICIPATED_TICKETS'].includes(viewCode) && this.ticketKeyword) {
           requestParams.ticketKeyword = this.ticketKeyword
         }
         const result = await listAgentViewSessions(viewCode, requestParams)
