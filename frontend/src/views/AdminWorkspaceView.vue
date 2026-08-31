@@ -8,14 +8,17 @@ import ArchiveStatsPanel from '../components/admin/ArchiveStatsPanel.vue'
 import DeadLetterPanel from '../components/admin/DeadLetterPanel.vue'
 import VipSkillPanel from '../components/admin/VipSkillPanel.vue'
 import AdminMessageSearchPanel from '../components/admin/AdminMessageSearchPanel.vue'
+import AdminTicketPanel from '../components/admin/AdminTicketPanel.vue'
 
 const activeTab = ref('dashboard')
+const focusedTicket = ref(null)
 
 const tabs = [
   { key: 'dashboard', label: '管理仪表盘' },
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
   { key: 'sessions', label: '会话管理' },
+  { key: 'tickets', label: '工单管理' },
   { key: 'messages', label: '消息搜索' },
   { key: 'archive', label: '归档统计' },
   { key: 'deadletters', label: '死信管理' },
@@ -24,6 +27,11 @@ const tabs = [
 
 function switchTab(key) {
   activeTab.value = key
+}
+
+function locateTicketSession(ticket) {
+  focusedTicket.value = ticket
+  activeTab.value = 'sessions'
 }
 </script>
 
@@ -47,7 +55,8 @@ function switchTab(key) {
       <AdminDashboard v-if="activeTab === 'dashboard'" />
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
-      <SessionAuditPanel v-if="activeTab === 'sessions'" />
+      <SessionAuditPanel v-if="activeTab === 'sessions'" :focused-ticket="focusedTicket" @session-focused="focusedTicket = null" />
+      <AdminTicketPanel v-if="activeTab === 'tickets'" @locate-session="locateTicketSession" />
       <AdminMessageSearchPanel v-if="activeTab === 'messages'" />
       <ArchiveStatsPanel v-if="activeTab === 'archive'" />
       <DeadLetterPanel v-if="activeTab === 'deadletters'" />

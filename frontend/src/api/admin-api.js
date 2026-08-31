@@ -105,6 +105,24 @@ export function findAdminDashboard() {
   return request('/chat/admin/dashboard')
 }
 
+function ticketQueryString(params = {}, includePaging = true) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '' && (includePaging || !['pageNo', 'pageSize'].includes(key))) {
+      query.set(key, value)
+    }
+  })
+  return query.toString()
+}
+
+export function listAdminTickets(params = {}) {
+  return request(`/chat/admin/tickets?${ticketQueryString(params)}`)
+}
+
+export function findAdminTicketStatusCounts(params = {}) {
+  return request(`/chat/admin/tickets/status-counts?${ticketQueryString(params, false)}`)
+}
+
 export function findAdminRatingSummary(params = {}) {
   const qs = new URLSearchParams(params).toString()
   return request(`/chat/admin/ratings/summary${qs ? '?' + qs : ''}`)

@@ -45,6 +45,8 @@
             s.title,
             COALESCE(NULLIF(u.nickname, ''), u.username) AS user_nickname,
             COALESCE(NULLIF(a.nickname, ''), a.username) AS agent_nickname,
+            t.description,
+            t.resolution,
             t.created_at,
             t.updated_at
         <include refid="adminTicketFrom" />

@@ -11,6 +11,8 @@ public class AdminSupportTicketListItemVO {
     private String title;
     private String userNickname;
     private String agentNickname;
+    private String description;
+    private String resolution;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -30,6 +32,10 @@ public class AdminSupportTicketListItemVO {
     public void setUserNickname(String userNickname) { this.userNickname = userNickname; }
     public String getAgentNickname() { return agentNickname; }
     public void setAgentNickname(String agentNickname) { this.agentNickname = agentNickname; }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
+    public String getResolution() { return resolution; }
+    public void setResolution(String resolution) { this.resolution = resolution; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }

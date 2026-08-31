@@ -1,11 +1,15 @@
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
-import { getSupportTicket } from '../../api/chat-api'
-import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, formatDateTime, priorityLabel, statusLabel, tagLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
+import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, formatDateTime, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
+
+const props = defineProps({
+  focusedTicket: { type: Object, default: null },
+})
+const emit = defineEmits(['session-focused'])
 
 const loading = ref(false)
 const error = ref(null)
@@ -23,38 +27,28 @@ const formError = ref(null)
 const createForm = ref({ userLoginNumber: '', agentLoginNumber: '' })
 const editForm = ref({ title: '', priority: 'NORMAL', category: 'OTHER', tags: [] })
 const tagInput = ref('')
-const showTicketDialog = ref(false)
-const ticketLoading = ref(false)
-const ticketError = ref(null)
-const selectedTicket = ref(null)
-const ticketSessionId = ref(null)
-const ticketCopied = ref(false)
 const focusedSessionId = ref(null)
 const sessionTable = ref(null)
 const topTableScroll = ref(null)
 const tableScrollWidth = ref(0)
 let tableResizeObserver
-let ticketCopiedTimer
 
 // Filters
-const filters = ref({
+function createFilters() {
+  return {
   userLoginNumber: '',
   agentLoginNumber: '',
   status: '',
   archiveStatus: '',
   rating: '',
-  ticketKeyword: '',
-  ticketStatus: '',
-  hasTicket: false,
+  ticketNo: '',
   from: '',
   to: '',
-})
+  }
+}
+const filters = ref(createFilters())
 
 const statusOptions = ['', 'ACTIVE', 'CLOSED']
-const ticketSummary = computed(() => ['OPEN', 'IN_PROGRESS', 'WAITING_USER', 'RESOLVED'].map((status) => ({
-  status,
-  count: sessions.value.filter((session) => session.ticketStatus === status).length,
-})))
 
 function normalizeDateTime(value) {
   const normalized = value.trim()
@@ -81,9 +75,7 @@ async function loadSessions() {
     if (filters.value.status) qs.set('status', filters.value.status)
     if (filters.value.rating) qs.set('rating', filters.value.rating)
     if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
-    if (filters.value.ticketKeyword) qs.set('ticketKeyword', filters.value.ticketKeyword)
-    if (filters.value.ticketStatus) qs.set('ticketStatus', filters.value.ticketStatus)
-    if (filters.value.hasTicket) qs.set('hasTicket', 'true')
+    if (filters.value.ticketNo) qs.set('ticketNo', filters.value.ticketNo)
     if (filters.value.from) qs.set('from', normalizeDateTime(filters.value.from))
     if (filters.value.to) qs.set('to', normalizeDateTime(filters.value.to))
 
@@ -103,8 +95,25 @@ async function loadSessions() {
 onMounted(loadSessions)
 onBeforeUnmount(() => {
   tableResizeObserver?.disconnect()
-  window.clearTimeout(ticketCopiedTimer)
 })
+
+watch(
+  () => props.focusedTicket,
+  async (ticket) => {
+    if (!ticket?.ticketNo) return
+    pageNo.value = 1
+    filters.value = { ...createFilters(), ticketNo: ticket.ticketNo }
+    await loadSessions()
+    focusedSessionId.value = ticket.sessionId
+    await nextTick()
+    const focusedRow = sessionTable.value?.$el?.querySelector('.focused-session-row')
+    if (typeof focusedRow?.scrollIntoView === 'function') {
+      focusedRow.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    emit('session-focused')
+  },
+  { immediate: true }
+)
 
 function refreshTableScrollWidth() {
   const tableElement = sessionTable.value?.$el?.querySelector('.el-table__body')
@@ -135,7 +144,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', ticketKeyword: '', ticketStatus: '', hasTicket: false, from: '', to: '' }
+  filters.value = createFilters()
   pageNo.value = 1
   loadSessions()
 }
@@ -221,45 +230,6 @@ async function deleteSession(row) {
   } catch (e) { error.value = e.message }
 }
 
-async function openTicket(row) {
-  const sessionId = row.sessionId
-  ticketSessionId.value = sessionId
-  selectedTicket.value = null
-  ticketCopied.value = false
-  ticketError.value = null
-  ticketLoading.value = true
-  showTicketDialog.value = true
-  try {
-    const result = await getSupportTicket(sessionId)
-    if (ticketSessionId.value === sessionId) selectedTicket.value = result?.data ?? null
-  } catch (e) {
-    if (ticketSessionId.value === sessionId) ticketError.value = e.message
-  } finally {
-    if (ticketSessionId.value === sessionId) ticketLoading.value = false
-  }
-}
-
-async function copyTicketNo() {
-  try {
-    await navigator.clipboard.writeText(selectedTicket.value.ticketNo)
-    ticketCopied.value = true
-    window.clearTimeout(ticketCopiedTimer)
-    ticketCopiedTimer = window.setTimeout(() => {
-      ticketCopied.value = false
-    }, 3000)
-    ElMessage.success('工单编号已复制')
-  } catch {
-    ticketError.value = '复制工单编号失败'
-  }
-}
-
-async function locateTicketSession() {
-  showTicketDialog.value = false
-  focusedSessionId.value = ticketSessionId.value
-  await nextTick()
-  sessionTable.value?.$el?.querySelector('.focused-session-row')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-}
-
 function rowClassName({ row }) {
   return row.sessionId === focusedSessionId.value ? 'focused-session-row' : ''
 }
@@ -280,9 +250,6 @@ function removeTag(tag) {
 
 <template>
   <section class="session-audit">
-    <div class="ticket-summary" aria-label="当前页工单统计">
-      <span v-for="item in ticketSummary" :key="item.status">{{ ticketStatusLabel(item.status) }} {{ item.count }}</span>
-    </div>
     <div class="panel-header">
       <h2>会话管理</h2>
       <div class="header-actions">
@@ -294,12 +261,6 @@ function removeTag(tag) {
     <div class="filters">
       <input v-model="filters.userLoginNumber" class="user-login-number" placeholder="用户登录编号" />
       <input v-model="filters.agentLoginNumber" class="agent-login-number" placeholder="客服登录编号" />
-      <input v-model="filters.ticketKeyword" class="ticket-number" placeholder="工单号、标题、问题或处理结果" />
-      <select v-model="filters.ticketStatus" aria-label="工单状态">
-        <option value="">全部工单状态</option>
-        <option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :value="item.code">{{ item.label }}</option>
-      </select>
-      <label class="only-ticket-filter"><input v-model="filters.hasTicket" class="only-ticket-sessions" type="checkbox" /> 仅有工单会话</label>
       <select v-model="filters.status" aria-label="Status">
         <option v-for="s in statusOptions" :key="s" :value="s">{{ s ? statusLabel(s) : '全部状态' }}</option>
       </select>
@@ -334,7 +295,7 @@ function removeTag(tag) {
           <template #default="{ row }"><span class="status-cell">{{ statusLabel(row.status) }}</span></template>
         </el-table-column>
         <el-table-column label="工单" min-width="130">
-          <template #default="{ row }"><span v-if="row.ticketNo">{{ row.ticketNo }} · {{ ticketStatusLabel(row.ticketStatus) }}</span><span v-else>-</span></template>
+          <template #default="{ row }"><span>{{ row.ticketNo ? '有关联工单' : '-' }}</span></template>
         </el-table-column>
         <el-table-column label="评分" width="110">
           <template #default="{ row }"><span class="rating-cell" :title="row.rating + '/5'">{{ ratingStars(row.rating) }}</span></template>
@@ -358,9 +319,8 @@ function removeTag(tag) {
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" min-width="250">
+        <el-table-column label="操作" min-width="190">
           <template #default="{ row }">
-            <el-button class="open-ticket" size="small" @click="openTicket(row)">工单</el-button>
             <el-button size="small" @click="openEditDialog(row)">编辑</el-button>
             <el-button size="small" type="danger" @click="deleteSession(row)">删除会话</el-button>
           </template>
@@ -401,25 +361,6 @@ function removeTag(tag) {
       <template #footer><el-button @click="showEditDialog = false">取消</el-button><el-button type="primary" :loading="saving" @click="saveSessionMetadata">保存</el-button></template>
     </el-dialog>
 
-    <el-dialog v-model="showTicketDialog" title="关联工单" width="520px">
-      <div v-loading="ticketLoading" class="ticket-detail">
-        <p v-if="ticketError" class="error">{{ ticketError }}</p>
-        <p v-else-if="!ticketLoading && !selectedTicket" class="empty">该会话暂未创建工单</p>
-        <dl v-else-if="selectedTicket">
-          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }} <el-button class="copy-ticket-no" link type="primary" size="small" @click="copyTicketNo">复制</el-button><span v-if="ticketCopied" class="copy-success" role="status">已复制</span></dd>
-          <dt>工单状态</dt><dd>{{ ticketStatusLabel(selectedTicket.status) }}</dd>
-          <dt>会话标题</dt><dd>{{ selectedTicket.title || '新咨询' }}</dd>
-          <dt>负责客服</dt><dd>{{ selectedTicket.agentNickname || '-' }}</dd>
-          <dt>问题描述</dt><dd>{{ selectedTicket.description || '-' }}</dd>
-          <template v-if="selectedTicket.resolution"><dt>处理结果</dt><dd>{{ selectedTicket.resolution }}</dd></template>
-          <dt>更新时间</dt><dd>{{ formatDateTime(selectedTicket.updatedAt) }}</dd>
-        </dl>
-      </div>
-      <template #footer>
-        <el-button class="locate-ticket-session" @click="locateTicketSession">定位关联会话</el-button>
-        <el-button @click="showTicketDialog = false">关闭</el-button>
-      </template>
-    </el-dialog>
   </section>
 </template>
 
@@ -458,11 +399,8 @@ function removeTag(tag) {
   font-size: 0.9rem;
 }
 .user-login-number,
-.agent-login-number,
-.ticket-number { width: 150px; }
+.agent-login-number { width: 150px; }
 .filters select { width: 130px; }
-.only-ticket-filter { display: inline-flex; align-items: center; gap: 4px; color: #4b5563; font-size: 0.85rem; white-space: nowrap; }
-.only-ticket-filter input { margin: 0; }
 .date-field { min-width: 0; width: 180px; }
 .rating-field { width: 92px; }
 .data-table {
@@ -538,8 +476,4 @@ function removeTag(tag) {
 .status-cell { display: inline-block; white-space: nowrap; }
 .data-table :deep(.el-table__body-wrapper td.el-table__cell:nth-child(4)) { white-space: nowrap; }
 .transfer-details { margin-top: 0.5rem; color: #6b7280; font-size: 0.8rem; line-height: 1.5; }
-.ticket-detail dl { display: grid; grid-template-columns: 76px 1fr; gap: 0.7rem 0.8rem; margin: 0; font-size: 0.9rem; }
-.ticket-detail dt { color: #6b7280; }
-.ticket-detail dd { margin: 0; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
-.copy-success { margin-left: 6px; color: var(--color-success); font-size: 12px; }
 </style>

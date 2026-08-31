@@ -50,6 +50,8 @@ vi.mock('../api/admin-api', () => ({
   deleteAdminSession: vi.fn(),
   searchAdminMessages: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
   deleteAdminMessage: vi.fn(),
+  listAdminTickets: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
+  findAdminTicketStatusCounts: vi.fn(() => Promise.resolve({ data: [] })),
 }))
 
 // ─── Mock http-client ────────────────────────────────────────
@@ -71,6 +73,7 @@ describe('AdminWorkspaceView', () => {
           UserManagementPanel: { template: '<div class="stub-users">用户管理</div>' },
           RoleManagementPanel: { template: '<div class="stub-roles">角色管理</div>' },
           SessionAuditPanel: { template: '<div class="stub-sessions">会话审计</div>' },
+          AdminTicketPanel: { template: '<button class="stub-tickets" @click="$emit(\'locate-session\', { sessionId: \'s1\', ticketNo: \'TK-00000125\' })">工单管理</button>' },
           AdminMessageSearchPanel: { template: '<div class="stub-message-search">消息搜索</div>' },
           ArchiveStatsPanel: { template: '<div class="stub-archive">归档统计</div>' },
           DeadLetterPanel: { template: '<div class="stub-deadletters">死信管理</div>' },
@@ -100,6 +103,12 @@ describe('AdminWorkspaceView', () => {
     await navigationItems.find((item) => item.text() === '死信管理').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-deadletters').exists()).toBe(true)
+
+    await navigationItems.find((item) => item.text() === '工单管理').trigger('click')
+    await nextTick()
+    await wrapper.get('.stub-tickets').trigger('click')
+    await nextTick()
+    expect(wrapper.find('.stub-sessions').exists()).toBe(true)
   })
 })
 
@@ -165,6 +174,57 @@ describe('DeadLetterPanel', () => {
     // Confirmation dialog should appear
     expect(wrapper.text()).toContain('确认重放')
     expect(wrapper.text()).toContain('msg-001')
+  })
+})
+
+describe('AdminTicketPanel', () => {
+  beforeEach(async () => {
+    setActivePinia(createPinia())
+    const { listAdminTickets, findAdminTicketStatusCounts } = await import('../api/admin-api')
+    listAdminTickets.mockReset().mockResolvedValue({
+      data: {
+        records: [{
+          ticketNo: 'TK-00000125', sessionId: 's1', status: 'IN_PROGRESS', priority: 'HIGH',
+          category: 'PAYMENT', title: '支付咨询', userNickname: '张三', agentNickname: '客服一',
+          updatedAt: '2026-08-31T10:00:00',
+        }],
+        total: 1,
+      },
+    })
+    findAdminTicketStatusCounts.mockReset().mockResolvedValue({ data: [{ status: 'IN_PROGRESS', count: 1 }] })
+  })
+
+  it('queries tickets and status counts with the same filters', async () => {
+    const { listAdminTickets, findAdminTicketStatusCounts } = await import('../api/admin-api')
+    const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
+    const wrapper = mount(AdminTicketPanel)
+    await vi.dynamicImportSettled()
+    await nextTick()
+    listAdminTickets.mockClear()
+    findAdminTicketStatusCounts.mockClear()
+
+    await wrapper.get('.ticket-keyword').setValue('支付失败')
+    await wrapper.get('.ticket-status').setValue('IN_PROGRESS')
+    await wrapper.get('.search-tickets').trigger('click')
+
+    expect(listAdminTickets).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '支付失败', status: 'IN_PROGRESS', pageNo: 1 }))
+    expect(findAdminTicketStatusCounts).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '支付失败', status: 'IN_PROGRESS' }))
+  })
+
+  it('emits the selected ticket when locating a ticket conversation', async () => {
+    const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
+    const wrapper = mount(AdminTicketPanel, { attachTo: document.body })
+    try {
+      await vi.dynamicImportSettled()
+      await nextTick()
+      await wrapper.get('.view-ticket-detail').trigger('click')
+      await nextTick()
+      await document.body.querySelector('button.locate-ticket-session').click()
+
+      expect(wrapper.emitted('locate-session')[0]).toEqual([expect.objectContaining({ sessionId: 's1', ticketNo: 'TK-00000125' })])
+    } finally {
+      wrapper.unmount()
+    }
   })
 })
 
@@ -283,7 +343,7 @@ describe('SessionAuditPanel', () => {
     expect(wrapper.text()).toContain('user004')
   })
 
-  it('keeps ticket actions in the scrollable table instead of a fixed overlay', async () => {
+  it('shows only a read-only linked-ticket marker in the session table', async () => {
     const { request } = await import('../services/http-client')
     request.mockResolvedValueOnce({
       data: {
@@ -300,7 +360,8 @@ describe('SessionAuditPanel', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
     await nextTick()
 
-    expect(wrapper.text()).toContain('TK-00000125')
+    expect(wrapper.text()).toContain('有关联工单')
+    expect(wrapper.find('button.open-ticket').exists()).toBe(false)
     const actionColumn = wrapper.findAllComponents({ name: 'ElTableColumn' })
       .find((column) => column.props('label') === '操作')
     expect(actionColumn.props('fixed')).toBe(false)
@@ -327,86 +388,22 @@ describe('SessionAuditPanel', () => {
     expect(deleteButtons.every((button) => button.attributes('disabled') === undefined)).toBe(true)
   })
 
-  it('searches sessions by ticket keyword and ticket status', async () => {
+  it('loads and highlights the linked session from the ticket management page', async () => {
     const { request } = await import('../services/http-client')
+    request.mockResolvedValue({
+      data: {
+        records: [{ sessionId: 's1', username: 'user004', agentUsername: 'agent001', status: 'CLOSED', title: '支付咨询', ticketNo: 'TK-00000125' }],
+        total: 1,
+      },
+    })
     const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
-    const wrapper = mount(SessionAuditPanel)
-    await nextTick()
-    request.mockClear()
-
-    await wrapper.get('.ticket-number').setValue('支付失败')
-    await wrapper.get('select[aria-label="工单状态"]').setValue('IN_PROGRESS')
-    await wrapper.get('.btn-primary').trigger('click')
-
-    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
-    expect(requestUrl.searchParams.get('ticketKeyword')).toBe('支付失败')
-    expect(requestUrl.searchParams.get('ticketStatus')).toBe('IN_PROGRESS')
-  })
-
-  it('offers a quick filter that limits session management to sessions with tickets', async () => {
-    const { request } = await import('../services/http-client')
-    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
-    const wrapper = mount(SessionAuditPanel)
-    await nextTick()
-    request.mockClear()
-
-    await wrapper.get('input.only-ticket-sessions').setValue(true)
-    await wrapper.get('.btn-primary').trigger('click')
-
-    const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
-    expect(requestUrl.searchParams.get('hasTicket')).toBe('true')
-  })
-
-  it('lets an administrator open a read-only ticket detail for a session', async () => {
-    const { request } = await import('../services/http-client')
-    request
-      .mockResolvedValueOnce({
-        data: {
-          records: [{ sessionId: 's1', username: 'user004', agentUsername: 'agent001', status: 'CLOSED', title: '支付咨询' }],
-          total: 1,
-        },
-      })
-      .mockResolvedValueOnce({
-        data: {
-          ticketNo: 'TK-00000125', status: 'IN_PROGRESS', title: '支付咨询',
-          agentNickname: '客服一', description: '支付失败', resolution: '正在处理',
-          updatedAt: '2026-08-26T10:00:00',
-        },
-      })
-    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
-    const wrapper = mount(SessionAuditPanel, { attachTo: document.body })
+    const wrapper = mount(SessionAuditPanel, { props: { focusedTicket: { sessionId: 's1', ticketNo: 'TK-00000125' } } })
     try {
       await new Promise((resolve) => setTimeout(resolve, 0))
       await nextTick()
-      await wrapper.get('button.open-ticket').trigger('click')
-      await nextTick()
-
-      expect(request).toHaveBeenLastCalledWith('/chat/sessions/s1/ticket')
-      expect(document.body.textContent).toContain('TK-00000125')
-      expect(document.body.textContent).toContain('处理中')
-      expect(document.body.textContent).toContain('支付失败')
-      expect(document.body.textContent).not.toContain('更新工单')
-    } finally {
-      wrapper.unmount()
-    }
-  })
-
-  it('shows an inline success indicator after copying an admin ticket number', async () => {
-    const { request } = await import('../services/http-client')
-    request
-      .mockResolvedValueOnce({ data: { records: [{ sessionId: 's1', status: 'CLOSED' }], total: 1 } })
-      .mockResolvedValueOnce({ data: { ticketNo: 'TK-00000125', status: 'RESOLVED', description: '支付失败' } })
-    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockResolvedValue() } })
-    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
-    const wrapper = mount(SessionAuditPanel, { attachTo: document.body })
-    try {
-      await new Promise((resolve) => setTimeout(resolve, 0))
-      await wrapper.get('button.open-ticket').trigger('click')
-      await nextTick()
-      await document.body.querySelector('button.copy-ticket-no').click()
-      await nextTick()
-
-      expect(document.body.querySelector('.copy-success')?.textContent).toBe('已复制')
+      const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+      expect(requestUrl.searchParams.get('ticketNo')).toBe('TK-00000125')
+      expect(wrapper.find('.focused-session-row').exists()).toBe(true)
     } finally {
       wrapper.unmount()
     }
