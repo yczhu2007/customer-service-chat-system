@@ -229,6 +229,22 @@ describe('会话关联工单', () => {
     expect(wrapper.text()).toContain('客服一 → 客服二')
   })
 
+  it('labels user confirmation as a distinct ticket history action', () => {
+    const chat = useChatStore()
+    chat.activeSessionId = 'session-1'
+    chat.sessions = [{ sessionId: 'session-1', agentId: 'agent-1' }]
+    chat.activeSupportTicket = {
+      ticketNo: 'TK-00000125', sessionId: 'session-1', status: 'RESOLVED',
+      description: '支付失败', version: 1,
+    }
+    chat.activeSupportTicketHistory = [{
+      id: 2, actionType: 'USER_CONFIRMED', fromStatus: 'RESOLVED', toStatus: 'RESOLVED',
+      operatorNickname: '用户一', createdAt: '2026-08-30T10:00:00',
+    }]
+
+    expect(mount(SupportTicketPanel).text()).toContain('用户确认已解决')
+  })
+
   it('lets a user confirm a resolved ticket or request further handling', async () => {
     const chat = useChatStore()
     const auth = useAuthStore()

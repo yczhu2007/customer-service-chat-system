@@ -6,6 +6,7 @@
 <mapper namespace="com.example.customerservice.mapper.SupportTicketStatusHistoryMapper">
     <select id="findRecentByTicketId" resultType="com.example.customerservice.dto.SupportTicketStatusHistoryVO">
         SELECT history.id,
+               history.action_type,
                history.from_status,
                history.to_status,
                COALESCE(NULLIF(operator_user.nickname, ''), operator_user.username) AS operator_nickname,

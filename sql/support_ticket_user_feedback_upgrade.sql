@@ -16,3 +16,19 @@ SET @user_confirmed_at_sql = IF(
 PREPARE user_confirmed_at_statement FROM @user_confirmed_at_sql;
 EXECUTE user_confirmed_at_statement;
 DEALLOCATE PREPARE user_confirmed_at_statement;
+
+SET @action_type_exists = (
+    SELECT COUNT(*)
+    FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'support_ticket_status_history'
+      AND COLUMN_NAME = 'action_type'
+);
+SET @action_type_sql = IF(
+    @action_type_exists = 0,
+    'ALTER TABLE support_ticket_status_history ADD COLUMN action_type VARCHAR(24) NOT NULL DEFAULT ''STATUS_CHANGED'' COMMENT ''操作类型：CREATED、STATUS_CHANGED、USER_CONFIRMED、REOPENED'' AFTER operator_id',
+    'SELECT 1'
+);
+PREPARE action_type_statement FROM @action_type_sql;
+EXECUTE action_type_statement;
+DEALLOCATE PREPARE action_type_statement;

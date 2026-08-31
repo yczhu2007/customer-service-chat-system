@@ -2,6 +2,7 @@ package com.example.customerservice.dto;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 
 import java.io.Serializable;
@@ -14,6 +15,7 @@ public class SupportTicketUserFeedbackDTO implements Serializable {
     @Pattern(regexp = "CONFIRM|REOPEN", message = "工单反馈操作不合法")
     private String action;
 
+    @NotNull(message = "工单版本不能为空")
     @Min(value = 0, message = "工单版本不合法")
     private Integer version;
 

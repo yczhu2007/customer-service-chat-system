@@ -57,6 +57,12 @@ function statusText(value) {
   return statusOptions.find((item) => item.value === value)?.label || '未知状态'
 }
 
+function historyText(item) {
+  if (item.actionType === 'USER_CONFIRMED') return '用户确认已解决'
+  if (item.actionType === 'REOPENED') return '用户申请继续处理'
+  return item.fromStatus ? `${statusText(item.fromStatus)} → ${statusText(item.toStatus)}` : `创建为${statusText(item.toStatus)}`
+}
+
 async function createTicket() {
   if (!description.value.trim()) {
     errorMessage.value = '问题描述不能为空'
@@ -224,7 +230,7 @@ async function respondToResolution(action) {
         <p v-if="!history.length" class="empty">暂无状态变更</p>
         <ul v-else>
           <li v-for="item in history" :key="item.id">
-            <span>{{ item.fromStatus ? `${statusText(item.fromStatus)} → ${statusText(item.toStatus)}` : `创建为${statusText(item.toStatus)}` }}</span>
+            <span>{{ historyText(item) }}</span>
             <small>{{ item.operatorNickname || '未知用户' }} · {{ formatDateTime(item.createdAt) }}</small>
           </li>
         </ul>

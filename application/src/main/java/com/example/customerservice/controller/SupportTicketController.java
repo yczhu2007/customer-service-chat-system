@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.validation.annotation.Validated;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.List;
 
@@ -31,20 +32,23 @@ public class SupportTicketController {
 
     private final SupportTicketService supportTicketService;
     private final CurrentUser currentUser;
+    private final HttpServletRequest httpServletRequest;
 
     public SupportTicketController(
             SupportTicketService supportTicketService,
-            CurrentUser currentUser
+            CurrentUser currentUser,
+            HttpServletRequest httpServletRequest
     ) {
         this.supportTicketService = supportTicketService;
         this.currentUser = currentUser;
+        this.httpServletRequest = httpServletRequest;
     }
 
     @GetMapping("/sessions/{sessionId}/ticket")
     public Result<SupportTicketVO> findTicket(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        boolean administrator = currentUser.getRoleCodes().contains("ADMIN");
+        boolean administrator = isAdministratorWorkspace();
         return Result.success(supportTicketService.findBySessionId(
                 currentUser.getUserId(), administrator, sessionId
         ));
@@ -54,7 +58,7 @@ public class SupportTicketController {
     public Result<List<SupportTicketStatusHistoryVO>> findTicketHistory(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        boolean administrator = currentUser.getRoleCodes().contains("ADMIN");
+        boolean administrator = isAdministratorWorkspace();
         return Result.success(supportTicketService.findHistoryBySessionId(
                 currentUser.getUserId(), administrator, sessionId
         ));
@@ -92,5 +96,24 @@ public class SupportTicketController {
                 ? supportTicketService.confirmResolution(currentUser.getUserId(), ticketNo, request.getVersion())
                 : supportTicketService.requestFurtherHandling(currentUser.getUserId(), ticketNo, request.getVersion());
         return Result.success(ticket);
+    }
+
+    private boolean isAdministratorWorkspace() {
+        String workspaceRole = httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role");
+        if (workspaceRole == null || workspaceRole.isBlank()) {
+            return currentUser.getRoleCodes().contains("ADMIN");
+        }
+        if (!"USER".equals(workspaceRole) && !"AGENT".equals(workspaceRole) && !"ADMIN".equals(workspaceRole)) {
+            throw new IllegalArgumentException("当前工作台角色无效");
+        }
+        if (!currentUser.getRoleCodes().contains(workspaceRole)) {
+            throw new IllegalArgumentException("当前工作台角色无效");
+        }
+        if (!"ADMIN".equals(workspaceRole)) {
+            return false;
+        }
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:session:audit:view");
+        return true;
     }
 }

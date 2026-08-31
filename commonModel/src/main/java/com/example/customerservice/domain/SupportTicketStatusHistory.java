@@ -12,6 +12,7 @@ public class SupportTicketStatusHistory {
     private Long id;
     private Long ticketId;
     private String operatorId;
+    private String actionType;
     private String fromStatus;
     private String toStatus;
     private LocalDateTime createdAt;
@@ -22,6 +23,8 @@ public class SupportTicketStatusHistory {
     public void setTicketId(Long ticketId) { this.ticketId = ticketId; }
     public String getOperatorId() { return operatorId; }
     public void setOperatorId(String operatorId) { this.operatorId = operatorId; }
+    public String getActionType() { return actionType; }
+    public void setActionType(String actionType) { this.actionType = actionType; }
     public String getFromStatus() { return fromStatus; }
     public void setFromStatus(String fromStatus) { this.fromStatus = fromStatus; }
     public String getToStatus() { return toStatus; }

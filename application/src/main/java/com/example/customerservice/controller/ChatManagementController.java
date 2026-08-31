@@ -257,6 +257,7 @@ public class ChatManagementController {
             @RequestParam(required = false) String archiveStatus,
             @RequestParam(required = false) Integer rating,
             @RequestParam(required = false) String ticketNo,
+            @RequestParam(required = false) String ticketKeyword,
             @RequestParam(required = false) String ticketStatus,
             @RequestParam(required = false) Boolean hasTicket,
             @RequestParam(required = false)
@@ -278,6 +279,7 @@ public class ChatManagementController {
                         archiveStatus,
                         rating,
                         ticketNo,
+                        ticketKeyword,
                         ticketStatus,
                         hasTicket,
                         from,

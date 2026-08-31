@@ -219,6 +219,12 @@ class SupportTicketServiceTest {
 
         assertEquals("RESOLVED", confirmed.getStatus());
         org.junit.jupiter.api.Assertions.assertNotNull(confirmed.getUserConfirmedAt());
+        verify(historyMapper).insert(org.mockito.ArgumentMatchers.<SupportTicketStatusHistory>argThat(history ->
+                "USER_CONFIRMED".equals(history.getActionType())
+                        && "RESOLVED".equals(history.getFromStatus())
+                        && "RESOLVED".equals(history.getToStatus())
+                        && "U001".equals(history.getOperatorId())
+        ));
 
         SupportTicket confirmedTicket = ticket("S001", "RESOLVED", 1);
         confirmedTicket.setResolution("已修复");

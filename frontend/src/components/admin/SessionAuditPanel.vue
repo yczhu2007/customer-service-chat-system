@@ -28,11 +28,13 @@ const ticketLoading = ref(false)
 const ticketError = ref(null)
 const selectedTicket = ref(null)
 const ticketSessionId = ref(null)
+const ticketCopied = ref(false)
 const focusedSessionId = ref(null)
 const sessionTable = ref(null)
 const topTableScroll = ref(null)
 const tableScrollWidth = ref(0)
 let tableResizeObserver
+let ticketCopiedTimer
 
 // Filters
 const filters = ref({
@@ -41,7 +43,7 @@ const filters = ref({
   status: '',
   archiveStatus: '',
   rating: '',
-  ticketNo: '',
+  ticketKeyword: '',
   ticketStatus: '',
   hasTicket: false,
   from: '',
@@ -75,7 +77,7 @@ async function loadSessions() {
     if (filters.value.status) qs.set('status', filters.value.status)
     if (filters.value.rating) qs.set('rating', filters.value.rating)
     if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
-    if (filters.value.ticketNo) qs.set('ticketNo', filters.value.ticketNo)
+    if (filters.value.ticketKeyword) qs.set('ticketKeyword', filters.value.ticketKeyword)
     if (filters.value.ticketStatus) qs.set('ticketStatus', filters.value.ticketStatus)
     if (filters.value.hasTicket) qs.set('hasTicket', 'true')
     if (filters.value.from) qs.set('from', normalizeDateTime(filters.value.from))
@@ -95,7 +97,10 @@ async function loadSessions() {
 }
 
 onMounted(loadSessions)
-onBeforeUnmount(() => tableResizeObserver?.disconnect())
+onBeforeUnmount(() => {
+  tableResizeObserver?.disconnect()
+  window.clearTimeout(ticketCopiedTimer)
+})
 
 function refreshTableScrollWidth() {
   const tableElement = sessionTable.value?.$el?.querySelector('.el-table__body')
@@ -126,7 +131,7 @@ function applyFilters() {
 }
 
 function clearFilters() {
-  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', ticketNo: '', ticketStatus: '', hasTicket: false, from: '', to: '' }
+  filters.value = { userLoginNumber: '', agentLoginNumber: '', status: '', archiveStatus: '', rating: '', ticketKeyword: '', ticketStatus: '', hasTicket: false, from: '', to: '' }
   pageNo.value = 1
   loadSessions()
 }
@@ -216,6 +221,7 @@ async function openTicket(row) {
   const sessionId = row.sessionId
   ticketSessionId.value = sessionId
   selectedTicket.value = null
+  ticketCopied.value = false
   ticketError.value = null
   ticketLoading.value = true
   showTicketDialog.value = true
@@ -232,6 +238,11 @@ async function openTicket(row) {
 async function copyTicketNo() {
   try {
     await navigator.clipboard.writeText(selectedTicket.value.ticketNo)
+    ticketCopied.value = true
+    window.clearTimeout(ticketCopiedTimer)
+    ticketCopiedTimer = window.setTimeout(() => {
+      ticketCopied.value = false
+    }, 3000)
     ElMessage.success('工单编号已复制')
   } catch {
     ticketError.value = '复制工单编号失败'
@@ -276,7 +287,7 @@ function removeTag(tag) {
     <div class="filters">
       <input v-model="filters.userLoginNumber" class="user-login-number" placeholder="用户登录编号" />
       <input v-model="filters.agentLoginNumber" class="agent-login-number" placeholder="客服登录编号" />
-      <input v-model="filters.ticketNo" class="ticket-number" placeholder="工单编号" />
+      <input v-model="filters.ticketKeyword" class="ticket-number" placeholder="工单号、标题、问题或处理结果" />
       <select v-model="filters.ticketStatus" aria-label="工单状态">
         <option value="">全部工单状态</option>
         <option v-for="item in TICKET_STATUS_OPTIONS" :key="item.code" :value="item.code">{{ item.label }}</option>
@@ -388,7 +399,7 @@ function removeTag(tag) {
         <p v-if="ticketError" class="error">{{ ticketError }}</p>
         <p v-else-if="!ticketLoading && !selectedTicket" class="empty">该会话暂未创建工单</p>
         <dl v-else-if="selectedTicket">
-          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }} <el-button class="copy-ticket-no" link type="primary" size="small" @click="copyTicketNo">复制</el-button></dd>
+          <dt>工单编号</dt><dd>{{ selectedTicket.ticketNo }} <el-button class="copy-ticket-no" link type="primary" size="small" @click="copyTicketNo">复制</el-button><span v-if="ticketCopied" class="copy-success" role="status">已复制</span></dd>
           <dt>工单状态</dt><dd>{{ ticketStatusLabel(selectedTicket.status) }}</dd>
           <dt>会话标题</dt><dd>{{ selectedTicket.title || '新咨询' }}</dd>
           <dt>负责客服</dt><dd>{{ selectedTicket.agentNickname || '-' }}</dd>
@@ -523,4 +534,5 @@ function removeTag(tag) {
 .ticket-detail dl { display: grid; grid-template-columns: 76px 1fr; gap: 0.7rem 0.8rem; margin: 0; font-size: 0.9rem; }
 .ticket-detail dt { color: #6b7280; }
 .ticket-detail dd { margin: 0; color: #1f2937; white-space: pre-wrap; word-break: break-word; }
+.copy-success { margin-left: 6px; color: var(--color-success); font-size: 12px; }
 </style>

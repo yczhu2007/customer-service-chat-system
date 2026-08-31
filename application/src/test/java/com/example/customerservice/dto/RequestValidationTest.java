@@ -57,4 +57,12 @@ class RequestValidationTest {
 
         assertFalse(validator.validate(request).isEmpty());
     }
+
+    @Test
+    void rejectsUserFeedbackWithoutTicketVersion() {
+        SupportTicketUserFeedbackDTO request = new SupportTicketUserFeedbackDTO();
+        request.setAction("CONFIRM");
+
+        assertFalse(validator.validate(request).isEmpty());
+    }
 }

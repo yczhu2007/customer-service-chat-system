@@ -72,6 +72,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 null,
                 null,
                 null,
+                null,
                 0L,
                 DASHBOARD_SESSION_LIMIT
         );
@@ -211,6 +212,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
             String archiveStatus,
             Integer rating,
             String ticketNo,
+            String ticketKeyword,
             String ticketStatus,
             Boolean hasTicket,
             LocalDateTime fromTime,
@@ -223,6 +225,10 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         validateStatus(status);
         validateArchiveStatus(archiveStatus);
         Long ticketId = parseTicketNo(ticketNo);
+        String normalizedTicketKeyword = normalize(ticketKeyword);
+        if (normalizedTicketKeyword != null && normalizedTicketKeyword.length() > 100) {
+            throw new IllegalArgumentException("工单搜索内容不能超过100个字符");
+        }
         String normalizedTicketStatus = validateTicketStatus(ticketStatus);
         if (rating != null && (rating < 1 || rating > 5)) {
             throw new IllegalArgumentException("rating必须在1到5之间");
@@ -240,6 +246,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 normalizedArchiveStatus,
                 rating,
                 ticketId,
+                normalizedTicketKeyword,
                 normalizedTicketStatus,
                 Boolean.TRUE.equals(hasTicket),
                 fromTime,
@@ -255,6 +262,7 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                         normalizedArchiveStatus,
                         rating,
                         ticketId,
+                        normalizedTicketKeyword,
                         normalizedTicketStatus,
                         Boolean.TRUE.equals(hasTicket),
                         fromTime,

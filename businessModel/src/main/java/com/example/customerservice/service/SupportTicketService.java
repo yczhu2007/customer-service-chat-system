@@ -84,7 +84,7 @@ public class SupportTicketService {
         } catch (DuplicateKeyException exception) {
             throw new BusinessStateException("该会话已创建工单", exception);
         }
-        writeStatusHistory(ticket.getId(), agentId, null, SupportTicketStatus.OPEN.name(), now);
+        writeStatusHistory(ticket.getId(), agentId, "CREATED", null, SupportTicketStatus.OPEN.name(), now);
         SupportTicketVO view = toView(ticket, session);
         notifyAfterCommit(session, view, "TICKET_CREATED");
         return view;
@@ -139,7 +139,7 @@ public class SupportTicketService {
             throw new BusinessStateException("工单已被其他操作修改，请刷新后重试");
         }
         if (current != target) {
-            writeStatusHistory(ticket.getId(), agentId, current.name(), target.name(), now);
+            writeStatusHistory(ticket.getId(), agentId, "STATUS_CHANGED", current.name(), target.name(), now);
         }
         next.setSessionId(ticket.getSessionId());
         next.setCreatedAt(ticket.getCreatedAt());
@@ -156,6 +156,7 @@ public class SupportTicketService {
         LocalDateTime now = LocalDateTime.now();
         SupportTicket next = copyTicketForUpdate(ticket, ticket.getStatus(), ticket.getResolution(), ticket.getResolvedAt(), now, now);
         updateByVersion(next, version);
+        writeStatusHistory(ticket.getId(), userId, "USER_CONFIRMED", SupportTicketStatus.RESOLVED.name(), SupportTicketStatus.RESOLVED.name(), now);
         ChatSession session = requireSession(ticket.getSessionId());
         SupportTicketVO view = toView(next, session);
         notifyAfterCommit(session, view, "TICKET_UPDATED");
@@ -168,7 +169,7 @@ public class SupportTicketService {
         LocalDateTime now = LocalDateTime.now();
         SupportTicket next = copyTicketForUpdate(ticket, SupportTicketStatus.IN_PROGRESS.name(), ticket.getResolution(), null, null, now);
         updateByVersion(next, version);
-        writeStatusHistory(ticket.getId(), userId, SupportTicketStatus.RESOLVED.name(), SupportTicketStatus.IN_PROGRESS.name(), now);
+        writeStatusHistory(ticket.getId(), userId, "REOPENED", SupportTicketStatus.RESOLVED.name(), SupportTicketStatus.IN_PROGRESS.name(), now);
         ChatSession session = requireSession(ticket.getSessionId());
         SupportTicketVO view = toView(next, session);
         notifyAfterCommit(session, view, "TICKET_UPDATED");
@@ -319,6 +320,7 @@ public class SupportTicketService {
     private void writeStatusHistory(
             Long ticketId,
             String operatorId,
+            String actionType,
             String fromStatus,
             String toStatus,
             LocalDateTime createdAt
@@ -326,6 +328,7 @@ public class SupportTicketService {
         SupportTicketStatusHistory history = new SupportTicketStatusHistory();
         history.setTicketId(ticketId);
         history.setOperatorId(operatorId);
+        history.setActionType(actionType);
         history.setFromStatus(fromStatus);
         history.setToStatus(toStatus);
         history.setCreatedAt(createdAt);

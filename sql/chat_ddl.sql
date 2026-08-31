@@ -145,9 +145,10 @@ CREATE TABLE IF NOT EXISTS support_ticket
 CREATE TABLE IF NOT EXISTS support_ticket_status_history
 (
     id          BIGINT      NOT NULL AUTO_INCREMENT COMMENT '工单状态历史主键',
-    ticket_id   BIGINT      NOT NULL COMMENT '工单主键',
-    operator_id VARCHAR(64) NOT NULL COMMENT '操作人ID',
-    from_status VARCHAR(20) NULL COMMENT '变更前状态，创建时为空',
+      ticket_id   BIGINT      NOT NULL COMMENT '工单主键',
+      operator_id VARCHAR(64) NOT NULL COMMENT '操作人ID',
+      action_type VARCHAR(24) NOT NULL DEFAULT 'STATUS_CHANGED' COMMENT '操作类型：CREATED、STATUS_CHANGED、USER_CONFIRMED、REOPENED',
+      from_status VARCHAR(20) NULL COMMENT '变更前状态，创建时为空',
     to_status   VARCHAR(20) NOT NULL COMMENT '变更后状态',
     created_at  DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) COMMENT '操作时间',
 

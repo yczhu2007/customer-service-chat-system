@@ -12,6 +12,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import jakarta.servlet.http.HttpServletRequest;
 
 import java.util.Set;
 import java.util.List;
@@ -25,19 +26,21 @@ class SupportTicketControllerTest {
 
     @Mock private SupportTicketService supportTicketService;
     @Mock private CurrentUser currentUser;
+    @Mock private HttpServletRequest httpServletRequest;
     @InjectMocks private SupportTicketController controller;
 
     @Test
-    void sessionParticipantCanReadTicketAndAdminRoleIsPassedToService() {
+    void userWorkspaceDoesNotUseAdminAuditAccessForMultiRoleAccount() {
         SupportTicketVO ticket = new SupportTicketVO();
         when(currentUser.getUserId()).thenReturn("U001");
         when(currentUser.getRoleCodes()).thenReturn(Set.of("USER", "ADMIN"));
-        when(supportTicketService.findBySessionId("U001", true, "S001")).thenReturn(ticket);
+        when(httpServletRequest.getHeader("X-Workspace-Role")).thenReturn("USER");
+        when(supportTicketService.findBySessionId("U001", false, "S001")).thenReturn(ticket);
 
         Result<SupportTicketVO> result = controller.findTicket("S001");
 
         assertEquals(ticket, result.getData());
-        verify(supportTicketService).findBySessionId("U001", true, "S001");
+        verify(supportTicketService).findBySessionId("U001", false, "S001");
     }
 
     @Test

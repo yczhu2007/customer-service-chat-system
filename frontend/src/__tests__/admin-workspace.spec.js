@@ -327,19 +327,19 @@ describe('SessionAuditPanel', () => {
     expect(deleteButtons.every((button) => button.attributes('disabled') === undefined)).toBe(true)
   })
 
-  it('searches sessions by ticket number and ticket status', async () => {
+  it('searches sessions by ticket keyword and ticket status', async () => {
     const { request } = await import('../services/http-client')
     const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
     const wrapper = mount(SessionAuditPanel)
     await nextTick()
     request.mockClear()
 
-    await wrapper.get('.ticket-number').setValue('TK-00000125')
+    await wrapper.get('.ticket-number').setValue('支付失败')
     await wrapper.get('select[aria-label="工单状态"]').setValue('IN_PROGRESS')
     await wrapper.get('.btn-primary').trigger('click')
 
     const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
-    expect(requestUrl.searchParams.get('ticketNo')).toBe('TK-00000125')
+    expect(requestUrl.searchParams.get('ticketKeyword')).toBe('支付失败')
     expect(requestUrl.searchParams.get('ticketStatus')).toBe('IN_PROGRESS')
   })
 
@@ -386,6 +386,27 @@ describe('SessionAuditPanel', () => {
       expect(document.body.textContent).toContain('处理中')
       expect(document.body.textContent).toContain('支付失败')
       expect(document.body.textContent).not.toContain('更新工单')
+    } finally {
+      wrapper.unmount()
+    }
+  })
+
+  it('shows an inline success indicator after copying an admin ticket number', async () => {
+    const { request } = await import('../services/http-client')
+    request
+      .mockResolvedValueOnce({ data: { records: [{ sessionId: 's1', status: 'CLOSED' }], total: 1 } })
+      .mockResolvedValueOnce({ data: { ticketNo: 'TK-00000125', status: 'RESOLVED', description: '支付失败' } })
+    vi.stubGlobal('navigator', { clipboard: { writeText: vi.fn().mockResolvedValue() } })
+    const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+    const wrapper = mount(SessionAuditPanel, { attachTo: document.body })
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.get('button.open-ticket').trigger('click')
+      await nextTick()
+      await document.body.querySelector('button.copy-ticket-no').click()
+      await nextTick()
+
+      expect(document.body.querySelector('.copy-success')?.textContent).toBe('已复制')
     } finally {
       wrapper.unmount()
     }
