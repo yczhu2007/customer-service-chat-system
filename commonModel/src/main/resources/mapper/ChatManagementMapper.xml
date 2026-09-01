@@ -85,6 +85,37 @@
         </constructor>
     </resultMap>
 
+    <resultMap id="reportTimeBucketResult" type="com.example.customerservice.dto.AdminReportOverviewVO$TimeBucketCountVO">
+        <constructor>
+            <arg column="bucket" javaType="java.lang.String"/>
+            <arg column="count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="reportAgentRankResult" type="com.example.customerservice.dto.AdminReportOverviewVO$AgentReceptionRankVO">
+        <constructor>
+            <arg column="agent_id" javaType="java.lang.String"/>
+            <arg column="agent_name" javaType="java.lang.String"/>
+            <arg column="session_count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="reportDurationBucketResult" type="com.example.customerservice.dto.AdminReportOverviewVO$DurationBucketCountVO">
+        <constructor>
+            <arg column="bucket" javaType="java.lang.String"/>
+            <arg column="count" javaType="_long"/>
+        </constructor>
+    </resultMap>
+
+    <resultMap id="reportSatisfactionResult" type="com.example.customerservice.dto.AdminReportOverviewVO$SatisfactionMetricsVO">
+        <constructor>
+            <arg column="rating_count" javaType="_long"/>
+            <arg column="average_rating" javaType="java.lang.Double"/>
+            <arg column="low_rating_count" javaType="_long"/>
+            <arg column="low_rating_rate" javaType="java.lang.Double"/>
+        </constructor>
+    </resultMap>
+
     <resultMap id="transferLogResult" type="com.example.customerservice.dto.SessionTransferLogVO">
         <constructor>
             <arg column="id" javaType="java.lang.String"/>
@@ -561,6 +592,92 @@
                 AND rating.create_time &lt; #{toTime}
             </if>
         </where>
+    </select>
+
+    <select id="findSessionTrend" resultMap="reportTimeBucketResult">
+        SELECT
+        <choose>
+            <when test="granularity == 'WEEK'">
+                DATE_FORMAT(DATE_SUB(session.create_time, INTERVAL WEEKDAY(session.create_time) DAY), '%Y-%m-%d')
+            </when>
+            <otherwise>
+                DATE_FORMAT(session.create_time, '%Y-%m-%d')
+            </otherwise>
+        </choose>
+        AS bucket,
+        COUNT(*) AS count
+        FROM chat_session session
+        WHERE session.create_time &gt;= #{fromTime}
+          AND session.create_time &lt; #{toTime}
+        GROUP BY bucket
+        ORDER BY bucket ASC
+    </select>
+
+    <select id="findAgentReceptionRanking" resultMap="reportAgentRankResult">
+        SELECT session.agent_id,
+               COALESCE(NULLIF(agent.nickname, ''), agent.username, session.agent_id) AS agent_name,
+               COUNT(*) AS session_count
+        FROM chat_session session
+        LEFT JOIN sys_user agent ON agent.id = session.agent_id
+        WHERE session.agent_id IS NOT NULL
+          AND session.create_time &gt;= #{fromTime}
+          AND session.create_time &lt; #{toTime}
+        GROUP BY session.agent_id, agent.nickname, agent.username
+        ORDER BY session_count DESC, session.agent_id ASC
+        LIMIT #{limit}
+    </select>
+
+    <select id="findAverageFirstResponseSeconds" resultType="java.lang.Long">
+        SELECT ROUND(AVG(first_response.first_response_seconds))
+        FROM (
+            SELECT TIMESTAMPDIFF(SECOND, session.create_time, MIN(message.create_time)) AS first_response_seconds
+            FROM chat_session session
+            JOIN chat_message message ON message.session_id = session.id
+            WHERE session.create_time &gt;= #{fromTime}
+              AND session.create_time &lt; #{toTime}
+              AND message.sender_role = 'AGENT'
+              AND message.recalled = 0
+            GROUP BY session.id, session.create_time
+        ) first_response
+    </select>
+
+    <select id="findSessionDurationDistribution" resultMap="reportDurationBucketResult">
+        SELECT CASE
+                   WHEN TIMESTAMPDIFF(MINUTE, session.create_time, session.end_time) &lt; 5 THEN '0-5m'
+                   WHEN TIMESTAMPDIFF(MINUTE, session.create_time, session.end_time) &lt; 15 THEN '5-15m'
+                   WHEN TIMESTAMPDIFF(MINUTE, session.create_time, session.end_time) &lt; 30 THEN '15-30m'
+                   WHEN TIMESTAMPDIFF(MINUTE, session.create_time, session.end_time) &lt; 60 THEN '30-60m'
+                   ELSE '60m+'
+               END AS bucket,
+               COUNT(*) AS count
+        FROM chat_session session
+        WHERE session.end_time IS NOT NULL
+          AND session.create_time &gt;= #{fromTime}
+          AND session.create_time &lt; #{toTime}
+        GROUP BY bucket
+        ORDER BY FIELD(bucket, '0-5m', '5-15m', '15-30m', '30-60m', '60m+')
+    </select>
+
+    <select id="findSatisfactionMetrics" resultMap="reportSatisfactionResult">
+        SELECT COUNT(*) AS rating_count,
+               ROUND(AVG(rating.rating), 2) AS average_rating,
+               COALESCE(SUM(CASE WHEN rating.rating &lt;= 2 THEN 1 ELSE 0 END), 0) AS low_rating_count,
+               CASE WHEN COUNT(*) = 0 THEN NULL
+                    ELSE ROUND(SUM(CASE WHEN rating.rating &lt;= 2 THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2)
+               END AS low_rating_rate
+        FROM chat_session_rating rating
+        WHERE rating.create_time &gt;= #{fromTime}
+          AND rating.create_time &lt; #{toTime}
+    </select>
+
+    <select id="findTicketStatusDistribution" resultType="com.example.customerservice.dto.SupportTicketStatusCountVO">
+        SELECT ticket.status,
+               COUNT(*) AS count
+        FROM support_ticket ticket
+        WHERE ticket.created_at &gt;= #{fromTime}
+          AND ticket.created_at &lt; #{toTime}
+        GROUP BY ticket.status
+        ORDER BY ticket.status ASC
     </select>
 
     <select id="findTransferLogs" resultMap="transferLogResult">

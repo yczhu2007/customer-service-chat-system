@@ -3,6 +3,8 @@ package com.example.customerservice.controller;
 import com.example.customerservice.common.Result;
 import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AdminDashboardVO;
+import com.example.customerservice.dto.AdminReportOverviewVO;
+import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.AdminSessionCreateDTO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
@@ -210,6 +212,25 @@ public class ChatManagementController {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:admin:dashboard:view");
         return Result.success(managementQueryService.findAdminDashboard());
+    }
+
+    @GetMapping("/admin/reports/overview")
+    public Result<AdminReportOverviewVO> findAdminReportOverview(
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime from,
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+            LocalDateTime to,
+            @RequestParam(required = false) String granularity
+    ) {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:admin:dashboard:view");
+        AdminReportQueryDTO query = new AdminReportQueryDTO();
+        query.setFrom(from);
+        query.setTo(to);
+        query.setGranularity(granularity);
+        return Result.success(managementQueryService.findAdminReportOverview(query));
     }
 
     @GetMapping("/agent/ratings/summary")

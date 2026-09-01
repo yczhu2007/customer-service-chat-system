@@ -2,11 +2,16 @@ package com.example.customerservice.mapper;
 
 import com.example.customerservice.dto.AgentLoadVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
+import com.example.customerservice.dto.AdminReportOverviewVO.AgentReceptionRankVO;
+import com.example.customerservice.dto.AdminReportOverviewVO.DurationBucketCountVO;
+import com.example.customerservice.dto.AdminReportOverviewVO.SatisfactionMetricsVO;
+import com.example.customerservice.dto.AdminReportOverviewVO.TimeBucketCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.ChatMessageSearchVO;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -85,6 +90,38 @@ public interface ChatManagementMapper {
 
     RatingSummaryVO findRatingSummary(
             @Param("agentId") String agentId,
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime
+    );
+
+    List<TimeBucketCountVO> findSessionTrend(
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime,
+            @Param("granularity") String granularity
+    );
+
+    List<AgentReceptionRankVO> findAgentReceptionRanking(
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime,
+            @Param("limit") long limit
+    );
+
+    Long findAverageFirstResponseSeconds(
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime
+    );
+
+    List<DurationBucketCountVO> findSessionDurationDistribution(
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime
+    );
+
+    SatisfactionMetricsVO findSatisfactionMetrics(
+            @Param("fromTime") LocalDateTime fromTime,
+            @Param("toTime") LocalDateTime toTime
+    );
+
+    List<SupportTicketStatusCountVO> findTicketStatusDistribution(
             @Param("fromTime") LocalDateTime fromTime,
             @Param("toTime") LocalDateTime toTime
     );

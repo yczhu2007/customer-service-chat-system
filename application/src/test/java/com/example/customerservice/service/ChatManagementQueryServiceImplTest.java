@@ -4,6 +4,7 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AgentLoadVO;
+import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
@@ -174,5 +175,24 @@ class ChatManagementQueryServiceImplTest {
 
         assertEquals(10L, result.ratingCount());
         verify(managementMapper).findRatingSummary(null, null, null);
+    }
+
+    @Test
+    void reportOverviewQueriesEveryMetricForRequestedRange() {
+        LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 9, 1, 0, 0);
+        AdminReportQueryDTO query = new AdminReportQueryDTO();
+        query.setFrom(from);
+        query.setTo(to);
+        query.setGranularity("DAY");
+
+        service.findAdminReportOverview(query);
+
+        verify(managementMapper).findSessionTrend(from, to, "DAY");
+        verify(managementMapper).findAgentReceptionRanking(from, to, 10);
+        verify(managementMapper).findAverageFirstResponseSeconds(from, to);
+        verify(managementMapper).findSessionDurationDistribution(from, to);
+        verify(managementMapper).findSatisfactionMetrics(from, to);
+        verify(managementMapper).findTicketStatusDistribution(from, to);
     }
 }

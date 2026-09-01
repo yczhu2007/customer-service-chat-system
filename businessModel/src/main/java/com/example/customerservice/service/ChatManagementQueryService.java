@@ -2,6 +2,8 @@ package com.example.customerservice.service;
 
 import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AdminDashboardVO;
+import com.example.customerservice.dto.AdminReportOverviewVO;
+import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
@@ -31,6 +33,8 @@ public interface ChatManagementQueryService {
     );
 
     AdminDashboardVO findAdminDashboard();
+
+    AdminReportOverviewVO findAdminReportOverview(AdminReportQueryDTO query);
 
     RatingSummaryVO findRatingSummary(
             String agentId,

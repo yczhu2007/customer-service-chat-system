@@ -41,6 +41,7 @@ vi.mock('../api/admin-api', () => ({
     })
   ),
   findAdminDashboard: vi.fn(() => Promise.resolve({ data: {} })),
+  findAdminReportOverview: vi.fn(() => Promise.resolve({ data: {} })),
   findVipSkillAgents: vi.fn(() => Promise.resolve({ data: [] })),
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),
@@ -70,6 +71,7 @@ describe('AdminWorkspaceView', () => {
       global: {
         stubs: {
           AdminDashboard: { template: '<div class="stub-dashboard">仪表盘</div>' },
+          AdminReportPanel: { template: '<div class="stub-reports">报表</div>' },
           UserManagementPanel: { template: '<div class="stub-users">用户管理</div>' },
           RoleManagementPanel: { template: '<div class="stub-roles">角色管理</div>' },
           SessionAuditPanel: { template: '<div class="stub-sessions">会话审计</div>' },
@@ -90,9 +92,13 @@ describe('AdminWorkspaceView', () => {
 
     // Click "用户管理" in the sidebar
     const navigationItems = sidebar.findAll('.sidebar-item')
-    await navigationItems[1].trigger('click')
+    await navigationItems.find((item) => item.text() === '用户管理').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-users').exists()).toBe(true)
+
+    await sidebar.findAll('.sidebar-item').find((item) => item.text() === '报表').trigger('click')
+    await nextTick()
+    expect(wrapper.find('.stub-reports').exists()).toBe(true)
 
     // Click "归档统计" tab
     await navigationItems.find((item) => item.text() === '归档统计').trigger('click')
