@@ -32,7 +32,7 @@ async function loadTickets() {
     const params = requestParams()
     const [page, counts] = await Promise.all([
       listAdminTickets(params),
-      findAdminTicketStatusCounts(params),
+      findAdminTicketStatusCounts(),
     ])
     tickets.value = page?.data?.records || []
     total.value = page?.data?.total || 0

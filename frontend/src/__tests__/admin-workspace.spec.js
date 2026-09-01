@@ -194,7 +194,7 @@ describe('AdminTicketPanel', () => {
     findAdminTicketStatusCounts.mockReset().mockResolvedValue({ data: [{ status: 'IN_PROGRESS', count: 1 }] })
   })
 
-  it('queries tickets and status counts with the same filters', async () => {
+  it('keeps status counts independent from the ticket list filters', async () => {
     const { listAdminTickets, findAdminTicketStatusCounts } = await import('../api/admin-api')
     const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
     const wrapper = mount(AdminTicketPanel)
@@ -208,7 +208,7 @@ describe('AdminTicketPanel', () => {
     await wrapper.get('.search-tickets').trigger('click')
 
     expect(listAdminTickets).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '支付失败', status: 'IN_PROGRESS', pageNo: 1 }))
-    expect(findAdminTicketStatusCounts).toHaveBeenLastCalledWith(expect.objectContaining({ keyword: '支付失败', status: 'IN_PROGRESS' }))
+    expect(findAdminTicketStatusCounts).toHaveBeenLastCalledWith()
   })
 
   it('emits the selected ticket when locating a ticket conversation', async () => {
