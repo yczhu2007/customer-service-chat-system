@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { findAdminReportOverview } from '../../api/admin-api'
+import { createRecent30DayRange } from '../../utils/admin-date-range'
 import ReportChart from './ReportChart.vue'
 import {
   buildAgentReceptionOption,
@@ -14,16 +15,9 @@ const loading = ref(true)
 const error = ref('')
 const report = ref(null)
 const granularity = ref('DAY')
-const from = ref(defaultDateTime(-30))
-const to = ref(defaultDateTime(1))
-
-function defaultDateTime(dayOffset) {
-  const date = new Date()
-  date.setDate(date.getDate() + dayOffset)
-  date.setSeconds(0, 0)
-  const pad = (value) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
-}
+const defaultDateRange = createRecent30DayRange()
+const from = ref(defaultDateRange.from)
+const to = ref(defaultDateRange.to)
 
 async function loadReport() {
   loading.value = true

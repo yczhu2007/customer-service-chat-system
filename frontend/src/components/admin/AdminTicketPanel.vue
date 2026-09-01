@@ -3,9 +3,14 @@ import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { findAdminTicketStatusCounts, listAdminTickets } from '../../api/admin-api'
 import { CATEGORY_OPTIONS, categoryLabel, formatDateTime, priorityLabel, ticketStatusLabel, TICKET_STATUS_OPTIONS } from '../../constants/session-ui'
+import { createRecent30DayRange } from '../../utils/admin-date-range'
 
 const emit = defineEmits(['locate-session'])
-const filters = ref({ keyword: '', status: '', priority: '', category: '', agentKeyword: '', createdFrom: '', createdTo: '' })
+function createFilters() {
+  const dateRange = createRecent30DayRange()
+  return { keyword: '', status: '', priority: '', category: '', agentKeyword: '', createdFrom: dateRange.from, createdTo: dateRange.to }
+}
+const filters = ref(createFilters())
 const tickets = ref([])
 const total = ref(0)
 const pageNo = ref(1)
@@ -50,7 +55,7 @@ function searchTickets() {
 }
 
 function resetTickets() {
-  filters.value = { keyword: '', status: '', priority: '', category: '', agentKeyword: '', createdFrom: '', createdTo: '' }
+  filters.value = createFilters()
   searchTickets()
 }
 

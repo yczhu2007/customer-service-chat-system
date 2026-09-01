@@ -217,6 +217,25 @@ describe('AdminTicketPanel', () => {
     expect(findAdminTicketStatusCounts).toHaveBeenLastCalledWith()
   })
 
+  it('loads tickets in the default recent 30-day range', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-01T10:30:00'))
+    try {
+      const { listAdminTickets } = await import('../api/admin-api')
+      const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
+      mount(AdminTicketPanel)
+      await nextTick()
+      await Promise.resolve()
+
+      expect(listAdminTickets).toHaveBeenLastCalledWith(expect.objectContaining({
+        createdFrom: '2026-08-02T00:00',
+        createdTo: '2026-09-02T00:00',
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('emits the selected ticket when locating a ticket conversation', async () => {
     const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
     const wrapper = mount(AdminTicketPanel, { attachTo: document.body })
@@ -328,6 +347,25 @@ describe('SessionAuditPanel', () => {
     const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
     expect(requestUrl.searchParams.get('from')).toBe('2026-08-22T09:30')
     expect(requestUrl.searchParams.get('to')).toBe('2026-08-22T18:45')
+  })
+
+  it('loads sessions in the default recent 30-day range', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-01T10:30:00'))
+    try {
+      const { request } = await import('../services/http-client')
+      request.mockClear()
+      const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+      mount(SessionAuditPanel)
+      await nextTick()
+      await Promise.resolve()
+
+      const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+      expect(requestUrl.searchParams.get('from')).toBe('2026-08-02T00:00')
+      expect(requestUrl.searchParams.get('to')).toBe('2026-09-02T00:00')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders returned audit records and their transfer row safely', async () => {
