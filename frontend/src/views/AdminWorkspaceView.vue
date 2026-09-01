@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 import AdminDashboard from '../components/admin/AdminDashboard.vue'
+import AdminReportPanel from '../components/admin/AdminReportPanel.vue'
 import UserManagementPanel from '../components/admin/UserManagementPanel.vue'
 import RoleManagementPanel from '../components/admin/RoleManagementPanel.vue'
 import SessionAuditPanel from '../components/admin/SessionAuditPanel.vue'
@@ -15,6 +16,7 @@ const focusedTicket = ref(null)
 
 const tabs = [
   { key: 'dashboard', label: '管理仪表盘' },
+  { key: 'reports', label: '报表' },
   { key: 'users', label: '用户管理' },
   { key: 'roles', label: '角色管理' },
   { key: 'sessions', label: '会话管理' },
@@ -53,6 +55,7 @@ function locateTicketSession(ticket) {
 
     <section class="admin-content">
       <AdminDashboard v-if="activeTab === 'dashboard'" />
+      <AdminReportPanel v-if="activeTab === 'reports'" />
       <UserManagementPanel v-if="activeTab === 'users'" />
       <RoleManagementPanel v-if="activeTab === 'roles'" />
       <SessionAuditPanel v-if="activeTab === 'sessions'" :focused-ticket="focusedTicket" @session-focused="focusedTicket = null" />

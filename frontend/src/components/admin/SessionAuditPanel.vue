@@ -4,6 +4,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { request } from '../../services/http-client'
 import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
 import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, formatDateTime, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
+import { createRecent30DayRange } from '../../utils/admin-date-range'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
 
 const props = defineProps({
@@ -35,6 +36,7 @@ let tableResizeObserver
 
 // Filters
 function createFilters() {
+  const dateRange = createRecent30DayRange()
   return {
   userLoginNumber: '',
   agentLoginNumber: '',
@@ -42,8 +44,8 @@ function createFilters() {
   archiveStatus: '',
   rating: '',
   ticketNo: '',
-  from: '',
-  to: '',
+  from: dateRange.from,
+  to: dateRange.to,
   }
 }
 const filters = ref(createFilters())
@@ -102,7 +104,7 @@ watch(
   async (ticket) => {
     if (!ticket?.ticketNo) return
     pageNo.value = 1
-    filters.value = { ...createFilters(), ticketNo: ticket.ticketNo }
+    filters.value = { ...createFilters(), ticketNo: ticket.ticketNo, from: '', to: '' }
     await loadSessions()
     focusedSessionId.value = ticket.sessionId
     await nextTick()

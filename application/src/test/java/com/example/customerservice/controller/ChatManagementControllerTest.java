@@ -3,6 +3,8 @@ package com.example.customerservice.controller;
 import com.example.customerservice.common.Result;
 import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
+import com.example.customerservice.dto.AdminReportOverviewVO;
+import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.SessionTransferLogVO;
@@ -16,6 +18,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.lang.reflect.Method;
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -129,5 +132,25 @@ class ChatManagementControllerTest {
         verify(currentUser).requireRole("USER");
         verify(currentUser, never()).requirePermission("chat:session:transfer-log:view");
         verify(managementQueryService).findTransferLogs("U001", false, "S001");
+    }
+
+    @Test
+    void adminCanReadReportOverviewWithDashboardPermission() {
+        LocalDateTime from = LocalDateTime.of(2026, 8, 1, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 9, 1, 0, 0);
+        AdminReportOverviewVO overview = new AdminReportOverviewVO(
+                List.of(), List.of(), null, List.of(), null, List.of()
+        );
+        when(managementQueryService.findAdminReportOverview(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(overview);
+
+        Result<AdminReportOverviewVO> result = controller.findAdminReportOverview(from, to, "WEEK");
+
+        assertEquals(overview, result.getData());
+        verify(currentUser).requireRole("ADMIN");
+        verify(currentUser).requirePermission("chat:admin:dashboard:view");
+        verify(managementQueryService).findAdminReportOverview(org.mockito.ArgumentMatchers.argThat(query ->
+                from.equals(query.getFrom()) && to.equals(query.getTo()) && "WEEK".equals(query.getGranularity())
+        ));
     }
 }

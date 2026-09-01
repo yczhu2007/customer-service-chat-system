@@ -6,6 +6,8 @@ import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatSessionTag;
 import com.example.customerservice.dto.AdminDashboardVO;
+import com.example.customerservice.dto.AdminReportOverviewVO;
+import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.AgentDashboardVO;
 import com.example.customerservice.dto.AgentLoadVO;
 import com.example.customerservice.dto.AgentSessionViewCountVO;
@@ -15,6 +17,7 @@ import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
+import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.constant.SupportTicketStatus;
 import com.example.customerservice.mapper.ChatManagementMapper;
@@ -37,6 +40,16 @@ import java.util.Set;
 public class ChatManagementQueryServiceImpl implements ChatManagementQueryService {
 
     private static final long DASHBOARD_SESSION_LIMIT = 100L;
+    private static final int REPORT_MAX_RANGE_DAYS = 366;
+    private static final List<String> REPORT_TICKET_STATUSES = List.of(
+            SupportTicketStatus.OPEN.name(),
+            SupportTicketStatus.IN_PROGRESS.name(),
+            SupportTicketStatus.WAITING_USER.name(),
+            SupportTicketStatus.RESOLVED.name()
+    );
+    private static final List<String> REPORT_DURATION_BUCKETS = List.of(
+            "0-5m", "5-15m", "15-30m", "30-60m", "60m+"
+    );
 
     private final ChatManagementMapper managementMapper;
     private final ChatSessionMapper sessionMapper;
@@ -191,6 +204,29 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
                 managementMapper.countTodaySessions(dayStart, dayEnd),
                 managementMapper.countTodayMessages(dayStart, dayEnd),
                 agentLoads == null ? List.of() : List.copyOf(agentLoads)
+        );
+    }
+
+    @Override
+    public AdminReportOverviewVO findAdminReportOverview(AdminReportQueryDTO query) {
+        ReportRange range = normalizeReportRange(query);
+        return new AdminReportOverviewVO(
+                fillTrend(range, managementMapper.findSessionTrend(
+                        range.fromTime(), range.toTime(), range.granularity()
+                )),
+                safeList(managementMapper.findAgentReceptionRanking(
+                        range.fromTime(), range.toTime(), 10L
+                )),
+                managementMapper.findAverageFirstResponseSeconds(range.fromTime(), range.toTime()),
+                fillDurationBuckets(managementMapper.findSessionDurationDistribution(
+                        range.fromTime(), range.toTime()
+                )),
+                satisfactionOrEmpty(managementMapper.findSatisfactionMetrics(
+                        range.fromTime(), range.toTime()
+                )),
+                fillTicketStatuses(managementMapper.findTicketStatusDistribution(
+                        range.fromTime(), range.toTime()
+                ))
         );
     }
 
@@ -422,4 +458,98 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
     private long valueOrZero(Long value) {
         return value == null ? 0L : value;
     }
+
+    private ReportRange normalizeReportRange(AdminReportQueryDTO query) {
+        LocalDateTime defaultTo = LocalDate.now().plusDays(1).atStartOfDay();
+        LocalDateTime fromTime = query == null || query.getFrom() == null
+                ? defaultTo.minusDays(30) : query.getFrom();
+        LocalDateTime toTime = query == null || query.getTo() == null
+                ? defaultTo : query.getTo();
+        validateTimeRange(fromTime, toTime);
+        if (fromTime.plusDays(REPORT_MAX_RANGE_DAYS).isBefore(toTime)) {
+            throw new IllegalArgumentException("报表查询时间范围不能超过366天");
+        }
+        String granularity = query == null ? null : normalize(query.getGranularity());
+        if (granularity == null) {
+            granularity = "DAY";
+        }
+        if (!"DAY".equals(granularity) && !"WEEK".equals(granularity)) {
+            throw new IllegalArgumentException("granularity只允许DAY或WEEK");
+        }
+        return new ReportRange(fromTime, toTime, granularity);
+    }
+
+    private List<AdminReportOverviewVO.TimeBucketCountVO> fillTrend(
+            ReportRange range,
+            List<AdminReportOverviewVO.TimeBucketCountVO> records
+    ) {
+        Map<String, Long> countByBucket = new LinkedHashMap<>();
+        for (AdminReportOverviewVO.TimeBucketCountVO record : safeList(records)) {
+            if (record != null && record.bucket() != null) {
+                countByBucket.put(record.bucket(), record.count());
+            }
+        }
+        List<AdminReportOverviewVO.TimeBucketCountVO> result = new ArrayList<>();
+        LocalDate cursor = range.fromTime().toLocalDate();
+        LocalDate endDate = range.toTime().minusNanos(1).toLocalDate();
+        if ("WEEK".equals(range.granularity())) {
+            cursor = cursor.minusDays(cursor.getDayOfWeek().getValue() - 1L);
+        }
+        while (!cursor.isAfter(endDate)) {
+            String bucket = cursor.toString();
+            result.add(new AdminReportOverviewVO.TimeBucketCountVO(
+                    bucket, countByBucket.getOrDefault(bucket, 0L)
+            ));
+            cursor = "WEEK".equals(range.granularity()) ? cursor.plusWeeks(1) : cursor.plusDays(1);
+        }
+        return List.copyOf(result);
+    }
+
+    private List<AdminReportOverviewVO.DurationBucketCountVO> fillDurationBuckets(
+            List<AdminReportOverviewVO.DurationBucketCountVO> records
+    ) {
+        Map<String, Long> countByBucket = new LinkedHashMap<>();
+        for (AdminReportOverviewVO.DurationBucketCountVO record : safeList(records)) {
+            if (record != null && record.bucket() != null) {
+                countByBucket.put(record.bucket(), record.count());
+            }
+        }
+        List<AdminReportOverviewVO.DurationBucketCountVO> result = new ArrayList<>();
+        for (String bucket : REPORT_DURATION_BUCKETS) {
+            result.add(new AdminReportOverviewVO.DurationBucketCountVO(
+                    bucket, countByBucket.getOrDefault(bucket, 0L)
+            ));
+        }
+        return List.copyOf(result);
+    }
+
+    private List<SupportTicketStatusCountVO> fillTicketStatuses(
+            List<SupportTicketStatusCountVO> records
+    ) {
+        Map<String, Long> countByStatus = new LinkedHashMap<>();
+        for (SupportTicketStatusCountVO record : safeList(records)) {
+            if (record != null && record.getStatus() != null) {
+                countByStatus.put(record.getStatus(), record.getCount());
+            }
+        }
+        List<SupportTicketStatusCountVO> result = new ArrayList<>();
+        for (String status : REPORT_TICKET_STATUSES) {
+            result.add(new SupportTicketStatusCountVO(status, countByStatus.getOrDefault(status, 0L)));
+        }
+        return List.copyOf(result);
+    }
+
+    private AdminReportOverviewVO.SatisfactionMetricsVO satisfactionOrEmpty(
+            AdminReportOverviewVO.SatisfactionMetricsVO metrics
+    ) {
+        return metrics == null
+                ? new AdminReportOverviewVO.SatisfactionMetricsVO(0L, null, 0L, null)
+                : metrics;
+    }
+
+    private <T> List<T> safeList(List<T> values) {
+        return values == null ? List.of() : values;
+    }
+
+    private record ReportRange(LocalDateTime fromTime, LocalDateTime toTime, String granularity) { }
 }

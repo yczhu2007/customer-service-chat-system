@@ -105,6 +105,14 @@ export function findAdminDashboard() {
   return request('/chat/admin/dashboard')
 }
 
+export function findAdminReportOverview(params = {}) {
+  const qs = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') qs.set(key, value)
+  })
+  return request(`/chat/admin/reports/overview${qs.size ? `?${qs}` : ''}`)
+}
+
 function ticketQueryString(params = {}, includePaging = true) {
   const query = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {

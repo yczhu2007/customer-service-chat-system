@@ -41,6 +41,7 @@ vi.mock('../api/admin-api', () => ({
     })
   ),
   findAdminDashboard: vi.fn(() => Promise.resolve({ data: {} })),
+  findAdminReportOverview: vi.fn(() => Promise.resolve({ data: {} })),
   findVipSkillAgents: vi.fn(() => Promise.resolve({ data: [] })),
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),
@@ -70,6 +71,7 @@ describe('AdminWorkspaceView', () => {
       global: {
         stubs: {
           AdminDashboard: { template: '<div class="stub-dashboard">仪表盘</div>' },
+          AdminReportPanel: { template: '<div class="stub-reports">报表</div>' },
           UserManagementPanel: { template: '<div class="stub-users">用户管理</div>' },
           RoleManagementPanel: { template: '<div class="stub-roles">角色管理</div>' },
           SessionAuditPanel: { template: '<div class="stub-sessions">会话审计</div>' },
@@ -90,9 +92,13 @@ describe('AdminWorkspaceView', () => {
 
     // Click "用户管理" in the sidebar
     const navigationItems = sidebar.findAll('.sidebar-item')
-    await navigationItems[1].trigger('click')
+    await navigationItems.find((item) => item.text() === '用户管理').trigger('click')
     await nextTick()
     expect(wrapper.find('.stub-users').exists()).toBe(true)
+
+    await sidebar.findAll('.sidebar-item').find((item) => item.text() === '报表').trigger('click')
+    await nextTick()
+    expect(wrapper.find('.stub-reports').exists()).toBe(true)
 
     // Click "归档统计" tab
     await navigationItems.find((item) => item.text() === '归档统计').trigger('click')
@@ -211,6 +217,25 @@ describe('AdminTicketPanel', () => {
     expect(findAdminTicketStatusCounts).toHaveBeenLastCalledWith()
   })
 
+  it('loads tickets in the default recent 30-day range', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-01T10:30:00'))
+    try {
+      const { listAdminTickets } = await import('../api/admin-api')
+      const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
+      mount(AdminTicketPanel)
+      await nextTick()
+      await Promise.resolve()
+
+      expect(listAdminTickets).toHaveBeenLastCalledWith(expect.objectContaining({
+        createdFrom: '2026-08-02T00:00',
+        createdTo: '2026-09-02T00:00',
+      }))
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('emits the selected ticket when locating a ticket conversation', async () => {
     const AdminTicketPanel = (await import('../components/admin/AdminTicketPanel.vue')).default
     const wrapper = mount(AdminTicketPanel, { attachTo: document.body })
@@ -322,6 +347,25 @@ describe('SessionAuditPanel', () => {
     const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
     expect(requestUrl.searchParams.get('from')).toBe('2026-08-22T09:30')
     expect(requestUrl.searchParams.get('to')).toBe('2026-08-22T18:45')
+  })
+
+  it('loads sessions in the default recent 30-day range', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-01T10:30:00'))
+    try {
+      const { request } = await import('../services/http-client')
+      request.mockClear()
+      const SessionAuditPanel = (await import('../components/admin/SessionAuditPanel.vue')).default
+      mount(SessionAuditPanel)
+      await nextTick()
+      await Promise.resolve()
+
+      const requestUrl = new URL(request.mock.calls.at(-1)[0], 'http://localhost')
+      expect(requestUrl.searchParams.get('from')).toBe('2026-08-02T00:00')
+      expect(requestUrl.searchParams.get('to')).toBe('2026-09-02T00:00')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('renders returned audit records and their transfer row safely', async () => {
