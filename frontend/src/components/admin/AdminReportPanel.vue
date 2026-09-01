@@ -1,8 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import { ElMessage } from 'element-plus'
 import { findAdminReportOverview } from '../../api/admin-api'
 import { createRecent30DayRange } from '../../utils/admin-date-range'
 import ReportChart from './ReportChart.vue'
+import { buildReportCsv, createReportFilename } from './report-export'
 import {
   buildAgentReceptionOption,
   buildDurationOption,
@@ -36,6 +38,27 @@ async function loadReport() {
   }
 }
 
+function exportReport() {
+  if (!report.value) return
+  try {
+    const blob = new Blob([buildReportCsv({
+      report: report.value,
+      from: from.value,
+      to: to.value,
+      granularity: granularity.value,
+    })], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = createReportFilename(from.value, to.value, granularity.value)
+    link.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('报表已导出')
+  } catch (exception) {
+    ElMessage.error(exception.message || '报表导出失败，请稍后重试。')
+  }
+}
+
 function formatSeconds(seconds) {
   if (seconds === null || seconds === undefined) return '暂无数据'
   if (seconds < 60) return `${seconds} 秒`
@@ -66,6 +89,7 @@ onMounted(loadReport)
           <option value="WEEK">按周</option>
         </select>
         <button class="btn refresh-report" :disabled="loading" @click="loadReport">刷新</button>
+        <button class="btn export-report" :disabled="loading || !!error || !report" @click="exportReport">导出 CSV</button>
       </div>
     </div>
 

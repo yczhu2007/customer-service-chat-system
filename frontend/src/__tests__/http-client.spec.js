@@ -63,4 +63,23 @@ describe('HTTP client authentication expiry', () => {
     expect(auth.isAuthenticated).toBe(false)
     expect(chat.sessions).toEqual([])
   })
+
+  it('rejects with a readable error when a request times out', async () => {
+    vi.useFakeTimers()
+    let requestSignal
+    vi.mocked(fetch).mockImplementationOnce((path, options) => {
+      requestSignal = options.signal
+      return new Promise((resolve, reject) => {
+        requestSignal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      })
+    })
+
+    const pending = request('/chat/sessions', { timeoutMs: 1 })
+    expect(requestSignal).toBeDefined()
+    const assertion = expect(pending).rejects.toThrow('请求超时，请检查网络或稍后重试')
+    await vi.advanceTimersByTimeAsync(1)
+
+    await assertion
+    vi.useRealTimers()
+  })
 })
