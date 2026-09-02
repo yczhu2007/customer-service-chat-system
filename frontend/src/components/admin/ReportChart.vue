@@ -18,6 +18,12 @@ function render() {
   chart.setOption(props.option, true)
 }
 
+function getDataURL() {
+  return chart?.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: '#FFFFFF' })
+}
+
+defineExpose({ getDataURL })
+
 onMounted(async () => {
   await nextTick()
   render()

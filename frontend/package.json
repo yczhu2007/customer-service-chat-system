@@ -15,6 +15,7 @@
     "@stomp/stompjs": "7.2.0",
     "echarts": "^6.1.0",
     "element-plus": "^2.14.5",
+    "exceljs": "^4.4.0",
     "pinia": "2.3.1",
     "vue": "3.5.20",
     "vue-router": "4.5.1"

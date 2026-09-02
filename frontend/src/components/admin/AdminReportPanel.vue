@@ -4,7 +4,7 @@ import { ElMessage } from 'element-plus'
 import { findAdminReportOverview } from '../../api/admin-api'
 import { createRecent30DayRange } from '../../utils/admin-date-range'
 import ReportChart from './ReportChart.vue'
-import { buildReportCsv, createReportFilename } from './report-export'
+import { buildReportXlsx, createReportFilename } from './report-export'
 import {
   buildAgentReceptionOption,
   buildDurationOption,
@@ -16,6 +16,7 @@ import {
 const loading = ref(true)
 const error = ref('')
 const report = ref(null)
+const trendChart = ref(null)
 const granularity = ref('DAY')
 const defaultDateRange = createRecent30DayRange()
 const from = ref(defaultDateRange.from)
@@ -38,22 +39,25 @@ async function loadReport() {
   }
 }
 
-function exportReport() {
+async function exportReport() {
   if (!report.value) return
   try {
-    const blob = new Blob([buildReportCsv({
+    const workbook = await buildReportXlsx({
       report: report.value,
       from: from.value,
       to: to.value,
       granularity: granularity.value,
-    })], { type: 'text/csv;charset=utf-8' })
+      trendChartImage: trendChart.value?.getDataURL(),
+    })
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = url
     link.download = createReportFilename(from.value, to.value, granularity.value)
     link.click()
     URL.revokeObjectURL(url)
-    ElMessage.success('报表已导出')
+    ElMessage.success('报表已导出为 XLSX 文件')
   } catch (exception) {
     ElMessage.error(exception.message || '报表导出失败，请稍后重试。')
   }
@@ -89,7 +93,7 @@ onMounted(loadReport)
           <option value="WEEK">按周</option>
         </select>
         <button class="btn refresh-report" :disabled="loading" @click="loadReport">刷新</button>
-        <button class="btn export-report" :disabled="loading || !!error || !report" @click="exportReport">导出 CSV</button>
+        <button class="btn export-report" :disabled="loading || !!error || !report" @click="exportReport">导出 XLSX</button>
       </div>
     </div>
 
@@ -103,7 +107,7 @@ onMounted(loadReport)
       </div>
 
       <div class="report-grid">
-        <article class="chart-card chart-card-wide"><h3>会话量趋势</h3><ReportChart :option="trendOption" /></article>
+        <article class="chart-card chart-card-wide"><h3>会话量趋势</h3><ReportChart ref="trendChart" :option="trendOption" /></article>
         <article class="chart-card"><h3>客服接待量排行</h3><ReportChart :option="agentOption" /></article>
         <article class="chart-card"><h3>会话时长分布</h3><ReportChart :option="durationOption" /></article>
         <article class="chart-card"><h3>满意度与低分占比</h3><ReportChart :option="satisfactionOption" /></article>
