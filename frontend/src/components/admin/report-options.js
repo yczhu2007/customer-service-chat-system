@@ -6,6 +6,7 @@ const ticketStatusLabels = {
 }
 
 const baseTooltip = { trigger: 'axis' }
+const reportBlue = '#2563EB'
 
 function shortDate(bucket) {
   return typeof bucket === 'string' && bucket.length === 10 ? bucket.slice(5) : bucket
@@ -27,7 +28,7 @@ export function buildAgentReceptionOption(records = []) {
     grid: { left: 92, right: 20, top: 16, bottom: 24 },
     xAxis: { type: 'value', minInterval: 1 },
     yAxis: { type: 'category', data: records.map((item) => item.agentName || item.agentId).reverse() },
-    series: [{ name: '接待会话', type: 'bar', data: records.map(({ sessionCount }) => sessionCount).reverse() }],
+    series: [{ name: '接待会话', type: 'bar', itemStyle: { color: reportBlue }, data: records.map(({ sessionCount }) => sessionCount).reverse() }],
   }
 }
 
@@ -37,7 +38,7 @@ export function buildDurationOption(records = []) {
     grid: { left: 42, right: 20, top: 24, bottom: 32 },
     xAxis: { type: 'category', data: records.map(({ bucket }) => bucket) },
     yAxis: { type: 'value', minInterval: 1 },
-    series: [{ name: '已结束会话', type: 'bar', data: records.map(({ count }) => count) }],
+    series: [{ name: '已结束会话', type: 'bar', itemStyle: { color: reportBlue }, data: records.map(({ count }) => count) }],
   }
 }
 
