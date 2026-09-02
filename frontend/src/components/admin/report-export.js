@@ -84,7 +84,7 @@ function formatExportTime(value) {
 function addDataBar(worksheet, range, color) {
   worksheet.addConditionalFormatting({
     ref: range,
-    rules: [{ type: 'dataBar', cfvo: [{ type: 'min' }, { type: 'max' }], color, gradient: true }],
+    rules: [{ type: 'dataBar', cfvo: [{ type: 'min' }, { type: 'max' }], color: { argb: color }, gradient: true }],
   })
 }
 

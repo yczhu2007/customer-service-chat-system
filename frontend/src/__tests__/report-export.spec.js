@@ -46,6 +46,8 @@ describe('admin report export', () => {
     expect(worksheet.getCell('A40').value).toBe('满意度构成')
     expect(worksheet.getCell('F40').value).toBe('工单状态分布')
     expect(worksheet.getImages()).toHaveLength(1)
+    expect(worksheet.conditionalFormattings.find(({ ref }) => ref === 'L13:L13').rules[0].color)
+      .toEqual({ argb: 'FF2563EB' })
   })
 
   it('uses a safe filename derived from the selected range and granularity', () => {
