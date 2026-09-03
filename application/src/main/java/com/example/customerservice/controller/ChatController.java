@@ -27,6 +27,7 @@ import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.validation.ConstraintViolation;
@@ -44,8 +45,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 
-@RestController
-@RequestMapping("/chat")
+@Component
 @Slf4j
 @Validated
 public class ChatController {
@@ -75,9 +75,6 @@ public class ChatController {
     private CurrentUser currentUser;
 
     @Autowired
-    private AuthRateLimiter authRateLimiter;
-
-    @Autowired
     private ChatSessionQueryService chatSessionQueryService;
 
     @Autowired
@@ -100,67 +97,6 @@ public class ChatController {
 
     @Autowired
     private HttpServletRequest httpServletRequest;
-
-    @PostMapping("/login")
-    public Result<LoginResponse> login(
-            @Valid
-            @RequestBody
-            LoginRequest request,
-            HttpServletRequest servletRequest
-    ) {
-        authRateLimiter.checkLogin(servletRequest);
-        return Result.success(
-                authenticationService.login(request)
-        );
-    }
-
-    @PostMapping("/logout")
-    public Result<Void> logout(
-            @RequestHeader("Authorization") String authorization
-    ) {
-        authenticationService.logout(
-                authorization,
-                currentUser.getUserId()
-        );
-        return Result.successMessage("退出登录成功");
-    }
-
-    @PostMapping("/ws-ticket")
-    public Result<WebSocketTicketResponse> issueWebSocketTicket(
-            @RequestHeader("Authorization") String authorization
-    ) {
-        return Result.success(
-                authenticationService.issueWebSocketTicket(
-                        authorization,
-                        currentUser.getUserId()
-                )
-        );
-    }
-    /**
-     * 普通用户显式发起或恢复咨询。
-     * 客户端发送地址：/app/chat.start
-     */
-    @PostMapping("/queue/cancel")
-    public Result<Void> cancelQueue() {
-        currentUser.requireRole("USER");
-        currentUser.requirePermission("chat:user:access");
-        String userId = currentUser.getUserId();
-        Long removed = chatRedisRepository.cancelQueueEntry(userId);
-        boolean cancelled = removed != null && removed > 0;
-        try {
-            chatRoutingOperations.refreshWaitingPositions();
-        } catch (RuntimeException exception) {
-            log.warn("刷新排队位置通知失败，取消操作已完成，userId={}", userId, exception);
-        }
-        try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("event", "QUEUE_CANCELLED");
-            messagingTemplate.convertAndSendToUser(userId, "/queue/chat", event);
-        } catch (RuntimeException exception) {
-            log.warn("发送取消排队通知失败，取消操作已完成，userId={}", userId, exception);
-        }
-        return Result.successMessage(cancelled ? "已取消排队" : "当前未在等待队列中");
-    }
 
     @MessageMapping("/chat.start")
     public void startConsultation(
