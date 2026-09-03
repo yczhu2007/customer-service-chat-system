@@ -27,4 +27,18 @@ public class AsyncConfig {
         executor.initialize();
         return executor;
     }
+
+    @Bean("stompOutboundExecutor")
+    public ThreadPoolTaskExecutor stompOutboundExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(4);
+        executor.setMaxPoolSize(8);
+        executor.setQueueCapacity(1000);
+        executor.setThreadNamePrefix("stomp-outbound-");
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
+    }
 }

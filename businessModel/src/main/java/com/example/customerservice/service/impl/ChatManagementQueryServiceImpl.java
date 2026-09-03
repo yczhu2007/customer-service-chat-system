@@ -471,10 +471,10 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         }
         String granularity = query == null ? null : normalize(query.getGranularity());
         if (granularity == null) {
-            granularity = "DAY";
+            granularity = "MONTH";
         }
-        if (!"DAY".equals(granularity) && !"WEEK".equals(granularity)) {
-            throw new IllegalArgumentException("granularity只允许DAY或WEEK");
+        if (!"DAY".equals(granularity) && !"WEEK".equals(granularity) && !"MONTH".equals(granularity)) {
+            throw new IllegalArgumentException("granularity只允许DAY、WEEK或MONTH");
         }
         return new ReportRange(fromTime, toTime, granularity);
     }
@@ -494,13 +494,17 @@ public class ChatManagementQueryServiceImpl implements ChatManagementQueryServic
         LocalDate endDate = range.toTime().minusNanos(1).toLocalDate();
         if ("WEEK".equals(range.granularity())) {
             cursor = cursor.minusDays(cursor.getDayOfWeek().getValue() - 1L);
+        } else if ("MONTH".equals(range.granularity())) {
+            cursor = cursor.withDayOfMonth(1);
         }
         while (!cursor.isAfter(endDate)) {
             String bucket = cursor.toString();
             result.add(new AdminReportOverviewVO.TimeBucketCountVO(
                     bucket, countByBucket.getOrDefault(bucket, 0L)
             ));
-            cursor = "WEEK".equals(range.granularity()) ? cursor.plusWeeks(1) : cursor.plusDays(1);
+            cursor = "WEEK".equals(range.granularity())
+                    ? cursor.plusWeeks(1)
+                    : "MONTH".equals(range.granularity()) ? cursor.plusMonths(1) : cursor.plusDays(1);
         }
         return List.copyOf(result);
     }

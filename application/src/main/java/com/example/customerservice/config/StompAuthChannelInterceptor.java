@@ -1,8 +1,6 @@
 package com.example.customerservice.config;
 
-import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.mapper.SysRolePermissionMapper;
-import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.service.TokenService;
 import org.springframework.messaging.Message;
@@ -42,18 +40,15 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String CHAT_QUEUE = "/user/queue/chat";
 
     private final TokenService tokenService;
-    private final SysUserMapper sysUserMapper;
     private final SysUserRoleMapper sysUserRoleMapper;
     private final SysRolePermissionMapper sysRolePermissionMapper;
 
     public StompAuthChannelInterceptor(
             TokenService tokenService,
-            SysUserMapper sysUserMapper,
             SysUserRoleMapper sysUserRoleMapper,
             SysRolePermissionMapper sysRolePermissionMapper
     ) {
         this.tokenService = tokenService;
-        this.sysUserMapper = sysUserMapper;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
     }
@@ -73,7 +68,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
 
         WebSocketUserPrincipal principal = requireCurrentPrincipal(accessor.getUser());
         String userId = requireValidToken(accessor, principal);
-        requireEnabledUser(userId);
         accessor.setUser(principal);
 
         if (command == StompCommand.SEND) {
@@ -132,14 +126,6 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
             throw new MessageDeliveryException("当前 STOMP 连接认证已失效");
         }
         return userId;
-    }
-
-    private SysUser requireEnabledUser(String userId) {
-        SysUser user = sysUserMapper.selectById(userId);
-        if (user == null || !"ENABLED".equals(user.getStatus())) {
-            throw new MessageDeliveryException("当前用户不存在或已被禁用");
-        }
-        return user;
     }
 
     private void requireChatSubscriptionPermission(String userId) {

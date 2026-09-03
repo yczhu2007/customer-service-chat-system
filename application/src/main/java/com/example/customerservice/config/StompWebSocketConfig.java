@@ -8,6 +8,7 @@ import org.springframework.core.env.Environment;
 import org.springframework.messaging.simp.config.ChannelRegistration;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.util.StringUtils;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
@@ -34,6 +35,8 @@ public class StompWebSocketConfig
 
     private final TaskScheduler stompHeartbeatTaskScheduler;
 
+    private final ThreadPoolTaskExecutor stompOutboundExecutor;
+
     private final Environment environment;
 
     public StompWebSocketConfig(
@@ -45,6 +48,8 @@ public class StompWebSocketConfig
                     webSocketHandshakeHandler,
             @Qualifier("stompHeartbeatTaskScheduler")
             TaskScheduler stompHeartbeatTaskScheduler,
+            @Qualifier("stompOutboundExecutor")
+            ThreadPoolTaskExecutor stompOutboundExecutor,
             Environment environment,
             @Value("${app.websocket.allowed-origin-patterns}")
             String allowedOriginPatterns
@@ -56,6 +61,7 @@ public class StompWebSocketConfig
         this.webSocketHandshakeHandler =
                 webSocketHandshakeHandler;
         this.stompHeartbeatTaskScheduler = stompHeartbeatTaskScheduler;
+        this.stompOutboundExecutor = stompOutboundExecutor;
         this.environment = environment;
 
         this.allowedOriginPatterns =
@@ -127,9 +133,15 @@ public class StompWebSocketConfig
     }
 
     @Override
+    public void configureClientOutboundChannel(ChannelRegistration registration) {
+        registration.taskExecutor(stompOutboundExecutor);
+    }
+
+    @Override
     public void configureMessageBroker(
             MessageBrokerRegistry registry
     ) {
+        registry.setPreservePublishOrder(true);
         registry.enableSimpleBroker(
                 "/queue",
                 "/topic"

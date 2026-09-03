@@ -42,6 +42,8 @@ export const useChatStore = defineStore('chat', {
     queueCancelling: false,
     queueNotice: null,
     consultationStarting: false,
+    /** Map of active session IDs to the remaining agent reconnect grace seconds. */
+    agentReconnectGraceBySession: {},
     /** Map of sessionId -> unread count */
     unreadCounts: {},
     /** Currently selected message being quoted by the composer. */
@@ -56,6 +58,7 @@ export const useChatStore = defineStore('chat', {
     reconnectAttempts: 0,
     lastActivityAt: null,
     manualDisconnect: false,
+    _restoreAgentOnlineAfterReconnect: false,
     /** STOMP client instance (internal) */
     _stomp: null,
     _connectAttempt: 0,
@@ -200,6 +203,8 @@ export const useChatStore = defineStore('chat', {
       this.queueCancelling = false
       this.queueNotice = null
       this.consultationStarting = false
+      this.agentReconnectGraceBySession = {}
+      this._restoreAgentOnlineAfterReconnect = false
       this.unreadCounts = {}
       this._sentClientMsgIds.clear()
       this.sessionsLoading = false
@@ -252,6 +257,11 @@ export const useChatStore = defineStore('chat', {
             delete this.typingBySession[body.sessionId]
           }
         }
+        return
+      }
+
+      if (event === 'AGENT_RECONNECTING') {
+        if (body.sessionId) this.agentReconnectGraceBySession[body.sessionId] = body.graceSeconds
         return
       }
 
@@ -364,6 +374,7 @@ export const useChatStore = defineStore('chat', {
           this.refreshAgentViews()
         } else {
           const sessionId = body.sessionId || body.session?.sessionId
+          if (sessionId) delete this.agentReconnectGraceBySession[sessionId]
           this._finishConsultationStart()
           this.queueWaiting = false
           this.queueCancelling = false

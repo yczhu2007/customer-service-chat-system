@@ -17,7 +17,7 @@ const loading = ref(true)
 const error = ref('')
 const report = ref(null)
 const trendChart = ref(null)
-const granularity = ref('DAY')
+const granularity = ref('MONTH')
 const defaultDateRange = createRecent30DayRange()
 const from = ref(defaultDateRange.from)
 const to = ref(defaultDateRange.to)
@@ -89,6 +89,7 @@ onMounted(loadReport)
         <input v-model="from" type="datetime-local" aria-label="开始时间" />
         <input v-model="to" type="datetime-local" aria-label="结束时间" />
         <select v-model="granularity" aria-label="会话趋势粒度">
+          <option value="MONTH">按月</option>
           <option value="DAY">按日</option>
           <option value="WEEK">按周</option>
         </select>

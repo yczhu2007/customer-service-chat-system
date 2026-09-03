@@ -51,8 +51,25 @@ describe('admin report export', () => {
   })
 
   it('uses a safe filename derived from the selected range and granularity', () => {
+    expect(createReportFilename('2026-08-01T00:00', '2026-09-01T00:00', 'MONTH'))
+      .toBe('客服系统报表_2026-08-01至2026-09-01_按月.xlsx')
     expect(createReportFilename('2026-08-01T00:00', '2026-09-01T00:00', 'WEEK'))
       .toBe('客服系统报表_2026-08-01至2026-09-01_按周.xlsx')
+  })
+
+  it('uses monthly labels in the exported trend detail', async () => {
+    const workbook = await buildReportXlsx({
+      report: { ...report, sessionTrend: [{ bucket: '2026-08-01', count: 3 }] },
+      from: '2026-08-01T00:00',
+      to: '2026-09-01T00:00',
+      granularity: 'MONTH',
+    })
+
+    const worksheet = workbook.getWorksheet('报表')
+    expect(worksheet.getCell('A11').value).toBe('每月会话量趋势')
+    expect(worksheet.getCell('K11').value).toBe('每月明细')
+    expect(worksheet.getCell('K12').value).toBe('月份')
+    expect(worksheet.getCell('K3').value).toBe('按月')
   })
 
   it('passes the rendered trend chart into the XLSX export after the report has loaded', async () => {
@@ -78,6 +95,9 @@ describe('admin report export', () => {
     })
     await flushPromises()
 
+    expect(wrapper.get('select[aria-label="会话趋势粒度"]').element.value).toBe('MONTH')
+    expect(wrapper.findAll('select[aria-label="会话趋势粒度"] option').map((option) => option.text()))
+      .toEqual(['按月', '按日', '按周'])
     expect(wrapper.get('button.export-report').text()).toBe('导出 XLSX')
     expect(wrapper.get('button.export-report').attributes('disabled')).toBeUndefined()
     await wrapper.get('button.export-report').trigger('click')

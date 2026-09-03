@@ -102,6 +102,7 @@ export const fetchAttachmentBlob = async (contentUrl) => {
     name: encodedName ? decodeURIComponent(encodedName) : (plainName || '附件'),
     size: blob.size,
     type: blob.type,
+    blob,
   }
 }
 

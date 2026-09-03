@@ -16,6 +16,9 @@ let queueTimer = null
 const activeSession = computed(() => chat.activeSession)
 const isClosed = computed(() => activeSession.value?.status === 'CLOSED')
 const showRating = computed(() => isClosed.value && activeSession.value)
+const agentReconnectGraceSeconds = computed(() =>
+  activeSession.value ? chat.agentReconnectGraceBySession[activeSession.value.sessionId] : null
+)
 const consultationButtonLabel = computed(() => {
   if (chat.consultationState === 'STARTING') return '正在提交…'
   if (chat.consultationState === 'QUEUED') return '排队中'
@@ -117,6 +120,9 @@ onUnmounted(() => {
     </el-aside>
 
     <el-main class="center-panel">
+      <p v-if="agentReconnectGraceSeconds" class="agent-reconnect-notice">
+        客服重连中，请稍候（最长约 {{ agentReconnectGraceSeconds }} 秒）
+      </p>
       <ChatWindow class="user-chat-window" />
     </el-main>
 
@@ -236,4 +242,5 @@ onUnmounted(() => {
   overflow-y: auto;
 }
 .queue-notice { margin: .5rem 0 0; color: var(--color-muted); font-size: .8rem; line-height: 1.4; }
+.agent-reconnect-notice { margin: 0; padding: .55rem 1rem; color: #8a5a00; background: #fff7e6; border-bottom: 1px solid #ffe1ad; font-size: .85rem; }
 </style>

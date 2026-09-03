@@ -59,6 +59,7 @@ public class ChatAgentService implements ChatAgentOperations {
     @Override
     public void agentOnline(String agentId) {
         requireAgentId(agentId);
+        chatRedisRepository.sortedSetRemove(RedisConstants.AGENT_RECONNECT_GRACE, agentId);
         List<ChatSession> activeSessions =
                 sessionRecoveryService.restoreActiveSessions(agentId);
 

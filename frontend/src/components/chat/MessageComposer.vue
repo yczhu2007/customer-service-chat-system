@@ -22,6 +22,8 @@ const draggingImage = ref(false)
 const typingTimer = ref(null)
 const typingActive = ref(false)
 const pendingAttachment = ref(null)
+const attachmentPreviewUrl = ref(null)
+const attachmentPreviewName = ref('')
 
 function draftKey(sessionId = props.sessionId) {
   return `chat-draft:${auth.userId || 'anonymous'}:${auth.role || 'unknown'}:${sessionId}`
@@ -51,7 +53,7 @@ watch(() => props.sessionId, (sessionId, previousSessionId) => {
   if (typingTimer.value) clearTimeout(typingTimer.value)
   if (typingActive.value && previousSessionId) chat.sendTyping(previousSessionId, false)
   typingActive.value = false
-  pendingAttachment.value = null
+  clearPendingAttachment()
   restoreDraft(sessionId)
 }, { immediate: true })
 watch(() => props.disabled, (disabled) => {
@@ -66,6 +68,7 @@ watch(text, () => {
 onUnmounted(() => {
   if (draftTimer.value) clearTimeout(draftTimer.value)
   stopTyping()
+  clearAttachmentPreview()
 })
 watch(
   () => props.insertText,
@@ -123,11 +126,27 @@ function sendPendingAttachment() {
   if (!pendingAttachment.value || props.disabled) return
   const { type, contentUrl } = pendingAttachment.value
   chat.sendMessage(props.sessionId, type, contentUrl)
-  pendingAttachment.value = null
+  clearPendingAttachment()
 }
 
 function clearPendingAttachment() {
   pendingAttachment.value = null
+  clearAttachmentPreview()
+}
+
+function setAttachmentPreview(file) {
+  clearAttachmentPreview()
+  if (!file?.type?.startsWith('image/') || typeof URL.createObjectURL !== 'function') return
+  attachmentPreviewUrl.value = URL.createObjectURL(file)
+  attachmentPreviewName.value = file.name
+}
+
+function clearAttachmentPreview() {
+  if (attachmentPreviewUrl.value && typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(attachmentPreviewUrl.value)
+  }
+  attachmentPreviewUrl.value = null
+  attachmentPreviewName.value = ''
 }
 
 function sendText() {
@@ -150,6 +169,7 @@ function onKeydown(e) {
 async function uploadFile(options) {
   const file = options.file
   if (!file || props.disabled) return
+  setAttachmentPreview(file)
   uploading.value = true
   try {
     const result = await chat.uploadAttachment(props.sessionId, file)
@@ -157,6 +177,7 @@ async function uploadFile(options) {
     pendingAttachment.value = { type, contentUrl: result?.contentUrl, name: file.name }
     options.onSuccess?.(result)
   } catch (e) {
+    clearAttachmentPreview()
     chat.error = e.message || '附件上传失败，请稍后重试'
     options.onError?.(e)
   } finally {
@@ -212,6 +233,9 @@ async function uploadFile(options) {
       >
         <el-button size="small" :loading="uploading" :disabled="disabled || uploading">选择附件</el-button>
       </el-upload>
+      <div v-if="attachmentPreviewUrl" class="attachment-preview">
+        <img :src="attachmentPreviewUrl" :alt="attachmentPreviewName" class="attachment-image-preview" />
+      </div>
       <span v-if="uploading" class="upload-hint">上传中…</span>
       <template v-else-if="pendingAttachment">
         <span class="upload-hint">已选择：{{ pendingAttachment.name }}</span>
@@ -284,4 +308,6 @@ async function uploadFile(options) {
   font-size: 0.8rem;
   color: #6b7280;
 }
+.attachment-preview { display: flex; align-items: center; }
+.attachment-image-preview { width: 40px; height: 40px; object-fit: cover; border: 1px solid #dbeafe; border-radius: .3rem; }
 </style>

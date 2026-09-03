@@ -295,6 +295,36 @@ class ChatMessageServiceTest {
     }
 
     @Test
+    void historyQueryLoadsReplyPreviewsInOneBatch() {
+        ChatMessage firstReply = textMessage();
+        firstReply.setId("M002");
+        firstReply.setReplyToMessageId("M010");
+        ChatMessage secondReply = textMessage();
+        secondReply.setId("M003");
+        secondReply.setReplyToMessageId("M011");
+        ChatMessage source = textMessage();
+        source.setId("M010");
+        source.setSenderRole("USER");
+        source.setContent("需要查看的原消息");
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(chatMessageMapper.selectLatestHistory("S001", 11))
+                .thenReturn(List.of(secondReply, firstReply));
+        when(chatMessageMapper.selectBatchIds(List.of("M010", "M011")))
+                .thenReturn(List.of(source));
+        when(chatMessageMapper.selectCount(any())).thenReturn(2L);
+        when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(0L);
+
+        ChatHistoryPage result = service.getHistory("S001", "U001", null, 10);
+
+        assertEquals("需要查看的原消息", result.records().get(0).getReplyPreview());
+        assertEquals("USER", result.records().get(0).getReplyPreviewSenderRole());
+        assertEquals("原消息不可用", result.records().get(1).getReplyPreview());
+        verify(chatMessageMapper).selectBatchIds(List.of("M010", "M011"));
+        verify(chatMessageMapper, never()).selectById("M010");
+        verify(chatMessageMapper, never()).selectById("M011");
+    }
+
+    @Test
     void historyCursorUsesStrictCompositeCursorBoundary() {
         ChatMessage cursor = textMessage();
         cursor.setId("M010");

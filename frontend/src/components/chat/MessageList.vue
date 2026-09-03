@@ -15,6 +15,7 @@ const listEl = ref(null)
 const blobCache = ref({})
 const unavailableAttachmentUrls = new Set()
 const highlightedMessageId = ref(null)
+const filePreview = ref(null)
 let highlightTimeout = null
 
 function replyMessageId(message) {
@@ -76,6 +77,7 @@ function formatFileSize(size) {
 
 function releaseBlob(messageId) {
   const cached = blobCache.value[messageId]
+  if (filePreview.value?.url === cached?.url) filePreview.value = null
   if (cached?.url && typeof URL.revokeObjectURL === 'function') {
     URL.revokeObjectURL(cached.url)
   }
@@ -113,6 +115,30 @@ function previewImages() {
   return chat.messages
     .filter((message) => message.type === 'IMAGE' && !message.recalled && blobCache.value[message.id]?.url)
     .map((message) => blobCache.value[message.id].url)
+}
+
+function previewKind(attachment) {
+  const name = attachment?.name?.toLowerCase() || ''
+  if (attachment?.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf'
+  if (attachment?.type === 'text/plain' || name.endsWith('.txt')) return 'text'
+  return null
+}
+
+function openFilePreview(attachment) {
+  const kind = previewKind(attachment)
+  if (!kind) return
+  if (kind === 'pdf') {
+    filePreview.value = { kind, name: attachment.name, url: attachment.url }
+    return
+  }
+  filePreview.value = {
+    kind,
+    name: attachment.name,
+    text: attachment.blob ? '加载中…' : '文本预览不可用',
+  }
+  attachment.blob?.text()
+    .then((text) => { if (filePreview.value?.name === attachment.name) filePreview.value.text = text })
+    .catch(() => { if (filePreview.value?.name === attachment.name) filePreview.value.text = '文本预览加载失败' })
 }
 
 /** Scroll to bottom */
@@ -255,6 +281,12 @@ onUnmounted(() => {
               <strong>{{ blobCache[msg.id].name }}</strong>
               <span class="file-info">Download file<span v-if="blobCache[msg.id].size"> · {{ formatFileSize(blobCache[msg.id].size) }}</span></span>
             </a>
+            <button
+              v-if="previewKind(blobCache[msg.id])"
+              type="button"
+              class="file-preview-btn"
+              @click="openFilePreview(blobCache[msg.id])"
+            >预览</button>
             <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
             <span v-else class="load-error">文件加载中…</span>
           </template>
@@ -276,6 +308,16 @@ onUnmounted(() => {
     <div v-if="!chat.messages.length && !chat.messagesLoading" class="empty-hint">
       暂无消息
     </div>
+    <el-dialog
+      v-if="filePreview"
+      :model-value="true"
+      :title="filePreview.name"
+      width="min(900px, 92vw)"
+      @close="filePreview = null"
+    >
+      <iframe v-if="filePreview.kind === 'pdf'" :src="filePreview.url" class="pdf-preview" :title="filePreview.name" />
+      <pre v-else class="text-preview">{{ filePreview.text }}</pre>
+    </el-dialog>
   </div>
 </template>
 
@@ -361,6 +403,9 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.1rem;
 }
+.file-preview-btn { margin-top: .4rem; border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font-size: .8rem; }
+.pdf-preview { display: block; width: 100%; height: min(70vh, 720px); border: 0; }
+.text-preview { max-height: min(70vh, 720px); margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; font: inherit; }
 .load-more-btn { align-self: center; padding: 0.35rem 0.75rem; border: 1px solid #d1d5db; border-radius: 999px; background: white; color: #374151; cursor: pointer; font-size: 0.75rem; }
 .load-more-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .reply-preview {

@@ -1,6 +1,9 @@
 import { ticketStatusLabel } from '../../constants/session-ui'
 
-const granularityLabel = (granularity) => granularity === 'WEEK' ? '按周' : '按日'
+const granularityLabel = (granularity) => granularity === 'MONTH' ? '按月' : granularity === 'WEEK' ? '按周' : '按日'
+const trendTitle = (granularity) => granularity === 'MONTH' ? '每月会话量趋势' : granularity === 'WEEK' ? '每周会话量趋势' : '每日会话量趋势'
+const detailTitle = (granularity) => granularity === 'MONTH' ? '每月明细' : granularity === 'WEEK' ? '每周明细' : '每日明细'
+const bucketLabel = (granularity) => granularity === 'MONTH' ? '月份' : granularity === 'WEEK' ? '周起始日' : '日期'
 const display = (value) => value === null || value === undefined ? '' : String(value)
 const colors = {
   navy: 'FF16324F', blue: 'FF2563EB', blueSoft: 'FFEAF2FF', cyanSoft: 'FFE8F7F5',
@@ -134,7 +137,7 @@ export async function buildReportXlsx({ report = {}, from, to, granularity, expo
   writeKpi(worksheet, 'F6:I9', '满意度均分', satisfaction.averageRating, colors.cyanSoft, '0.00 "分"')
   writeKpi(worksheet, 'K6:N9', '低分占比', satisfaction.lowRatingRate == null ? '' : satisfaction.lowRatingRate / 100, colors.amberSoft, '0.0%')
 
-  styleSectionTitle(worksheet, 'A11:I11', '每日会话量趋势')
+  styleSectionTitle(worksheet, 'A11:I11', trendTitle(granularity))
   if (trendChartImage) {
     const imageId = workbook.addImage({ base64: trendChartImage, extension: 'png' })
     worksheet.addImage(imageId, { tl: { col: 0, row: 11 }, br: { col: 9, row: 29 }, editAs: 'oneCell' })
@@ -146,8 +149,8 @@ export async function buildReportXlsx({ report = {}, from, to, granularity, expo
     emptyChart.alignment = { vertical: 'middle', horizontal: 'center' }
   }
 
-  styleSectionTitle(worksheet, 'K11:N11', '每日明细')
-  ;[['K12', '日期'], ['L12', '会话量']].forEach(([address, value]) => {
+  styleSectionTitle(worksheet, 'K11:N11', detailTitle(granularity))
+  ;[['K12', bucketLabel(granularity)], ['L12', '会话量']].forEach(([address, value]) => {
     const cell = worksheet.getCell(address)
     cell.value = value
     cell.fill = fill(colors.blueSoft)

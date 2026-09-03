@@ -14,6 +14,7 @@ public final class ChatConstants {
     public static final String SESSION_STATUS_CLOSED = "CLOSED";
     public static final String EVENT_SESSION_CLOSED = "SESSION_CLOSED";
     public static final String EVENT_SESSION_ENDED = "SESSION_ENDED";
+    public static final String EVENT_AGENT_RECONNECTING = "AGENT_RECONNECTING";
     public static final String REASON_AGENT_OFFLINE = "AGENT_OFFLINE";
     public static final String REASON_WEBSOCKET_DISCONNECT = "WEBSOCKET_DISCONNECT";
     public static final String REASON_HEARTBEAT_TIMEOUT = "HEARTBEAT_TIMEOUT";

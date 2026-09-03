@@ -132,17 +132,13 @@ public class MessagePersistServiceImpl implements MessagePersistService {
     @Override
     @Async("messagePersistExecutor")
     public void persistMessageAsync(ChatMessage message) {
+        validateMessage(message);
         String leaseToken = tryAcquireRetryLease(message.getId());
         if (leaseToken == null) {
             return;
         }
         ScheduledFuture<?> renewal = startRetryLeaseRenewal(message.getId(), leaseToken);
-        try {
-            persistWithRetry(message);
-        } finally {
-            stopRetryLeaseRenewal(renewal);
-            releaseRetryLease(message.getId(), leaseToken);
-        }
+        persistWithRetry(message, 1, leaseToken, renewal);
     }
 
     @Override
@@ -158,8 +154,9 @@ public class MessagePersistServiceImpl implements MessagePersistService {
             return;
         }
         for (String messageId : pendingIds) {
+            String leaseToken = null;
             try {
-                String leaseToken = tryAcquireRetryLease(messageId);
+                leaseToken = tryAcquireRetryLease(messageId);
                 if (leaseToken == null) {
                     continue;
                 }
@@ -172,16 +169,13 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                     continue;
                 }
                 ChatMessage message = objectMapper.readValue(payload, ChatMessage.class);
+                String retryLeaseToken = leaseToken;
                 messagePersistExecutor.execute(() -> {
-                    ScheduledFuture<?> renewal = startRetryLeaseRenewal(message.getId(), leaseToken);
-                    try {
-                        persistWithRetry(message);
-                    } finally {
-                        stopRetryLeaseRenewal(renewal);
-                        releaseRetryLease(message.getId(), leaseToken);
-                    }
+                    ScheduledFuture<?> renewal = startRetryLeaseRenewal(message.getId(), retryLeaseToken);
+                    persistWithRetry(message, 1, retryLeaseToken, renewal);
                 });
             } catch (Exception exception) {
+                releaseRetryLease(messageId, leaseToken);
                 log.error("重新提交待落库消息失败，messageId={}", messageId, exception);
             }
         }
@@ -278,12 +272,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                     return;
                 }
                 ScheduledFuture<?> renewal = startRetryLeaseRenewal(messageId, leaseToken);
-                try {
-                    persistWithRetry(message);
-                } finally {
-                    stopRetryLeaseRenewal(renewal);
-                    releaseRetryLease(messageId, leaseToken);
-                }
+                persistWithRetry(message, 1, leaseToken, renewal);
             });
         } catch (BusinessStateException | IllegalArgumentException exception) {
             throw exception;
@@ -339,46 +328,60 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         return expiredIds.size();
     }
 
-    private boolean persistWithRetry(ChatMessage message) {
-        validateMessage(message);
-        for (int attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-            try {
-                int insertedRows = chatMessageMapper.insert(message);
-                if (insertedRows != 1) {
-                    throw new IllegalStateException("消息写入行数不是 1");
-                }
-                markStored(message);
-                return true;
-            } catch (DuplicateKeyException exception) {
-                ChatMessage storedMessage = chatMessageMapper.findByClientMessage(
-                        message.getSessionId(), message.getSenderId(), message.getClientMsgId()
-                );
-                if (!isSameLogicalMessage(message, storedMessage)) {
-                    log.error("消息唯一键冲突且内容不匹配，messageId={}", message.getId(), exception);
-                    moveToDeadLetter(message.getId());
-                    return false;
-                }
-                markStored(storedMessage);
-                return true;
-            } catch (Exception exception) {
-                log.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
-                if (attempt < MAX_ATTEMPTS && !waitBeforeRetry(attempt)) {
-                    return false;
-                }
+    private void persistWithRetry(
+            ChatMessage message,
+            int attempt,
+            String leaseToken,
+            ScheduledFuture<?> renewal
+    ) {
+        try {
+            int insertedRows = chatMessageMapper.insert(message);
+            if (insertedRows != 1) {
+                throw new IllegalStateException("消息写入行数不是 1");
             }
+            markStored(message);
+            completeRetry(message.getId(), leaseToken, renewal);
+        } catch (DuplicateKeyException exception) {
+            ChatMessage storedMessage = chatMessageMapper.findByClientMessage(
+                    message.getSessionId(), message.getSenderId(), message.getClientMsgId()
+            );
+            if (!isSameLogicalMessage(message, storedMessage)) {
+                log.error("消息唯一键冲突且内容不匹配，messageId={}", message.getId(), exception);
+                moveToDeadLetter(message.getId());
+            } else {
+                markStored(storedMessage);
+            }
+            completeRetry(message.getId(), leaseToken, renewal);
+        } catch (Exception exception) {
+            log.warn("消息落库失败，第 {} 次尝试，messageId={}", attempt, message.getId(), exception);
+            if (attempt == MAX_ATTEMPTS) {
+                moveToDeadLetter(message.getId());
+                completeRetry(message.getId(), leaseToken, renewal);
+                return;
+            }
+            RETRY_LEASE_WATCHDOG.schedule(() -> {
+                try {
+                    messagePersistExecutor.execute(
+                            () -> persistWithRetry(message, attempt + 1, leaseToken, renewal)
+                    );
+                } catch (RuntimeException submissionFailure) {
+                    completeRetry(message.getId(), leaseToken, renewal);
+                    log.error("延迟重试消息提交失败，messageId={}", message.getId(), submissionFailure);
+                }
+            },
+                    RETRY_DELAYS_SECONDS[attempt - 1],
+                    TimeUnit.SECONDS
+            );
         }
-        moveToDeadLetter(message.getId());
-        return false;
     }
 
-    private boolean waitBeforeRetry(int attempt) {
-        try {
-            Thread.sleep(TimeUnit.SECONDS.toMillis(RETRY_DELAYS_SECONDS[attempt - 1]));
-            return true;
-        } catch (InterruptedException exception) {
-            Thread.currentThread().interrupt();
-            return false;
-        }
+    private void completeRetry(
+            String messageId,
+            String leaseToken,
+            ScheduledFuture<?> renewal
+    ) {
+        stopRetryLeaseRenewal(renewal);
+        releaseRetryLease(messageId, leaseToken);
     }
 
     private void markStored(ChatMessage message) {

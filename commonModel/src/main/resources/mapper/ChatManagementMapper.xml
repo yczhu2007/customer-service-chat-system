@@ -600,6 +600,9 @@
             <when test="granularity == 'WEEK'">
                 DATE_FORMAT(DATE_SUB(session.create_time, INTERVAL WEEKDAY(session.create_time) DAY), '%Y-%m-%d')
             </when>
+            <when test="granularity == 'MONTH'">
+                DATE_FORMAT(session.create_time, '%Y-%m-01')
+            </when>
             <otherwise>
                 DATE_FORMAT(session.create_time, '%Y-%m-%d')
             </otherwise>

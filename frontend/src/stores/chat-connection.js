@@ -61,6 +61,11 @@ connectStomp() {
             this._handleStompErrorEvent({ message: frame.body || '操作失败' })
           }
         })
+        if (this._restoreAgentOnlineAfterReconnect) {
+          this._restoreAgentOnlineAfterReconnect = false
+          request('/chat/agent/online', { method: 'POST' })
+            .catch((error) => this.handleConnectionError(`恢复客服接待失败: ${error.message}`))
+        }
         // Pull offline messages on connect
         this.pullOfflineMessages()
       },
@@ -71,6 +76,9 @@ connectStomp() {
       onDisconnect: () => {
         const wasManual = this.manualDisconnect
         this.manualDisconnect = false
+        if (!wasManual && auth.role === 'AGENT' && this.agentOnline) {
+          this._restoreAgentOnlineAfterReconnect = true
+        }
         this.stopHeartbeat()
         this.connected = false
         this.connectionState = 'disconnected'
@@ -144,4 +152,3 @@ stopHeartbeat() {
 
 
 }
-

@@ -1,6 +1,5 @@
 package com.example.customerservice.config;
 
-import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.mapper.SysRolePermissionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -35,7 +34,7 @@ class StompAuthChannelInterceptorTest {
     @BeforeEach
     void setUp() {
         interceptor = new StompAuthChannelInterceptor(
-                tokenService, sysUserMapper, sysUserRoleMapper, sysRolePermissionMapper);
+                tokenService, sysUserRoleMapper, sysRolePermissionMapper);
         // Per-test user stubs keep Mockito strict-stubbing checks meaningful.
     }
 
@@ -81,6 +80,16 @@ class StompAuthChannelInterceptorTest {
     }
 
     @Test
+    void acceptsValidTokenWithoutLoadingUserStateForEveryFrame() {
+        when(tokenService.resolveUserId("valid-token")).thenReturn("U001");
+
+        assertDoesNotThrow(() -> interceptor.preSend(
+                frame(StompCommand.SEND, "/app/chat.send", rawPrincipal()), null));
+
+        org.mockito.Mockito.verifyNoInteractions(sysUserMapper);
+    }
+
+    @Test
     void rejectsSubscriptionOutsideUserWhitelist() {
         assertThrows(MessageDeliveryException.class,
                 () -> interceptor.preSend(frame(StompCommand.SUBSCRIBE, "/topic/chat", principal()), null));
@@ -98,19 +107,11 @@ class StompAuthChannelInterceptorTest {
 
     private WebSocketUserPrincipal principal() {
         when(tokenService.resolveUserId("valid-token")).thenReturn("U001");
-        return principalWithoutTokenStub();
+        return rawPrincipal();
     }
 
     private WebSocketUserPrincipal validPrincipal() {
         return principal();
-    }
-
-    private WebSocketUserPrincipal principalWithoutTokenStub() {
-        SysUser user = new SysUser();
-        user.setId("U001");
-        user.setStatus("ENABLED");
-        when(sysUserMapper.selectById("U001")).thenReturn(user);
-        return rawPrincipal();
     }
 
     private WebSocketUserPrincipal rawPrincipal() {

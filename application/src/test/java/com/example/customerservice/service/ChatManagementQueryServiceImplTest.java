@@ -5,6 +5,7 @@ import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AgentLoadVO;
 import com.example.customerservice.dto.AdminReportQueryDTO;
+import com.example.customerservice.dto.AdminReportOverviewVO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
@@ -194,5 +195,26 @@ class ChatManagementQueryServiceImplTest {
         verify(managementMapper).findSessionDurationDistribution(from, to);
         verify(managementMapper).findSatisfactionMetrics(from, to);
         verify(managementMapper).findTicketStatusDistribution(from, to);
+    }
+
+    @Test
+    void reportOverviewDefaultsToMonthlyTrendAndFillsCalendarMonths() {
+        LocalDateTime from = LocalDateTime.of(2026, 8, 15, 0, 0);
+        LocalDateTime to = LocalDateTime.of(2026, 11, 2, 0, 0);
+        when(managementMapper.findSessionTrend(from, to, "MONTH"))
+                .thenReturn(List.of(new AdminReportOverviewVO.TimeBucketCountVO("2026-09-01", 5L)));
+        AdminReportQueryDTO query = new AdminReportQueryDTO();
+        query.setFrom(from);
+        query.setTo(to);
+
+        AdminReportOverviewVO result = service.findAdminReportOverview(query);
+
+        assertEquals(List.of(
+                new AdminReportOverviewVO.TimeBucketCountVO("2026-08-01", 0L),
+                new AdminReportOverviewVO.TimeBucketCountVO("2026-09-01", 5L),
+                new AdminReportOverviewVO.TimeBucketCountVO("2026-10-01", 0L),
+                new AdminReportOverviewVO.TimeBucketCountVO("2026-11-01", 0L)
+        ), result.sessionTrend());
+        verify(managementMapper).findSessionTrend(from, to, "MONTH");
     }
 }

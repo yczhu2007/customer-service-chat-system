@@ -1,6 +1,7 @@
 package com.example.customerservice.service;
 
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatAgentSkill;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.mapper.ChatAgentSkillMapper;
@@ -65,5 +66,31 @@ class ChatAgentServiceTest {
         assertEquals("VIP", skillCaptor.getValue().getSkillCode());
         verify(redisRepository).delete(RedisConstants.AGENT_SKILL_VIP);
         verify(redisRepository).setAdd(RedisConstants.AGENT_SKILL_VIP, "A001");
+    }
+
+    @Test
+    void agentOnlineCancelsPendingReconnectGrace() {
+        ChatRedisRepository redisRepository = mock(ChatRedisRepository.class);
+        ChatAgentSessionRecoveryService recoveryService = mock(ChatAgentSessionRecoveryService.class);
+        ChatRoutingOperations routingOperations = mock(ChatRoutingOperations.class);
+        ChatPresenceOperations presenceOperations = mock(ChatPresenceOperations.class);
+        ChatSessionNotificationOperations notificationOperations = mock(ChatSessionNotificationOperations.class);
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        SysUserRoleMapper userRoleMapper = mock(SysUserRoleMapper.class);
+        ChatAgentSkillMapper skillMapper = mock(ChatAgentSkillMapper.class);
+        SysUser agent = new SysUser();
+        agent.setId("A001");
+        when(userMapper.selectById("A001")).thenReturn(agent);
+        when(userRoleMapper.findRoleCodesByUserId("A001")).thenReturn(Set.of("AGENT"));
+        when(recoveryService.restoreActiveSessions("A001")).thenReturn(List.<ChatSession>of());
+
+        ChatAgentService service = new ChatAgentService(
+                redisRepository, recoveryService, routingOperations, presenceOperations,
+                notificationOperations, userMapper, userRoleMapper, skillMapper
+        );
+
+        service.agentOnline("A001");
+
+        verify(redisRepository).sortedSetRemove(RedisConstants.AGENT_RECONNECT_GRACE, "A001");
     }
 }

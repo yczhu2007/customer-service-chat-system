@@ -337,6 +337,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
 
         if (isAgent && (ChatConstants.REASON_WEBSOCKET_DISCONNECT.equals(reason)
                 || ChatConstants.REASON_HEARTBEAT_TIMEOUT.equals(reason))) {
+            notifyAgentReconnecting(userId);
             scheduleAgentReconnectGrace(userId);
             return;
         }
@@ -608,6 +609,21 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 agentId,
                 System.currentTimeMillis() + agentReconnectGraceMillis
         );
+    }
+
+    private void notifyAgentReconnecting(String agentId) {
+        List<ChatSession> sessions = chatSessionMapper.selectList(
+                Wrappers.<ChatSession>lambdaQuery()
+                        .eq(ChatSession::getAgentId, agentId)
+                        .eq(ChatSession::getStatus, ChatConstants.SESSION_STATUS_ACTIVE)
+        );
+        for (ChatSession session : sessions) {
+            Map<String, Object> notice = new HashMap<>();
+            notice.put("event", ChatConstants.EVENT_AGENT_RECONNECTING);
+            notice.put("sessionId", session.getId());
+            notice.put("graceSeconds", TimeUnit.MILLISECONDS.toSeconds(agentReconnectGraceMillis));
+            messagingTemplate.convertAndSendToUser(session.getUserId(), "/queue/chat", notice);
+        }
     }
 
 

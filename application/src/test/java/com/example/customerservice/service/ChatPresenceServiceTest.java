@@ -19,10 +19,13 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -113,5 +116,45 @@ class ChatPresenceServiceTest {
         );
         assertEquals(ChatConstants.EVENT_SESSION_CLOSED, agentNotice.getValue().getEvent());
         assertEquals("S001", agentNotice.getValue().getSessionId());
+    }
+
+    @Test
+    void agentHeartbeatTimeoutNotifiesActiveUsersDuringReconnectGrace() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setUserId("U001");
+        session.setAgentId("A001");
+        session.setStatus(ChatConstants.SESSION_STATUS_ACTIVE);
+
+        @SuppressWarnings("unchecked")
+        java.util.concurrent.ScheduledFuture<?> renewal =
+                (java.util.concurrent.ScheduledFuture<?>) org.mockito.Mockito.mock(java.util.concurrent.ScheduledFuture.class);
+        when(chatRedisRepository.acquireLock(
+                RedisConstants.PRESENCE_OPERATION_LOCK + "A001",
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        )).thenReturn("lock-token");
+        when(chatRedisRepository.startLockRenewal(
+                RedisConstants.PRESENCE_OPERATION_LOCK + "A001",
+                "lock-token",
+                RedisConstants.PRESENCE_OPERATION_LOCK_TTL_SECONDS,
+                java.util.concurrent.TimeUnit.SECONDS
+        )).thenReturn((java.util.concurrent.ScheduledFuture) renewal);
+        when(chatRedisRepository.sortedSetScore(RedisConstants.ONLINE_HEARTBEAT, "A001"))
+                .thenReturn(0D);
+        when(chatRedisRepository.sortedSetScore(RedisConstants.AGENT_LOAD, "A001"))
+                .thenReturn(0D);
+        when(chatSessionMapper.selectList(any())).thenReturn(List.of(session));
+
+        service.handleHeartbeatTimeout("A001");
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> notice = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("U001"), eq("/queue/chat"), notice.capture()
+        );
+        assertEquals("AGENT_RECONNECTING", notice.getValue().get("event"));
+        assertEquals("S001", notice.getValue().get("sessionId"));
+        assertEquals(30L, notice.getValue().get("graceSeconds"));
     }
 }

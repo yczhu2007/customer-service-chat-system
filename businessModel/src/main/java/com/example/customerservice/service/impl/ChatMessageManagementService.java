@@ -26,7 +26,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 @Slf4j
 public class ChatMessageManagementService implements ChatMessageManagementOperations {
@@ -389,12 +392,23 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
     }
 
     private void enrichReplyPreviews(List<ChatMessage> records, String sessionId) {
+        List<String> replyToMessageIds = records.stream()
+                .map(ChatMessage::getReplyToMessageId)
+                .filter(replyToMessageId -> replyToMessageId != null && !replyToMessageId.isBlank())
+                .distinct()
+                .toList();
+        if (replyToMessageIds.isEmpty()) {
+            return;
+        }
+        Map<String, ChatMessage> sourceById = chatMessageMapper.selectBatchIds(replyToMessageIds)
+                .stream()
+                .collect(Collectors.toMap(ChatMessage::getId, Function.identity()));
         for (ChatMessage message : records) {
             String replyToMessageId = message.getReplyToMessageId();
             if (replyToMessageId == null || replyToMessageId.isBlank()) {
                 continue;
             }
-            ChatMessage source = chatMessageMapper.selectById(replyToMessageId);
+            ChatMessage source = sourceById.get(replyToMessageId);
             if (source == null || !sessionId.equals(source.getSessionId())) {
                 message.setReplyPreview("原消息不可用");
                 continue;

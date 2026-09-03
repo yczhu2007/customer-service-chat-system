@@ -12,6 +12,7 @@ import { fetchAttachmentBlob } from '../api/chat-api'
 // Mock fetch globally
 const mockFetch = vi.fn()
 global.fetch = mockFetch
+let latestStompOptions
 
 // Mock crypto.randomUUID
 if (!global.crypto) global.crypto = {}
@@ -43,15 +44,16 @@ vi.mock('@stomp/stompjs', () => ({
 
 // Mock stomp-client
 vi.mock('../services/stomp-client', () => ({
-  createStompClient: (opts) => ({
+  createStompClient: (opts) => {
+    latestStompOptions = opts
+    return {
     client: {},
-    connect: () => {
-      if (opts?.onConnect) opts.onConnect()
-    },
+    connect: () => {},
     disconnect: () => {},
     subscribe: (dest, cb) => {},
     publish: (dest, body) => {},
-  }),
+    }
+  },
 }))
 
 describe('User Workspace', () => {
@@ -204,6 +206,41 @@ describe('User Workspace', () => {
     })
   })
 
+  it('restores agent availability after an unexpected WebSocket reconnect', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 'token', userId: 'a1', role: 'AGENT' })
+    const chat = useChatStore()
+    chat.agentOnline = true
+    chat.reconnectStomp = vi.fn()
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: { ticket: 'first-ticket' } }),
+    })
+
+    chat.connectStomp()
+    await vi.waitFor(() => expect(latestStompOptions).toBeTruthy())
+    latestStompOptions.onConnect()
+    latestStompOptions.onDisconnect()
+
+    latestStompOptions = null
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: { ticket: 'second-ticket' } }),
+    }).mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: null }),
+    })
+    chat.connectStomp()
+    await vi.waitFor(() => expect(latestStompOptions).toBeTruthy())
+    latestStompOptions.onConnect()
+    await Promise.resolve()
+
+    expect(mockFetch).toHaveBeenLastCalledWith('/chat/agent/online', expect.objectContaining({ method: 'POST' }))
+  })
+
   it('acknowledges an inactive-session delivery without marking it as read', () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
@@ -325,6 +362,25 @@ describe('User Workspace', () => {
     expect(wrapper.get('.center-panel > .user-chat-window').exists()).toBe(true)
     expect(wrapper.get('.right-panel > .user-ticket-panel').exists()).toBe(true)
     expect(wrapper.get('.right-panel > .user-rating-form').exists()).toBe(true)
+    wrapper.unmount()
+  })
+
+  it('shows an active-session notice while the assigned agent is reconnecting', async () => {
+    const chat = useChatStore()
+    chat.connectStomp = vi.fn()
+    chat.loadQueueStatus = vi.fn()
+    chat.loadSessions = vi.fn()
+    chat.sessions = [{ sessionId: 's1', status: 'ACTIVE' }]
+    chat.activeSessionId = 's1'
+
+    chat._handleChatEvent({ event: 'AGENT_RECONNECTING', sessionId: 's1', graceSeconds: 20 })
+
+    const UserWorkspaceView = (await import('../views/UserWorkspaceView.vue')).default
+    const wrapper = mount(UserWorkspaceView, {
+      global: { stubs: { ChatWindow: true, UserSessionList: true, SessionRatingForm: true, ConnectionStatus: true, SupportTicketPanel: true } },
+    })
+
+    expect(wrapper.text()).toContain('客服重连中，请稍候（最长约 20 秒）')
     wrapper.unmount()
   })
 
@@ -537,6 +593,51 @@ describe('User Workspace', () => {
       createUrl.mockRestore()
       if (hadRevokeUrl) revokeUrl.mockRestore()
     }
+  })
+
+  it('shows a selected image thumbnail before its attachment upload completes', async () => {
+    const chat = useChatStore()
+    chat.uploadAttachment = vi.fn(() => new Promise(() => {}))
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:selected-image')
+
+    try {
+      const wrapper = mount(MessageComposer, { props: { sessionId: 's1' } })
+      const file = new File(['image'], 'photo.png', { type: 'image/png' })
+      const input = wrapper.find('input[type="file"]')
+      Object.defineProperty(input.element, 'files', { value: [file] })
+      await input.trigger('change')
+
+      expect(wrapper.find('.attachment-image-preview').attributes('src')).toBe('blob:selected-image')
+    } finally {
+      createUrl.mockRestore()
+    }
+  })
+
+  it('offers in-app preview actions for attached PDF and TXT files', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [
+      { id: 'pdf', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/pdf/content' },
+      { id: 'txt', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/txt/content' },
+    ]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })),
+        headers: { get: () => 'attachment; filename="guide.pdf"' },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['plain text'], { type: 'text/plain' })),
+        headers: { get: () => 'attachment; filename="notes.txt"' },
+      })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(wrapper.findAll('.file-preview-btn')).toHaveLength(2)
   })
 
   describe('chat store — consultation start', () => {
