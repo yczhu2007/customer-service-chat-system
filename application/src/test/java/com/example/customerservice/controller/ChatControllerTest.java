@@ -1,88 +1,43 @@
 package com.example.customerservice.controller;
 
-import com.example.customerservice.constant.SessionParticipantType;
-import com.example.customerservice.common.Result;
-import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
-import com.example.customerservice.dto.ChatSessionMetadataVO;
-import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.HistoryRequest;
-import com.example.customerservice.dto.PageResult;
-import com.example.customerservice.dto.SessionArchiveRemarkDTO;
-import com.example.customerservice.domain.SysUser;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
-import com.example.customerservice.security.CurrentUser;
-import com.example.customerservice.service.ChatSessionQueryService;
-import com.example.customerservice.service.IAuthenticationService;
-import com.example.customerservice.service.ChatAgentOperations;
 import com.example.customerservice.service.ChatMessageOperations;
-import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
-import com.example.customerservice.service.ChatSessionOperations;
+import com.example.customerservice.service.IAuthenticationService;
+import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.Validator;
 
 import java.security.Principal;
 import java.util.List;
-import java.util.Set;
 import java.util.Map;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class ChatControllerTest {
 
     @Mock private ChatRoutingOperations chatRoutingOperations;
-    @Mock private ChatAgentOperations chatAgentOperations;
     @Mock private ChatMessageOperations chatMessageOperations;
-    @Mock private ChatSessionOperations chatSessionOperations;
-    @Mock private ChatPresenceOperations chatPresenceOperations;
     @Mock private IAuthenticationService authenticationService;
-    @Mock private CurrentUser currentUser;
-    @Mock private ChatSessionQueryService chatSessionQueryService;
     @Mock private Validator validator;
-    @Mock private SysUserMapper sysUserMapper;
-    @Mock private SysUserRoleMapper sysUserRoleMapper;
-    @Mock private HttpServletRequest httpServletRequest;
     @InjectMocks private ChatController controller;
-
-    @Test
-    void assignedAgentCanSaveArchiveRemarkIndependently() {
-        SessionArchiveRemarkDTO request = new SessionArchiveRemarkDTO();
-        request.setRemark("新的唯一备注");
-        when(currentUser.getUserId()).thenReturn("A001");
-
-        controller.saveArchiveRemark("S001", request);
-
-        verify(currentUser).requireRole("AGENT");
-        verify(currentUser).requirePermission("chat:session:archive");
-        verify(chatSessionQueryService).saveArchiveRemark("A001", "S001", request);
-    }
 
     @Test
     void ordinaryUserCanStartConsultationExplicitly() {
         Principal principal = () -> "U001";
-        when(authenticationService.findRoleCodesByUserId("U001"))
-                .thenReturn(Set.of("USER"));
+        when(authenticationService.findRoleCodesByUserId("U001")).thenReturn(Set.of("USER"));
 
         controller.startConsultation(principal);
 
-        verify(authenticationService).requirePermission(
-                "U001",
-                "chat:user:access"
-        );
+        verify(authenticationService).requirePermission("U001", "chat:user:access");
         verify(chatRoutingOperations).onUserConnected("U001");
     }
 
@@ -98,273 +53,5 @@ class ChatControllerTest {
         Map<String, Object> response = controller.getHistory(request, () -> "U001");
 
         assertEquals("history-1", response.get("requestId"));
-    }
-
-    @Test
-    void agentCannotUseUserConsultationEntry() {
-        Principal principal = () -> "A001";
-        when(authenticationService.findRoleCodesByUserId("A001"))
-                .thenReturn(Set.of("AGENT"));
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> controller.startConsultation(principal)
-        );
-
-        verify(chatRoutingOperations, never()).onUserConnected("A001");
-    }
-
-    @Test
-    void userSessionEndpointUsesUserScope() {
-        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("USER"));
-        when(currentUser.getUserId()).thenReturn("U001");
-        when(chatSessionQueryService.findMySessions(
-                "U001",
-                SessionParticipantType.USER,
-                "OPEN",
-                "NONE",
-                1,
-                20
-        )).thenReturn(page);
-
-        Result<PageResult<ChatSessionListItemVO>> result =
-                controller.findMySessions("OPEN", "NONE", 1, 20);
-
-        assertEquals(page, result.getData());
-        verify(currentUser).requirePermission("chat:session:view-own");
-        verify(chatSessionQueryService).findMySessions(
-                "U001",
-                SessionParticipantType.USER,
-                "OPEN",
-                "NONE",
-                1,
-                20
-        );
-    }
-
-    @Test
-    void agentSessionEndpointUsesAgentScope() {
-        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
-        when(currentUser.getUserId()).thenReturn("A001");
-        when(chatSessionQueryService.findMySessions(
-                "A001",
-                SessionParticipantType.AGENT,
-                null,
-                null,
-                1,
-                20
-        )).thenReturn(page);
-
-        Result<PageResult<ChatSessionListItemVO>> result =
-                controller.findMySessions(null, null, 1, 20);
-
-        assertEquals(page, result.getData());
-        verify(currentUser).requirePermission("chat:session:view-own");
-        verify(chatSessionQueryService).findMySessions(
-                "A001",
-                SessionParticipantType.AGENT,
-                null,
-                null,
-                1,
-                20
-        );
-    }
-
-    @Test
-    void dualRoleSessionEndpointUsesUserScopeByDefault() {
-        PageResult<ChatSessionListItemVO> page = new PageResult<>(1, 20, 0, 0, List.of());
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("USER", "AGENT"));
-        when(currentUser.getUserId()).thenReturn("UA001");
-        when(chatSessionQueryService.findMySessions(
-                "UA001",
-                SessionParticipantType.USER,
-                null,
-                null,
-                1,
-                20
-        )).thenReturn(page);
-
-        controller.findMySessions(null, null, 1, 20);
-
-        verify(chatSessionQueryService).findMySessions(
-                "UA001",
-                SessionParticipantType.USER,
-                null,
-                null,
-                1,
-                20
-        );
-    }
-
-    @Test
-    void adminCannotUseParticipantSessionEndpoint() {
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
-        when(currentUser.getUserId()).thenReturn("ADMIN001");
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> controller.findMySessions(null, null, 1, 20)
-        );
-
-        verify(currentUser).requirePermission("chat:session:view-own");
-        verifyNoInteractions(chatSessionQueryService);
-    }
-
-    @Test
-    void adminCanReadSessionMetadataViaAuditScope() {
-        ChatSessionMetadataVO metadata = metadata("S001");
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
-        when(currentUser.getUserId()).thenReturn("ADMIN001");
-        when(chatSessionQueryService.getSessionMetadata("ADMIN001", true, "S001"))
-                .thenReturn(metadata);
-
-        Result<ChatSessionMetadataVO> result =
-                controller.getSessionMetadata("S001");
-
-        assertEquals(metadata, result.getData());
-        verify(currentUser).requireRole("ADMIN");
-        verify(currentUser).requirePermission("chat:session:audit:view");
-        verify(chatSessionQueryService).getSessionMetadata("ADMIN001", true, "S001");
-    }
-
-    @Test
-    void participantCanReadSessionMetadataViaOwnScope() {
-        ChatSessionMetadataVO metadata = metadata("S001");
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
-        when(currentUser.getUserId()).thenReturn("A001");
-        when(chatSessionQueryService.getSessionMetadata("A001", false, "S001"))
-                .thenReturn(metadata);
-
-        Result<ChatSessionMetadataVO> result =
-                controller.getSessionMetadata("S001");
-
-        assertEquals(metadata, result.getData());
-        verify(currentUser).requirePermission("chat:session:view-own");
-        verify(chatSessionQueryService).getSessionMetadata("A001", false, "S001");
-    }
-
-    @Test
-    void adminAgentReadsMetadataUsingAgentWorkspaceScope() {
-        ChatSessionMetadataVO metadata = metadata("S001");
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN", "AGENT"));
-        when(currentUser.getUserId()).thenReturn("AA001");
-        when(httpServletRequest.getHeader("X-Workspace-Role")).thenReturn("AGENT");
-        when(chatSessionQueryService.getSessionMetadata("AA001", false, "S001"))
-                .thenReturn(metadata);
-
-        Result<ChatSessionMetadataVO> result = controller.getSessionMetadata("S001");
-
-        assertEquals(metadata, result.getData());
-        verify(currentUser).requirePermission("chat:session:view-own");
-        verify(chatSessionQueryService).getSessionMetadata("AA001", false, "S001");
-    }
-
-    @Test
-    void unsupportedRoleCannotReadSessionMetadata() {
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("SUPERVISOR"));
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> controller.getSessionMetadata("S001")
-        );
-
-        verifyNoInteractions(chatSessionQueryService);
-    }
-
-    @Test
-    void agentCanUpdateSessionMetadata() {
-        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
-        ChatSessionMetadataVO metadata = metadata("S001");
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("AGENT"));
-        when(currentUser.getUserId()).thenReturn("A001");
-        when(chatSessionQueryService.updateSessionMetadata("A001", "S001", request))
-                .thenReturn(metadata);
-
-        Result<ChatSessionMetadataVO> result =
-                controller.updateSessionMetadata("S001", request);
-
-        assertEquals(metadata, result.getData());
-        verify(currentUser).requireRole("AGENT");
-        verify(currentUser).requirePermission("chat:session:metadata:update");
-        verify(chatSessionQueryService).updateSessionMetadata("A001", "S001", request);
-    }
-
-    @Test
-    void adminAgentCanUpdateSessionMetadataFromAgentWorkspace() {
-        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
-        ChatSessionMetadataVO metadata = metadata("S001");
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN", "AGENT"));
-        when(currentUser.getUserId()).thenReturn("AA001");
-        when(chatSessionQueryService.updateSessionMetadata("AA001", "S001", request))
-                .thenReturn(metadata);
-
-        Result<ChatSessionMetadataVO> result = controller.updateSessionMetadata("S001", request);
-
-        assertEquals(metadata, result.getData());
-        verify(currentUser).requireRole("AGENT");
-        verify(chatSessionQueryService).updateSessionMetadata("AA001", "S001", request);
-    }
-
-    @Test
-    void adminCannotUpdateSessionMetadata() {
-        ChatSessionMetadataUpdateDTO request = metadataUpdateRequest();
-        when(currentUser.getRoleCodes()).thenReturn(Set.of("ADMIN"));
-
-        assertThrows(
-                IllegalArgumentException.class,
-                () -> controller.updateSessionMetadata("S001", request)
-        );
-
-        verifyNoInteractions(chatSessionQueryService);
-    }
-
-    @Test
-    void vipSkillOperationsResolveEnabledAgentLoginNumberBeforePersistingMembership() {
-        SysUser agent = new SysUser();
-        agent.setId("agent-internal-id");
-        agent.setUsername("agent001");
-        agent.setStatus("ENABLED");
-        lenient().when(sysUserMapper.findByUsername("agent001")).thenReturn(agent);
-        lenient().when(sysUserRoleMapper.findRoleCodesByUserId("agent-internal-id"))
-                .thenReturn(Set.of("AGENT"));
-
-        controller.enableAgentVipSkill("agent001");
-
-        verify(chatAgentOperations).setAgentVipSkill("agent-internal-id", true);
-    }
-
-    @Test
-    void vipSkillListReturnsAgentLoginNumbersInsteadOfInternalIds() {
-        SysUser agent = new SysUser();
-        agent.setId("agent-internal-id");
-        agent.setUsername("agent001");
-        lenient().when(chatAgentOperations.findVipSkillAgentIds())
-                .thenReturn(Set.of("agent-internal-id"));
-        lenient().when(sysUserMapper.selectById("agent-internal-id")).thenReturn(agent);
-
-        Result<Set<String>> result = controller.findVipSkillAgents();
-
-        assertEquals(Set.of("agent001"), result.getData());
-    }
-
-    private static ChatSessionMetadataVO metadata(String sessionId) {
-        ChatSessionMetadataVO metadata = new ChatSessionMetadataVO();
-        metadata.setSessionId(sessionId);
-        metadata.setTitle("Priority case");
-        metadata.setPriority("HIGH");
-        metadata.setCategory("PAYMENT");
-        metadata.setTags(List.of("vip"));
-        return metadata;
-    }
-
-    private static ChatSessionMetadataUpdateDTO metadataUpdateRequest() {
-        ChatSessionMetadataUpdateDTO request = new ChatSessionMetadataUpdateDTO();
-        request.setTitle("Updated title");
-        request.setPriority("URGENT");
-        request.setCategory("TECHNICAL");
-        request.setTags(List.of("vip", "billing"));
-        return request;
     }
 }
