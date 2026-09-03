@@ -185,6 +185,25 @@ describe('User Workspace', () => {
     expect(chat.unreadCounts.s1).toBeUndefined()
   })
 
+  describe('chat store — WebSocket ticket', () => {
+    it('leaves connecting state and retries when the ticket request times out', async () => {
+      vi.useFakeTimers()
+      const auth = useAuthStore()
+      auth.login({ token: 'token', userId: 'u1', role: 'USER' })
+      mockFetch.mockImplementationOnce((path, options) => new Promise((resolve, reject) => {
+        options.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')))
+      }))
+      const chat = useChatStore()
+
+      chat.connectStomp()
+      await vi.advanceTimersByTimeAsync(15_000)
+
+      expect(chat.connectionState).toBe('reconnecting')
+      expect(chat.connectionError).toContain('请求超时')
+      vi.useRealTimers()
+    })
+  })
+
   it('acknowledges an inactive-session delivery without marking it as read', () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })

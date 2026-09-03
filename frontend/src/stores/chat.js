@@ -25,7 +25,7 @@ import {
   submitSupportTicketUserFeedback,
 } from '../api/chat-api'
 import { createStompClient } from '../services/stomp-client'
-import { handleUnauthorized } from '../services/http-client'
+import { request } from '../services/http-client'
 
 export const useChatStore = defineStore('chat', {
   state: () => ({
@@ -779,19 +779,10 @@ export const useChatStore = defineStore('chat', {
       this._ticketAbortController = ticketAbortController
 
       // Acquire ws ticket, then connect
-      fetch('/chat/ws-ticket', {
+      request('/chat/ws-ticket', {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${auth.token}`,
-          'Content-Type': 'application/json',
-        },
         signal: ticketAbortController.signal,
       })
-        .then(async (res) => {
-          if (res.status === 401) await handleUnauthorized()
-          if (!res.ok) throw new Error(`Ticket HTTP ${res.status}`)
-          return res.json()
-        })
         .then((ticketResult) => {
           if (attempt !== this._connectAttempt || this.manualDisconnect) return
           const ticket = ticketResult?.data?.ticket || ticketResult?.ticket

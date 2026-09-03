@@ -23,6 +23,7 @@ import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
+import org.springframework.core.task.TaskRejectedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -45,6 +46,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -53,6 +55,7 @@ import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -170,6 +173,44 @@ class ChatMessageServiceTest {
         verify(messagingTemplate).convertAndSendToUser(
                 eq("U001"), eq("/queue/messages"), eq(result)
         );
+    }
+
+    @Test
+    void recallMessageKeepsDatabaseResultWhenPostCommitCacheSyncFails() {
+        ChatMessage message = textMessage();
+        when(chatMessageMapper.selectById("M001")).thenReturn(message);
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(valueOperations.setIfAbsent(
+                eq(RedisConstants.SESSION_OPERATION_LOCK + "S001"),
+                anyString(), anyLong(), eq(TimeUnit.SECONDS)
+        )).thenReturn(true);
+        when(chatMessageMapper.recallOwnMessage(
+                eq("M001"), eq("A001"), any(LocalDateTime.class), any(LocalDateTime.class)
+        )).thenReturn(1);
+        when(listOperations.range(anyString(), eq(0L), eq(-1L)))
+                .thenThrow(new IllegalStateException("Redis unavailable"));
+
+        assertDoesNotThrow(() -> service.recallMessage("M001", "A001"));
+    }
+
+    @Test
+    void acceptedMessageKeepsDeduplicationWhenAsyncPersistenceQueueRejectsIt() {
+        ChatMessage message = textMessage();
+        message.setId(null);
+        message.setClientMsgId("CLIENT-QUEUE-FULL");
+        String dedupKey = RedisConstants.CLIENT_MSG_DEDUP + "S001:A001:CLIENT-QUEUE-FULL";
+        when(valueOperations.setIfAbsent(eq(dedupKey), anyString(), eq(24L), eq(TimeUnit.HOURS)))
+                .thenReturn(true);
+        when(valueOperations.setIfAbsent(
+                eq(RedisConstants.SESSION_OPERATION_LOCK + "S001"),
+                anyString(), anyLong(), eq(TimeUnit.SECONDS)
+        )).thenReturn(true);
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        doThrow(new TaskRejectedException("message persistence queue is full"))
+                .when(messagePersistService).persistMessageAsync(any(ChatMessage.class));
+
+        assertEquals(1, service.handleMessage(message));
+        verify(redisTemplate, never()).delete(dedupKey);
     }
 
     @Test

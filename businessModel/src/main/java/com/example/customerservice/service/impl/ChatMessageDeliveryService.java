@@ -24,6 +24,7 @@ import com.example.customerservice.service.MessagePersistService;
 import com.example.customerservice.util.ChatMessageContentValidator;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.connection.DataType;
+import org.springframework.core.task.TaskRejectedException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -278,9 +279,11 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                 receivedAcknowledgement
         );
         routeAndPush(message);
-        messagePersistService.persistMessageAsync(
-                message
-        );
+        try {
+            messagePersistService.persistMessageAsync(message);
+        } catch (TaskRejectedException exception) {
+            log.warn("消息已接收，异步落库队列繁忙，将由补偿任务处理，messageId={}", message.getId());
+        }
 
 
         log.info(

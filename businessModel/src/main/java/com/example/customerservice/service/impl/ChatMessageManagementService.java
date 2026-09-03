@@ -115,6 +115,7 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
     }
 
     @Override
+    @Transactional
     public MessageMutationResult recallMessage(
             String messageId,
             String operatorId
@@ -154,9 +155,13 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
             message.setRecalledAt(now);
             MessageMutationResult result = MessageMutationResult.recalled(message);
             afterCommit(() -> {
-                synchronizeMutatedMessageCache(message);
-                touchSessionActivity(message.getSessionId());
-                notifyMessageMutationCounterpart(message, result);
+                try {
+                    synchronizeMutatedMessageCache(message);
+                    touchSessionActivity(message.getSessionId());
+                    notifyMessageMutationCounterpart(message, result);
+                } catch (RuntimeException exception) {
+                    log.error("撤回消息已提交，但缓存或通知同步失败，messageId={}", message.getId(), exception);
+                }
             });
             return result;
         } finally {
