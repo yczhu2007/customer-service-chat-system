@@ -3,6 +3,7 @@ import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { fetchAttachmentBlob, fetchAttachmentMetadata } from '../../api/chat-api'
+import { previewCellText } from './xlsx-preview'
 
 const props = defineProps({
   sessionId: { type: String, default: null },
@@ -179,9 +180,10 @@ async function openFilePreview(attachment) {
         sheets: workbook.worksheets.map((sheet) => ({
           name: sheet.name,
           rows: Array.from({ length: Math.min(sheet.rowCount, 100) }, (_, rowIndex) =>
-            Array.from({ length: Math.min(sheet.columnCount, 20) }, (_, columnIndex) =>
-              sheet.getRow(rowIndex + 1).getCell(columnIndex + 1).text
-            )
+            Array.from({ length: Math.min(sheet.columnCount, 20) }, (_, columnIndex) => {
+              const cell = sheet.getRow(rowIndex + 1).getCell(columnIndex + 1)
+              return previewCellText(cell)
+            })
           ),
         })),
       }

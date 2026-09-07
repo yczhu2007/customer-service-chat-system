@@ -8,11 +8,49 @@ import MessageComposer from '../components/chat/MessageComposer.vue'
 import MessageList from '../components/chat/MessageList.vue'
 import UserSessionList from '../components/session/UserSessionList.vue'
 import { fetchAttachmentBlob } from '../api/chat-api'
+import { previewCellText } from '../components/chat/xlsx-preview'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 let latestStompOptions
+
+describe('XLSX preview values', () => {
+  it('renders structured cell values without object coercion', () => {
+    expect(previewCellText({
+      value: { richText: [{ text: '加' }, { text: '粗' }] },
+      text: '加粗',
+    })).toBe('加粗')
+    expect(previewCellText({
+      value: { text: '官网', hyperlink: 'https://example.com' },
+      text: '官网',
+    })).toBe('官网')
+    expect(previewCellText({
+      value: { formula: 'A1+B1', result: { error: '#N/A' } },
+      text: '[object Object]',
+    })).toBe('{"error":"#N/A"}')
+    expect(previewCellText({ value: 46272, numFmt: 'm月d日', text: '46272' })).toBe('9月7日')
+    expect(previewCellText({ value: 46279, numFmt: 'yyyy-mm-dd', text: '46279' })).toBe('2026-09-14')
+    expect(previewCellText({ value: 46272, numFmt: '0.00', text: '46272' })).toBe('46272')
+  })
+
+  it('renders date serials when numFmt is lost (WPS builtin Chinese formats)', () => {
+    // 课表源文件：B2 纯数值日期、B4 起为公式日期，均无 numFmt（exceljs 不识别 numFmtId=58）
+    expect(previewCellText({ value: 46272, numFmt: undefined, text: '46272' })).toBe('2026-9-7')
+    expect(previewCellText({ value: { formula: 'B2+7', result: 46279 }, numFmt: undefined, text: '46279' })).toBe('2026-9-14')
+    // 超链接式带引号的中文格式
+    expect(previewCellText({ value: 46272, numFmt: 'm"月"d"日"', text: '46272' })).toBe('9月7日')
+    // 带区域前缀的格式
+    expect(previewCellText({ value: 46272, numFmt: '[$-804]yyyy"年"m"月"d"日"', text: '46272' })).toBe('2026年9月7日')
+    // 普通数字不受日期兜底影响
+    expect(previewCellText({ value: 303, numFmt: undefined, text: '303' })).toBe('303')
+    expect(previewCellText({ value: 46272.5, numFmt: undefined, text: '46272.5' })).toBe('46272.5')
+    // Date 对象
+    expect(previewCellText({ value: new Date(Date.UTC(2026, 8, 7)), numFmt: undefined, text: '' })).toBe('2026-09-07')
+    // 时间格式
+    expect(previewCellText({ value: 0.5833333333, numFmt: 'h:mm', text: '0.58' })).toBe('14:00')
+  })
+})
 
 // Mock crypto.randomUUID
 if (!global.crypto) global.crypto = {}
@@ -693,6 +731,66 @@ describe('User Workspace', () => {
     expect(wrapper.find('.load-file-btn').exists()).toBe(false)
     expect(wrapper.find('.file-preview-btn').exists()).toBe(true)
   })
+
+  it('previews XLSX files with empty merged cells', async () => {
+    const { Workbook } = await import('exceljs')
+    const { markRaw } = await import('vue')
+    const workbook = new Workbook()
+    const sheet = workbook.addWorksheet('Sheet1')
+    sheet.mergeCells('A1:B1')
+    sheet.getCell('C1').value = '尾部列'
+    const fileBytes = await workbook.xlsx.writeBuffer()
+    const arrayBuffer = new Uint8Array(fileBytes).buffer
+    const file = markRaw({
+      size: arrayBuffer.byteLength,
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      arrayBuffer: () => Promise.resolve(arrayBuffer),
+    })
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'xlsx-message', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content',
+    }]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          code: 200,
+          data: {
+            originalName: 'merged.xlsx',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            fileSize: file.size,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(file),
+        headers: { get: () => 'attachment; filename="merged.xlsx"' },
+      })
+
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:merged-xlsx')
+    try {
+      const wrapper = mount(MessageList, {
+        attachTo: document.body,
+        props: { sessionId: 's1' },
+        global: { stubs: { ElDialog: { template: '<div class="preview-dialog"><slot /></div>' } } },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.find('.file-preview-btn').trigger('click')
+
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(document.body.textContent).toContain('尾部列'), { timeout: 5000 })
+      expect(document.body.textContent).not.toContain('XLSX 预览加载失败')
+      wrapper.unmount()
+    } finally {
+      createUrl.mockRestore()
+    }
+  }, 10_000)
 
   describe('chat store — consultation start', () => {
     it('refreshes the session list immediately when the server creates a session', () => {
