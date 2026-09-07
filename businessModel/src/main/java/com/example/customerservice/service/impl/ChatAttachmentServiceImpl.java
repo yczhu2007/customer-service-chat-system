@@ -8,6 +8,8 @@ import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.service.ChatAttachmentService;
+import com.example.customerservice.service.AttachmentPreview;
+import com.example.customerservice.service.OfficePreviewConverter;
 import com.example.customerservice.storage.AttachmentObjectStorage;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -58,15 +60,18 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private final ChatSessionMapper sessionMapper;
     private final AttachmentObjectStorage storage;
     private final MinioAttachmentProperties properties;
+    private final OfficePreviewConverter previewConverter;
 
     @Autowired
     public ChatAttachmentServiceImpl(ChatAttachmentMapper attachmentMapper, ChatSessionMapper sessionMapper,
                                      AttachmentObjectStorage storage,
-                                     MinioAttachmentProperties properties) {
+                                     MinioAttachmentProperties properties,
+                                     OfficePreviewConverter previewConverter) {
         this.attachmentMapper = attachmentMapper;
         this.sessionMapper = sessionMapper;
         this.storage = storage;
         this.properties = properties;
+        this.previewConverter = previewConverter;
     }
 
     @Override
@@ -226,6 +231,30 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
             return new InputStreamResource(storage.open(attachment.getStoredName()));
         } catch (RuntimeException exception) {
             throw new NotFoundException("附件文件不存在");
+        }
+    }
+
+    @Override
+    public AttachmentPreview preview(String userId, String attachmentId) {
+        ChatAttachment attachment = requireAccessible(userId, attachmentId);
+        String extension = extensionOf(attachment.getOriginalName());
+        if (!Set.of("doc", "xls").contains(extension)) {
+            throw new IllegalArgumentException("该附件不支持服务端预览");
+        }
+        InputStream storedInput;
+        try {
+            storedInput = storage.open(attachment.getStoredName());
+        } catch (RuntimeException exception) {
+            throw new NotFoundException("附件文件不存在");
+        }
+        try (InputStream input = storedInput) {
+            byte[] content = previewConverter.convertToPdf(attachment.getOriginalName(), input);
+            String baseName = attachment.getOriginalName().substring(
+                    0, attachment.getOriginalName().length() - extension.length() - 1
+            );
+            return new AttachmentPreview(baseName + ".pdf", content);
+        } catch (IOException exception) {
+            throw new IllegalStateException("附件读取失败", exception);
         }
     }
 

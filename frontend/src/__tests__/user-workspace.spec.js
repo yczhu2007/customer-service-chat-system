@@ -8,11 +8,27 @@ import MessageComposer from '../components/chat/MessageComposer.vue'
 import MessageList from '../components/chat/MessageList.vue'
 import UserSessionList from '../components/session/UserSessionList.vue'
 import { fetchAttachmentBlob } from '../api/chat-api'
+import { previewCellText } from '../components/chat/xlsx-preview'
 
 // Mock fetch globally
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 let latestStompOptions
+
+describe('XLSX preview values', () => {
+  it('renders empty and structured cell values without object coercion', () => {
+    expect(previewCellText({ value: null, text: '' })).toBe('')
+    expect(previewCellText({
+      value: { richText: [{ text: '加' }, { text: '粗' }] },
+      text: '加粗',
+    })).toBe('加粗')
+    expect(previewCellText({
+      value: { formula: 'A1+B1', result: { error: '#N/A' } },
+      text: '[object Object]',
+    })).toBe('{"error":"#N/A"}')
+    expect(previewCellText({ value: 46272, numFmt: 'm月d日', text: '46272' })).toBe('9月7日')
+  })
+})
 
 // Mock crypto.randomUUID
 if (!global.crypto) global.crypto = {}
@@ -631,6 +647,8 @@ describe('User Workspace', () => {
       { id: 'txt', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/22222222222222222222222222222222/content' },
       { id: 'docx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/33333333333333333333333333333333/content' },
       { id: 'xlsx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/44444444444444444444444444444444/content' },
+      { id: 'doc', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/55555555555555555555555555555555/content' },
+      { id: 'xls', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/66666666666666666666666666666666/content' },
     ]
     mockFetch
       .mockResolvedValueOnce({
@@ -653,15 +671,129 @@ describe('User Workspace', () => {
         status: 200,
         json: () => Promise.resolve({ code: 200, data: { originalName: 'table.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 1 } }),
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'legacy.doc', contentType: 'application/msword', fileSize: 1 } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 1 } }),
+      })
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(4)
-    expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(4)
+    expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(6)
+    expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(6)
     expect(wrapper.findAll('.load-file-btn')).toHaveLength(0)
   })
+
+  it('opens a legacy Excel attachment through the authenticated PDF preview endpoint', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 'token-1', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'xls', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/66666666666666666666666666666666/content',
+    }]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          code: 200,
+          data: { originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 12 },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ 'content-disposition': "inline; filename*=UTF-8''legacy.pdf" }),
+        blob: () => Promise.resolve(new Blob(['%PDF-preview'], { type: 'application/pdf' })),
+      })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await wrapper.findAll('button').find((button) => button.text() === '预览').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockFetch).toHaveBeenLastCalledWith(
+      '/chat/attachments/66666666666666666666666666666666/preview',
+      { headers: { Authorization: 'Bearer token-1' } }
+    )
+    expect(wrapper.find('.pdf-preview').exists()).toBe(true)
+
+    wrapper.findComponent({ name: 'ElDialog' }).vm.$emit('close')
+    await wrapper.vm.$nextTick()
+    await wrapper.findAll('button').find((button) => button.text() === '预览').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    expect(mockFetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('previews XLSX files with empty merged cells', async () => {
+    const { Workbook } = await import('exceljs')
+    const { markRaw } = await import('vue')
+    const workbook = new Workbook()
+    const sheet = workbook.addWorksheet('Sheet1')
+    sheet.mergeCells('A1:B1')
+    sheet.getCell('C1').value = '尾部列'
+    const fileBytes = await workbook.xlsx.writeBuffer()
+    const arrayBuffer = new Uint8Array(fileBytes).buffer
+    const file = markRaw({
+      size: arrayBuffer.byteLength,
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      arrayBuffer: () => Promise.resolve(arrayBuffer),
+    })
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'xlsx-message', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content',
+    }]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          code: 200,
+          data: {
+            originalName: 'merged.xlsx',
+            contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            fileSize: file.size,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(file),
+        headers: { get: () => 'attachment; filename="merged.xlsx"' },
+      })
+
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:merged-xlsx')
+    try {
+      const wrapper = mount(MessageList, {
+        attachTo: document.body,
+        props: { sessionId: 's1' },
+        global: { stubs: { ElDialog: { template: '<div class="preview-dialog"><slot /></div>' } } },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.find('.file-preview-btn').trigger('click')
+
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(document.body.textContent).toContain('尾部列'), { timeout: 5000 })
+      expect(document.body.textContent).not.toContain('XLSX 预览加载失败')
+      wrapper.unmount()
+    } finally {
+      createUrl.mockRestore()
+    }
+  }, 10_000)
 
   it('shows file metadata before downloading an attachment body', async () => {
     const auth = useAuthStore()

@@ -8,12 +8,14 @@ import com.example.customerservice.config.MinioAttachmentProperties;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.service.impl.ChatAttachmentServiceImpl;
+import com.example.customerservice.service.OfficePreviewConverter;
 import com.example.customerservice.storage.AttachmentObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.Instant;
+import java.io.ByteArrayInputStream;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -32,7 +34,7 @@ class ChatAttachmentServiceImplTest {
         AtomicReference<ChatAttachment> saved = new AtomicReference<>();
         when(attachmentMapper.insert(any(ChatAttachment.class))).thenAnswer(invocation -> { saved.set(invocation.getArgument(0)); return 1; });
         when(attachmentMapper.selectById(anyString())).thenAnswer(invocation -> saved.get());
-        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties());
+        ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
 
         var result = service.upload("U1", "S1",
                 new MockMultipartFile("file", "safe.jpg", "text/html", new byte[]{
@@ -50,7 +52,7 @@ class ChatAttachmentServiceImplTest {
         AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
         ChatSession session = new ChatSession(); session.setId("S1"); session.setUserId("U1"); session.setAgentId("A1");
         when(sessionMapper.selectById("S1")).thenReturn(session);
-        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties());
+        ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
 
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
                 new MockMultipartFile("file", "payload.jpg", "image/jpeg", "<script>alert(1)</script>".getBytes())));
@@ -65,7 +67,7 @@ class ChatAttachmentServiceImplTest {
         AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
         ChatSession session = new ChatSession(); session.setId("S1"); session.setUserId("U1"); session.setAgentId("A1");
         when(sessionMapper.selectById("S1")).thenReturn(session);
-        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties());
+        ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
         assertThrows(IllegalArgumentException.class, () -> service.upload("X1", "S1",
                 new MockMultipartFile("file", "safe.jpg", "image/jpeg", new byte[]{1})));
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
@@ -86,11 +88,46 @@ class ChatAttachmentServiceImplTest {
         when(attachmentMapper.selectList(any())).thenReturn(List.of());
         doThrow(new IllegalStateException("storage unavailable"))
                 .when(storage).delete("orphan.txt");
-        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
-                attachmentMapper, mock(ChatSessionMapper.class), storage,
-                new MinioAttachmentProperties()
-        );
+        ChatAttachmentServiceImpl service = service(attachmentMapper, mock(ChatSessionMapper.class), storage);
 
         assertEquals(0, service.cleanupOrphanFiles());
+    }
+
+    @Test
+    void previewsAccessibleLegacyOfficeAttachmentAsPdf() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        OfficePreviewConverter converter = mock(OfficePreviewConverter.class);
+        ChatAttachment attachment = new ChatAttachment();
+        attachment.setId("A1");
+        attachment.setSessionId("S1");
+        attachment.setOriginalName("schedule.xls");
+        attachment.setStoredName("A1.xls");
+        ChatSession session = new ChatSession();
+        session.setId("S1");
+        session.setUserId("U1");
+        when(attachmentMapper.selectById("A1")).thenReturn(attachment);
+        when(sessionMapper.selectById("S1")).thenReturn(session);
+        when(storage.open("A1.xls")).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
+        when(converter.convertToPdf(eq("schedule.xls"), any())).thenReturn("%PDF-preview".getBytes());
+        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
+                attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties(), converter
+        );
+
+        AttachmentPreview preview = service.preview("U1", "A1");
+
+        assertEquals("schedule.pdf", preview.filename());
+        assertArrayEquals("%PDF-preview".getBytes(), preview.content());
+        verify(converter).convertToPdf(eq("schedule.xls"), any());
+    }
+
+    private ChatAttachmentServiceImpl service(ChatAttachmentMapper attachmentMapper,
+                                              ChatSessionMapper sessionMapper,
+                                              AttachmentObjectStorage storage) {
+        return new ChatAttachmentServiceImpl(
+                attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties(),
+                mock(OfficePreviewConverter.class)
+        );
     }
 }
