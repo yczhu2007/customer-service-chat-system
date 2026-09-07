@@ -51,6 +51,7 @@ compose.yml        Redis 与 MinIO 的 Docker Compose 配置
 - Node.js 20 或更高版本与 npm
 - MySQL 8（或兼容版本）
 - Docker Desktop（用于 Redis、MinIO）
+- LibreOffice（用于将旧版 `.doc`、`.xls` 附件转换为 PDF 预览）
 
 项目当前的 `compose.yml` 只管理 Redis 和 MinIO；MySQL 仍按应用配置连接到已有实例。若后续将 MySQL 容器化，建议先导出原数据库，再导入 Docker 命名卷中的 MySQL，避免丢失现有数据。
 
@@ -110,6 +111,8 @@ $env:REDIS_PORT = '16379'
 $env:MINIO_ENDPOINT = 'http://127.0.0.1:9000'
 $env:MINIO_ACCESS_KEY = 'your-minio-access-key'
 $env:MINIO_SECRET_KEY = 'your-minio-secret-key'
+# 若 soffice 不在 PATH 中，请设置 LibreOffice 的完整可执行文件路径：
+# $env:CHAT_ATTACHMENT_PREVIEW_COMMAND = 'C:\Program Files\LibreOffice\program\soffice.com'
 
 mvn -pl application -am spring-boot:run
 ```
@@ -177,6 +180,10 @@ redis-cli -h 127.0.0.1 -p 16379 ping
 ### 附件文件存放在哪里
 
 聊天附件由 MinIO 保存，业务数据库只保留文件元数据和访问关联信息。导出或交付源码时，不会自动包含 MinIO 中的实际附件文件；如需演示数据，请单独备份相应 Bucket。
+
+### DOC 或 XLS 附件无法预览
+
+旧版 Word/Excel 附件由后端调用 LibreOffice 转换为 PDF，服务器需要安装 LibreOffice，并确保 `soffice` 可执行。若它不在系统 `PATH` 中，通过 `CHAT_ATTACHMENT_PREVIEW_COMMAND` 配置完整路径。单次转换默认最多等待 30 秒，生成结果最大 20 MB；失败时原附件仍可下载。
 
 ## 源码交付与安全
 

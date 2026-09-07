@@ -9,5 +9,6 @@ public interface ChatAttachmentService {
     ChatAttachmentVO upload(String userId, String sessionId, MultipartFile file);
     ChatAttachment requireAccessible(String userId, String attachmentId);
     Resource load(ChatAttachment attachment);
+    AttachmentPreview preview(String userId, String attachmentId);
     int cleanupOrphanFiles();
 }

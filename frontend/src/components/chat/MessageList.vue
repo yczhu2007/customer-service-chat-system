@@ -2,7 +2,7 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
-import { fetchAttachmentBlob, fetchAttachmentMetadata } from '../../api/chat-api'
+import { fetchAttachmentBlob, fetchAttachmentMetadata, fetchAttachmentPreview } from '../../api/chat-api'
 import { previewCellText } from './xlsx-preview'
 
 const props = defineProps({
@@ -14,6 +14,7 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const listEl = ref(null)
 const blobCache = ref({})
+const legacyPreviewCache = new Map()
 const attachmentMetadata = ref({})
 const unavailableAttachmentUrls = new Set()
 const highlightedMessageId = ref(null)
@@ -89,6 +90,17 @@ function releaseBlob(messageId) {
 
 function releaseAllBlobs() {
   Object.keys(blobCache.value).forEach((messageId) => releaseBlob(messageId))
+  legacyPreviewCache.forEach((attachment) => {
+    if (attachment.url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(attachment.url)
+  })
+  legacyPreviewCache.clear()
+}
+
+function closeFilePreview() {
+  if (filePreview.value?.revokeOnClose && filePreview.value.url && typeof URL.revokeObjectURL === 'function') {
+    URL.revokeObjectURL(filePreview.value.url)
+  }
+  filePreview.value = null
 }
 
 /** Fetch blob URL for IMAGE/FILE messages */
@@ -145,6 +157,8 @@ function previewKind(attachment) {
   if (attachment?.type === 'text/plain' || name.endsWith('.txt')) return 'text'
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx')) return 'docx'
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || name.endsWith('.xlsx')) return 'xlsx'
+  if (attachment?.type === 'application/msword' || name.endsWith('.doc')) return 'legacy-office'
+  if (attachment?.type === 'application/vnd.ms-excel' || name.endsWith('.xls')) return 'legacy-office'
   return null
 }
 
@@ -203,6 +217,44 @@ async function openFilePreview(attachment) {
 }
 
 async function previewFile(msg) {
+  const metadata = attachmentMetadata.value[msg.id]
+  if (previewKind({ name: metadata?.originalName, type: metadata?.contentType }) === 'legacy-office') {
+    const id = attachmentId(msg.content)
+    if (!id) return
+    const cached = legacyPreviewCache.get(msg.id)
+    if (cached) {
+      filePreview.value = { kind: 'pdf', name: metadata.originalName, url: cached.url }
+      return
+    }
+    const sessionId = props.sessionId
+    closeFilePreview()
+    filePreview.value = { kind: 'legacy-office', messageId: msg.id, name: metadata.originalName, loading: true }
+    try {
+      const attachment = await fetchAttachmentPreview(id)
+      if (sessionId !== props.sessionId || !chat.messages.some((item) => item.id === msg.id)) {
+        if (attachment.url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(attachment.url)
+        if (filePreview.value?.messageId === msg.id) filePreview.value = null
+        return
+      }
+      legacyPreviewCache.set(msg.id, attachment)
+      filePreview.value = {
+        kind: 'pdf',
+        name: metadata.originalName,
+        url: attachment.url,
+      }
+    } catch (error) {
+      if (sessionId !== props.sessionId || !chat.messages.some((item) => item.id === msg.id)) {
+        if (filePreview.value?.messageId === msg.id) filePreview.value = null
+        return
+      }
+      filePreview.value = {
+        kind: 'legacy-office',
+        name: metadata.originalName,
+        error: `文件预览转换失败：${error.message || '请稍后重试'}`,
+      }
+    }
+    return
+  }
   const attachment = await loadBlob(msg)
   if (attachment) openFilePreview(attachment)
 }
@@ -251,6 +303,12 @@ watch(
     Object.keys(attachmentMetadata.value)
       .filter((messageId) => !messageIds.has(messageId))
       .forEach((messageId) => delete attachmentMetadata.value[messageId])
+    legacyPreviewCache.forEach((attachment, messageId) => {
+      if (!messageIds.has(messageId)) {
+        if (attachment.url && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(attachment.url)
+        legacyPreviewCache.delete(messageId)
+      }
+    })
     if (chat.focusedMessageId) nextTick(() => focusMessage(chat.focusedMessageId))
     else scrollToBottom()
     chat.messages
@@ -266,6 +324,7 @@ watch(
 onMounted(() => scrollToBottom())
 onUnmounted(() => {
   if (highlightTimeout) clearTimeout(highlightTimeout)
+  closeFilePreview()
   releaseAllBlobs()
 })
 </script>
@@ -390,7 +449,7 @@ onUnmounted(() => {
       :model-value="true"
       :title="filePreview.name"
       width="min(900px, 92vw)"
-      @close="filePreview = null"
+      @close="closeFilePreview"
     >
       <iframe v-if="filePreview.kind === 'pdf'" :src="filePreview.url" class="pdf-preview" :title="filePreview.name" />
       <pre v-else-if="filePreview.kind === 'text'" class="text-preview">{{ filePreview.text }}</pre>
@@ -408,6 +467,9 @@ onUnmounted(() => {
           <div class="xlsx-preview"><table><tbody><tr v-for="(row, rowIndex) in filePreview.sheets[filePreview.sheetIndex]?.rows" :key="rowIndex"><td v-for="(cell, columnIndex) in row" :key="columnIndex">{{ cell }}</td></tr></tbody></table></div>
         </template>
       </template>
+      <span v-else-if="filePreview.kind === 'legacy-office'">
+        {{ filePreview.loading ? '正在转换预览…' : filePreview.error }}
+      </span>
     </el-dialog>
   </div>
 </template>

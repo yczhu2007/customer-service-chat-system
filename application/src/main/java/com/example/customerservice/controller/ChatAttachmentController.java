@@ -5,9 +5,11 @@ import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.dto.ChatAttachmentVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
+import com.example.customerservice.service.AttachmentPreview;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import org.springframework.core.io.Resource;
+import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -60,5 +62,19 @@ public class ChatAttachmentController {
                 .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
                 .body(service.load(attachment));
+    }
+
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<Resource> preview(@PathVariable @NotBlank @Size(max=64) String id) {
+        AttachmentPreview preview = service.preview(currentUser.getUserId(), id);
+        ContentDisposition disposition = ContentDisposition.inline()
+                .filename(preview.filename(), StandardCharsets.UTF_8)
+                .build();
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .contentLength(preview.content().length)
+                .header("X-Content-Type-Options", "nosniff")
+                .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
+                .body(new ByteArrayResource(preview.content()));
     }
 }

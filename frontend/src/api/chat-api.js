@@ -109,6 +109,29 @@ export const fetchAttachmentBlob = async (contentUrl) => {
   }
 }
 
+/** Fetch the server-generated PDF preview for a legacy DOC/XLS attachment. */
+export const fetchAttachmentPreview = async (attachmentId) => {
+  if (!/^[A-Za-z0-9]{32,64}$/.test(attachmentId || '')) throw new Error('附件编号无效')
+  const auth = useAuthStore()
+  const headers = {}
+  if (auth.token) headers.Authorization = `Bearer ${auth.token}`
+  const url = `/chat/attachments/${encodeURIComponent(attachmentId)}/preview`
+  const res = await fetch(url, { headers })
+  if (res.status === 401) await handleUnauthorized()
+  if (!res.ok) throw new Error(`HTTP ${res.status}`)
+  const blob = await res.blob()
+  const disposition = res.headers.get('content-disposition') || ''
+  const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1]
+  const plainName = disposition.match(/filename="?([^";]+)"?/i)?.[1]
+  return {
+    url: URL.createObjectURL(blob),
+    name: encodedName ? decodeURIComponent(encodedName) : (plainName || '附件预览.pdf'),
+    size: blob.size,
+    type: blob.type,
+    blob,
+  }
+}
+
 // ─── Agent workspace APIs ────────────────────────────────────────
 
 /**
