@@ -93,4 +93,26 @@ class ChatAgentServiceTest {
 
         verify(redisRepository).sortedSetRemove(RedisConstants.AGENT_RECONNECT_GRACE, "A001");
     }
+
+    @Test
+    void agentOnlineRefreshesWaitingPositionsOnceAfterCapacityCheck() {
+        ChatRedisRepository redisRepository = mock(ChatRedisRepository.class);
+        ChatAgentSessionRecoveryService recoveryService = mock(ChatAgentSessionRecoveryService.class);
+        ChatRoutingOperations routingOperations = mock(ChatRoutingOperations.class);
+        ChatPresenceOperations presenceOperations = mock(ChatPresenceOperations.class);
+        ChatSessionNotificationOperations notificationOperations = mock(ChatSessionNotificationOperations.class);
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        SysUserRoleMapper userRoleMapper = mock(SysUserRoleMapper.class);
+        ChatAgentSkillMapper skillMapper = mock(ChatAgentSkillMapper.class);
+        when(recoveryService.restoreActiveSessions("A001")).thenReturn(List.of());
+        when(redisRepository.sortedSetCardinality(RedisConstants.QUEUE_PENDING)).thenReturn(0L);
+        ChatAgentService service = new ChatAgentService(
+                redisRepository, recoveryService, routingOperations, presenceOperations,
+                notificationOperations, userMapper, userRoleMapper, skillMapper
+        );
+
+        service.agentOnline("A001");
+
+        verify(routingOperations).refreshWaitingPositions();
+    }
 }

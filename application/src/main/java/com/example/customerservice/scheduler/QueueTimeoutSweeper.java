@@ -2,6 +2,7 @@ package com.example.customerservice.scheduler;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.ChatRoutingOperations;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
@@ -13,6 +14,7 @@ import java.util.Set;
 
 /** 清理等待超时用户，避免无限排队。 */
 @Component
+@Slf4j
 public class QueueTimeoutSweeper {
 
     private static final DefaultRedisScript<Long> REMOVE_TIMED_OUT_USER_SCRIPT =
@@ -27,6 +29,7 @@ public class QueueTimeoutSweeper {
                             "redis.call('ZREM', KEYS[2], ARGV[1]); " +
                             "redis.call('HDEL', KEYS[3], ARGV[1]); " +
                             "redis.call('ZREM', KEYS[4], ARGV[1]); " +
+                            "redis.call('ZREM', KEYS[5], ARGV[1]); " +
                             "return vipLevel + 1;",
                     Long.class
             );
@@ -35,8 +38,6 @@ public class QueueTimeoutSweeper {
     private final SimpMessagingTemplate messagingTemplate;
     private final long timeoutMillis;
     private final long vipTimeoutMillis;
-    private final long vipPriorityStepMillis;
-    private final QueuePriorityPolicy priorityPolicy;
     private final ChatRoutingOperations chatRoutingOperations;
     private final DistributedSchedulerLock schedulerLock;
 
@@ -46,24 +47,12 @@ public class QueueTimeoutSweeper {
             ChatRoutingOperations chatRoutingOperations,
             DistributedSchedulerLock schedulerLock,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
-            @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds,
-            @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}")
-            long vipPriorityStepSeconds,
-            @Value("${app.chat.queue.anti-starvation-seconds:180}")
-            long antiStarvationSeconds
+            @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds
     ) {
         this.redisTemplate = redisTemplate;
         this.messagingTemplate = messagingTemplate;
         this.timeoutMillis = timeoutSeconds * 1000L;
         this.vipTimeoutMillis = vipTimeoutSeconds * 1000L;
-        this.vipPriorityStepMillis = Math.max(
-                0L,
-                vipPriorityStepSeconds * 1000L
-        );
-        this.priorityPolicy = new QueuePriorityPolicy(
-                vipPriorityStepMillis,
-                Math.max(1L, antiStarvationSeconds) * 1000L
-        );
         this.chatRoutingOperations = chatRoutingOperations;
         this.schedulerLock = schedulerLock;
     }
@@ -79,7 +68,6 @@ public class QueueTimeoutSweeper {
     private void removeTimedOutUsersLocked() {
         backfillMissingEnqueueTimes();
         long now = System.currentTimeMillis();
-        normalizeFairPriorityScores(now);
         long earliestDeadline =
                 now - Math.min(timeoutMillis, vipTimeoutMillis);
         Set<String> userIds = redisTemplate.opsForZSet().rangeByScore(
@@ -92,6 +80,7 @@ public class QueueTimeoutSweeper {
         if (userIds == null || userIds.isEmpty()) {
             return;
         }
+        Set<String> onlineAgentIds = null;
         for (String userId : userIds) {
             Long removedVipMarker = redisTemplate.execute(
                     REMOVE_TIMED_OUT_USER_SCRIPT,
@@ -99,6 +88,7 @@ public class QueueTimeoutSweeper {
                             RedisConstants.QUEUE_PENDING,
                             RedisConstants.QUEUE_ENQUEUED_AT,
                             RedisConstants.QUEUE_VIP_LEVEL,
+                            RedisConstants.QUEUE_NORMAL_DUE,
                             RedisConstants.VIP_CALLBACK_PENDING
                     ),
                     userId,
@@ -108,59 +98,35 @@ public class QueueTimeoutSweeper {
             );
             if (removedVipMarker != null && removedVipMarker > 0) {
                 int vipLevel = Math.toIntExact(removedVipMarker - 1);
-                messagingTemplate.convertAndSendToUser(
-                        userId,
-                        "/queue/chat",
-                        java.util.Map.of(
-                                "event", "WAITING_TIMEOUT",
-                                "message", "排队超时，请稍后重新发起咨询"
-                        )
-                );
+                try {
+                    messagingTemplate.convertAndSendToUser(
+                            userId,
+                            "/queue/chat",
+                            java.util.Map.of(
+                                    "event", "WAITING_TIMEOUT",
+                                    "message", "排队超时，请稍后重新发起咨询"
+                            )
+                    );
+                } catch (RuntimeException exception) {
+                    log.warn("发送排队超时通知失败，userId={}", userId, exception);
+                }
                 if (vipLevel > 0) {
+                    if (onlineAgentIds == null) {
+                        onlineAgentIds = redisTemplate.opsForZSet().range(
+                                RedisConstants.AGENT_LOAD,
+                                0,
+                                -1
+                        );
+                    }
                     notifyAgentsAboutVipTimeout(
                             userId,
-                            vipLevel
+                            vipLevel,
+                            onlineAgentIds
                     );
                 }
             }
         }
         chatRoutingOperations.refreshWaitingPositions();
-    }
-
-    /** 重新计算 VIP 权重和普通用户反饥饿保障分数，同一优先层仍保持 FIFO。 */
-    private void normalizeFairPriorityScores(long now) {
-        Set<String> queuedUserIds = redisTemplate.opsForZSet().range(
-                RedisConstants.QUEUE_PENDING,
-                0,
-                -1
-        );
-        if (queuedUserIds == null || queuedUserIds.isEmpty()) {
-            return;
-        }
-        for (String userId : queuedUserIds) {
-            Double enqueuedAt = redisTemplate.opsForZSet().score(
-                    RedisConstants.QUEUE_ENQUEUED_AT,
-                    userId
-            );
-            if (enqueuedAt == null) {
-                continue;
-            }
-            Object vipLevelValue = redisTemplate.opsForHash().get(
-                    RedisConstants.QUEUE_VIP_LEVEL,
-                    userId
-            );
-            int vipLevel = parseVipLevel(vipLevelValue);
-            double fairScore = priorityPolicy.score(
-                    enqueuedAt,
-                    vipLevel,
-                    now
-            );
-            redisTemplate.opsForZSet().add(
-                    RedisConstants.QUEUE_PENDING,
-                    userId,
-                    fairScore
-            );
-        }
     }
 
     /** 为升级前的排队数据补齐独立的真实入队时间索引。 */
@@ -173,52 +139,44 @@ public class QueueTimeoutSweeper {
         if (queuedUserIds == null || queuedUserIds.isEmpty()) {
             return;
         }
+        java.util.List<String> missingUserIds = new java.util.ArrayList<>();
         for (String userId : queuedUserIds) {
             Double enqueuedAt = redisTemplate.opsForZSet().score(
                     RedisConstants.QUEUE_ENQUEUED_AT,
                     userId
             );
             if (enqueuedAt == null) {
-                chatRoutingOperations.enqueueWaitingUser(userId);
+                missingUserIds.add(userId);
             }
         }
-    }
-
-    private int parseVipLevel(Object value) {
-        if (value == null) {
-            return 0;
-        }
-        try {
-            return Math.max(0, Integer.parseInt(value.toString()));
-        } catch (NumberFormatException ignored) {
-            return 0;
+        if (!missingUserIds.isEmpty()) {
+            chatRoutingOperations.backfillWaitingUsers(missingUserIds);
         }
     }
 
     private void notifyAgentsAboutVipTimeout(
             String userId,
-            int vipLevel
+            int vipLevel,
+            Set<String> onlineAgentIds
     ) {
-        Set<String> onlineAgentIds =
-                redisTemplate.opsForZSet().range(
-                        RedisConstants.AGENT_LOAD,
-                        0,
-                        -1
-                );
         if (onlineAgentIds == null || onlineAgentIds.isEmpty()) {
             return;
         }
         for (String agentId : onlineAgentIds) {
-            messagingTemplate.convertAndSendToUser(
-                    agentId,
-                    "/queue/chat",
-                    java.util.Map.of(
-                            "event", "VIP_WAITING_TIMEOUT",
-                            "userId", userId,
-                            "vipLevel", vipLevel,
-                            "message", "VIP用户等待超时，请优先处理"
-                    )
-            );
+            try {
+                messagingTemplate.convertAndSendToUser(
+                        agentId,
+                        "/queue/chat",
+                        java.util.Map.of(
+                                "event", "VIP_WAITING_TIMEOUT",
+                                "userId", userId,
+                                "vipLevel", vipLevel,
+                                "message", "VIP用户等待超时，请优先处理"
+                        )
+                );
+            } catch (RuntimeException exception) {
+                log.warn("发送VIP排队超时通知失败，agentId={}", agentId, exception);
+            }
         }
     }
 }

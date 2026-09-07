@@ -223,21 +223,25 @@ public class ChatAgentService implements ChatAgentOperations {
     }
 
     private void fillAvailableCapacity(String agentId) {
-        for (int slot = 0; slot < RedisConstants.AGENT_MAX_CONCURRENCY; slot++) {
-            Long waitingCount = chatRedisRepository.sortedSetCardinality(
-                    RedisConstants.QUEUE_PENDING
-            );
-            Double currentLoad = chatRedisRepository.sortedSetScore(
-                    RedisConstants.AGENT_LOAD,
-                    agentId
-            );
-            if (waitingCount == null
-                    || waitingCount <= 0
-                    || currentLoad == null
-                    || currentLoad >= RedisConstants.AGENT_MAX_CONCURRENCY) {
-                return;
+        try {
+            for (int slot = 0; slot < RedisConstants.AGENT_MAX_CONCURRENCY; slot++) {
+                Long waitingCount = chatRedisRepository.sortedSetCardinality(
+                        RedisConstants.QUEUE_PENDING
+                );
+                Double currentLoad = chatRedisRepository.sortedSetScore(
+                        RedisConstants.AGENT_LOAD,
+                        agentId
+                );
+                if (waitingCount == null
+                        || waitingCount <= 0
+                        || currentLoad == null
+                        || currentLoad >= RedisConstants.AGENT_MAX_CONCURRENCY) {
+                    return;
+                }
+                chatRoutingOperations.processNextWaitingUser(agentId);
             }
-            chatRoutingOperations.processNextWaitingUser(agentId);
+        } finally {
+            chatRoutingOperations.refreshWaitingPositions();
         }
     }
 

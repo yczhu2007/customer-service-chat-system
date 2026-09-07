@@ -9,6 +9,7 @@ import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.service.ChatAttachmentService;
 import com.example.customerservice.storage.AttachmentObjectStorage;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.InputStreamResource;
@@ -23,6 +24,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -32,11 +34,13 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @Service
+@Slf4j
 public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private static final long MAX_SIZE = 10L * 1024 * 1024;
     private static final long MAX_ZIP_UNCOMPRESSED_SIZE = 50L * 1024 * 1024;
     private static final int MAX_ZIP_ENTRIES = 1_000;
     private static final int MAX_ZIP_COMPRESSION_RATIO = 100;
+    private static final int CLEANUP_QUERY_BATCH_SIZE = 500;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "zip"
     );
@@ -198,8 +202,14 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         }
     }
 
-    private void deleteQuietly(String objectName) {
-        try { storage.delete(objectName); } catch (RuntimeException ignored) { }
+    private boolean deleteQuietly(String objectName) {
+        try {
+            storage.delete(objectName);
+            return true;
+        } catch (RuntimeException exception) {
+            log.warn("删除附件对象失败，objectName={}", objectName, exception);
+            return false;
+        }
     }
 
     @Override
@@ -223,18 +233,29 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     public int cleanupOrphanFiles() {
         List<AttachmentObjectStorage.StoredObject> objects = storage.list("");
         if (objects.isEmpty()) return 0;
-        List<String> storedNames = objects.stream().map(AttachmentObjectStorage.StoredObject::objectName).toList();
+        List<String> storedNames = objects.stream()
+                .map(AttachmentObjectStorage.StoredObject::objectName)
+                .toList();
         Set<String> referencedNames = new HashSet<>();
-        attachmentMapper.selectList(com.baomidou.mybatisplus.core.toolkit.Wrappers.<ChatAttachment>lambdaQuery()
-                        .select(ChatAttachment::getStoredName).in(ChatAttachment::getStoredName, storedNames))
-                .forEach(value -> referencedNames.add(value.getStoredName()));
+        for (int start = 0; start < storedNames.size(); start += CLEANUP_QUERY_BATCH_SIZE) {
+            List<String> batch = new ArrayList<>(storedNames.subList(
+                    start,
+                    Math.min(start + CLEANUP_QUERY_BATCH_SIZE, storedNames.size())
+            ));
+            attachmentMapper.selectList(
+                            com.baomidou.mybatisplus.core.toolkit.Wrappers
+                                    .<ChatAttachment>lambdaQuery()
+                                    .select(ChatAttachment::getStoredName)
+                                    .in(ChatAttachment::getStoredName, batch)
+                    )
+                    .forEach(value -> referencedNames.add(value.getStoredName()));
+        }
         int removed = 0;
         Instant cutoff = Instant.now().minusSeconds(properties.getOrphanGracePeriodSeconds());
         for (AttachmentObjectStorage.StoredObject object : objects) {
             String objectName = object.objectName();
             if (object.lastModified() != null && object.lastModified().isAfter(cutoff)) continue;
-            if (!referencedNames.contains(objectName)) {
-                deleteQuietly(objectName);
+            if (!referencedNames.contains(objectName) && deleteQuietly(objectName)) {
                 removed++;
             }
         }

@@ -355,6 +355,10 @@ public class ChatPresenceService implements ChatPresenceOperations {
                         RedisConstants.QUEUE_ENQUEUED_AT,
                         userId
                 );
+        chatRedisRepository.sortedSetRemove(
+                        RedisConstants.QUEUE_NORMAL_DUE,
+                        userId
+                );
         chatRedisRepository.hashDelete(
                         RedisConstants.QUEUE_VIP_LEVEL,
                         userId

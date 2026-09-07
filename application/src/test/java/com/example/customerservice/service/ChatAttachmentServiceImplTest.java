@@ -1,5 +1,7 @@
 package com.example.customerservice.service;
 
+import com.baomidou.mybatisplus.core.MybatisConfiguration;
+import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.config.MinioAttachmentProperties;
@@ -8,8 +10,11 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.service.impl.ChatAttachmentServiceImpl;
 import com.example.customerservice.storage.AttachmentObjectStorage;
 import org.junit.jupiter.api.Test;
+import org.apache.ibatis.builder.MapperBuilderAssistant;
 import org.springframework.mock.web.MockMultipartFile;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -65,5 +70,27 @@ class ChatAttachmentServiceImplTest {
                 new MockMultipartFile("file", "safe.jpg", "image/jpeg", new byte[]{1})));
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
                 new MockMultipartFile("file", "attack.html", "text/html", new byte[]{1})));
+    }
+
+    @Test
+    void cleanupDoesNotCountAnObjectWhoseDeletionFails() {
+        TableInfoHelper.initTableInfo(
+                new MapperBuilderAssistant(new MybatisConfiguration(), ""),
+                ChatAttachment.class
+        );
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        when(storage.list("")).thenReturn(List.of(
+                new AttachmentObjectStorage.StoredObject("orphan.txt", 1L, Instant.EPOCH)
+        ));
+        when(attachmentMapper.selectList(any())).thenReturn(List.of());
+        doThrow(new IllegalStateException("storage unavailable"))
+                .when(storage).delete("orphan.txt");
+        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
+                attachmentMapper, mock(ChatSessionMapper.class), storage,
+                new MinioAttachmentProperties()
+        );
+
+        assertEquals(0, service.cleanupOrphanFiles());
     }
 }

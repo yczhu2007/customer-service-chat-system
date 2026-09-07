@@ -11,6 +11,8 @@ public class RedisConstants {
     public static final String QUEUE_PENDING = "queue:pending";
     /** 等待用户真实入队时间，避免VIP加权score影响超时判断。 */
     public static final String QUEUE_ENQUEUED_AT = "queue:enqueued-at";
+    /** 普通用户达到反饥饿保障时间的索引。 */
+    public static final String QUEUE_NORMAL_DUE = "queue:normal-due";
     /** 排队用户VIP等级Hash，供Lua分配和超时任务读取。 */
     public static final String QUEUE_VIP_LEVEL = "queue:vip-level";
     /** 保存上一次入队 score，用于在同一毫秒内生成严格递增的 FIFO score。 */

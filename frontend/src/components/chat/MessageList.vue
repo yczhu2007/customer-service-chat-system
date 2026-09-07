@@ -176,7 +176,7 @@ watch(
     if (chat.focusedMessageId) nextTick(() => focusMessage(chat.focusedMessageId))
     else scrollToBottom()
     chat.messages
-      .filter((msg) => (msg.type === 'IMAGE' || msg.type === 'FILE') && !msg.recalled)
+      .filter((msg) => msg.type === 'IMAGE' && !msg.recalled)
       .forEach((msg) => loadBlob(msg))
   },
   { immediate: true }
@@ -288,7 +288,7 @@ onUnmounted(() => {
               @click="openFilePreview(blobCache[msg.id])"
             >预览</button>
             <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
-            <span v-else class="load-error">文件加载中…</span>
+            <button v-else type="button" class="load-file-btn" @click="loadBlob(msg)">加载文件</button>
           </template>
           <div v-if="isMine(msg) && !msg.recalled" class="message-actions">
             <button v-if="msg.sendState === 'FAILED'" class="message-action" @click="chat.retryMessage(msg.clientMsgId)">重新发送</button>

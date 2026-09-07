@@ -65,6 +65,7 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
             int vipReservedSlots,
             long averageHandleSeconds,
             long vipPriorityStepSeconds,
+            long antiStarvationSeconds,
             long messageRecallWindowSeconds,
             long messageEditWindowSeconds
     ) {
@@ -75,6 +76,7 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
                 messagingTemplate, messagePersistService, objectMapper,
                 sysUserRoleMapper, sysUserMapper, agentReconnectGraceSeconds,
                 vipReservedSlots, averageHandleSeconds, vipPriorityStepSeconds,
+                antiStarvationSeconds,
                 messageRecallWindowSeconds, messageEditWindowSeconds
         );
     }
@@ -234,7 +236,9 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
             );
             return;
         }
-        while (true) {
+        for (int attempts = 0;
+                    attempts < RedisConstants.AGENT_MAX_CONCURRENCY;
+                    attempts++) {
 
             String waitingUserId =
                     chatRedisRepository.execute(
@@ -247,7 +251,8 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
                                     RedisConstants.QUEUE_ENQUEUED_AT,
                                     RedisConstants.QUEUE_VIP_LEVEL,
                                     RedisConstants.AGENT_SKILL_VIP,
-                                    RedisConstants.AGENT_LAST_ASSIGNED
+                                    RedisConstants.AGENT_LAST_ASSIGNED,
+                                    RedisConstants.QUEUE_NORMAL_DUE
                             ),
                             agentId,
                             String.valueOf(RedisConstants.AGENT_MAX_CONCURRENCY),
@@ -257,7 +262,6 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
 
 
             if (waitingUserId == null) {
-                refreshWaitingPositions();
                 log.info(
                         "当前没有等待用户"
                 );
@@ -329,7 +333,6 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
                         waitingUserId,
                         assignmentLockToken
                 );
-                refreshWaitingPositions();
             }
         }
     }
@@ -348,7 +351,8 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
                         RedisConstants.QUEUE_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
-                        RedisConstants.QUEUE_ENQUEUED_AT
+                        RedisConstants.QUEUE_ENQUEUED_AT,
+                        RedisConstants.QUEUE_NORMAL_DUE
                 ),
                 userId,
                 agentId,

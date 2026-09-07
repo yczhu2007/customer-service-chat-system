@@ -58,20 +58,22 @@ final class ChatRedisScripts {
                             "local score = redis.call('ZSCORE', KEYS[1], ARGV[1]); " +
                             "local maxLoad = tonumber(ARGV[2]); " +
                             "if not score or tonumber(score) >= maxLoad then return nil; end; " +
-                            "local first = redis.call('ZRANGE', KEYS[2], 0, 0); " +
+                            "local first = redis.call('ZRANGEBYSCORE', KEYS[9], '-inf', ARGV[3], 'LIMIT', 0, 1); " +
+                            "if #first > 0 and not redis.call('ZSCORE', KEYS[2], first[1]) then redis.call('ZREM', KEYS[9], first[1]); first = {}; end; " +
+                            "if #first == 0 then first = redis.call('ZRANGE', KEYS[2], 0, 0); end; " +
                             "if #first == 0 then return nil; end; " +
                             "local vipLevel = tonumber(redis.call('HGET', KEYS[6], first[1]) or '0'); " +
                             "local vipSkilled = redis.call('SISMEMBER', KEYS[7], ARGV[1]) == 1; " +
                             "local reserved = tonumber(ARGV[4]); " +
                             "if vipLevel == 0 and vipSkilled and tonumber(score) >= math.max(0, maxLoad - reserved) then return nil; end; " +
-                            "local users = redis.call('ZPOPMIN', KEYS[2], 1); " +
-                            "if #users == 0 then return nil; end; " +
-                            "local enqueuedAt = redis.call('ZSCORE', KEYS[5], users[1]) or ARGV[3]; " +
+                            "local queueScore = redis.call('ZSCORE', KEYS[2], first[1]); " +
+                            "if not queueScore or redis.call('ZREM', KEYS[2], first[1]) == 0 then return nil; end; " +
+                            "local enqueuedAt = redis.call('ZSCORE', KEYS[5], first[1]) or ARGV[3]; " +
                             "redis.call('ZINCRBY', KEYS[1], 1, ARGV[1]); " +
                             "redis.call('ZADD', KEYS[8], ARGV[3], ARGV[1]); " +
-                            "redis.call('ZADD', KEYS[3], ARGV[3], users[1]); " +
-                            "redis.call('HSET', KEYS[4], users[1], ARGV[1] .. '|' .. users[2] .. '|' .. enqueuedAt); " +
-                            "return users[1];",
+                            "redis.call('ZADD', KEYS[3], ARGV[3], first[1]); " +
+                            "redis.call('HSET', KEYS[4], first[1], ARGV[1] .. '|' .. queueScore .. '|' .. enqueuedAt); " +
+                            "return first[1];",
                     String.class
             );
 
@@ -93,7 +95,8 @@ final class ChatRedisScripts {
                             "if storedAgent ~= ARGV[2] then return 0; end; " +
                             "if ARGV[3] == '1' then " +
                             "redis.call('ZADD', KEYS[2], queueScore, ARGV[1]); " +
-                            "redis.call('ZADD', KEYS[5], enqueuedAt, ARGV[1]); end; " +
+                            "redis.call('ZADD', KEYS[5], enqueuedAt, ARGV[1]); " +
+                            "else redis.call('ZREM', KEYS[6], ARGV[1]); end; " +
                             "local load = redis.call('ZSCORE', KEYS[1], ARGV[2]); " +
                             "if load then redis.call('ZADD', KEYS[1], math.max(0, tonumber(load) - 1), ARGV[2]); end; " +
                             "redis.call('ZREM', KEYS[3], ARGV[1]); " +
@@ -131,6 +134,7 @@ final class ChatRedisScripts {
                             "redis.call('ZREM', KEYS[6], ARGV[2]); " +
                             "redis.call('HDEL', KEYS[7], ARGV[2]); " +
                             "redis.call('ZREM', KEYS[8], ARGV[2]); " +
+                            "redis.call('ZREM', KEYS[10], ARGV[2]); " +
                             "redis.call('ZADD', KEYS[9], 'NX', ARGV[7], ARGV[1]); " +
                             "return 1;",
                     Long.class
@@ -153,6 +157,7 @@ final class ChatRedisScripts {
                             "redis.call('ZADD', KEYS[1], score, ARGV[1]); " +
                             "redis.call('ZADD', KEYS[3], now, ARGV[1]); " +
                             "redis.call('HSET', KEYS[4], ARGV[1], ARGV[3]); " +
+                            "if vipLevel == 0 then redis.call('ZADD', KEYS[5], now + tonumber(ARGV[5]), ARGV[1]); else redis.call('ZREM', KEYS[5], ARGV[1]); end; " +
                             "return 1;",
                     Long.class
             );

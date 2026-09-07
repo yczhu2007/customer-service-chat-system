@@ -56,8 +56,8 @@ class ChatRedisRepositoryTest {
 
         org.mockito.ArgumentCaptor<RedisScript> script = org.mockito.ArgumentCaptor.forClass(RedisScript.class);
         verify(template).execute(script.capture(), eq(List.of(
-                "queue:pending", "queue:enqueued-at", "queue:vip-level", "vip:callback:pending"
+                "queue:pending", "queue:enqueued-at", "queue:vip-level", "queue:normal-due", "vip:callback:pending"
         )), eq("U001"));
-        assertTrue(script.getValue().getScriptAsString().contains("ZREM', KEYS[2]"));
+        assertTrue(script.getValue().getScriptAsString().contains("ZREM', KEYS[4]"));
     }
 }

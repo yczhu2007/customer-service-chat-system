@@ -74,6 +74,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             int vipReservedSlots,
             long averageHandleSeconds,
             long vipPriorityStepSeconds,
+            long antiStarvationSeconds,
             long messageRecallWindowSeconds,
             long messageEditWindowSeconds,
             int activeSessionReconciliationBatchSize
@@ -85,6 +86,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                 messagingTemplate, messagePersistService, objectMapper,
                 sysUserRoleMapper, sysUserMapper, agentReconnectGraceSeconds,
                 vipReservedSlots, averageHandleSeconds, vipPriorityStepSeconds,
+                antiStarvationSeconds,
                 messageRecallWindowSeconds, messageEditWindowSeconds
         );
         this.reconciliationService = new ChatSessionReconciliationService(
@@ -367,7 +369,8 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                         RedisConstants.ASSIGNMENT_PENDING,
                         RedisConstants.ASSIGNMENT_PENDING_PAYLOAD,
                         RedisConstants.QUEUE_PENDING,
-                        RedisConstants.SESSION_LAST_ACTIVITY
+                        RedisConstants.SESSION_LAST_ACTIVITY,
+                        RedisConstants.QUEUE_NORMAL_DUE
                 ),
                 sessionId,
                 userId,
@@ -441,6 +444,27 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             String userId
     ) {
 
+        enqueueWaitingUserInternal(userId);
+        refreshWaitingPositions();
+    }
+
+    @Override
+    public void backfillWaitingUsers(Iterable<String> userIds) {
+        boolean changed = false;
+        for (String userId : userIds) {
+            if (userId == null || userId.isBlank()) {
+                continue;
+            }
+            enqueueWaitingUserInternal(userId);
+            changed = true;
+        }
+        if (changed) {
+            refreshWaitingPositions();
+        }
+    }
+
+    private void enqueueWaitingUserInternal(String userId) {
+
         /*
          * 先删除该用户可能存在的旧排队记录，
          * 防止重复订阅造成重复入队。
@@ -451,14 +475,15 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                         RedisConstants.QUEUE_PENDING,
                         RedisConstants.QUEUE_SEQUENCE,
                         RedisConstants.QUEUE_ENQUEUED_AT,
-                        RedisConstants.QUEUE_VIP_LEVEL
+                        RedisConstants.QUEUE_VIP_LEVEL,
+                        RedisConstants.QUEUE_NORMAL_DUE
                 ),
                 userId,
                 String.valueOf(System.currentTimeMillis()),
                 String.valueOf(getVipLevel(userId)),
-                String.valueOf(vipPriorityStepMillis)
+                String.valueOf(vipPriorityStepMillis),
+                String.valueOf(antiStarvationMillis)
         );
-        refreshWaitingPositions();
     }
     @Override
     public void notifyBothParties(ChatSession session) {

@@ -208,6 +208,7 @@ public class ChatServiceConfiguration {
             @Value("${app.chat.vip.reserved-slots:1}") int vipReservedSlots,
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}") long vipPriorityStepSeconds,
+            @Value("${app.chat.queue.anti-starvation-seconds:180}") long antiStarvationSeconds,
             @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
             ,
             @Value("${app.chat.reconciliation.active-session-batch-size:200}")
@@ -232,6 +233,7 @@ public class ChatServiceConfiguration {
                 vipReservedSlots,
                 averageHandleSeconds,
                 vipPriorityStepSeconds,
+                antiStarvationSeconds,
                 messageRecallWindowSeconds,
                  300,
                  activeSessionReconciliationBatchSize

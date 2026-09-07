@@ -68,6 +68,7 @@ abstract class ChatRoutingSessionSupport
     protected final int vipReservedSlots;
     protected final long averageHandleSeconds;
     protected final long vipPriorityStepMillis;
+    protected final long antiStarvationMillis;
     protected final long messageRecallWindowSeconds;
     protected final long messageEditWindowSeconds;
 
@@ -89,6 +90,7 @@ abstract class ChatRoutingSessionSupport
             int vipReservedSlots,
             long averageHandleSeconds,
             long vipPriorityStepSeconds,
+            long antiStarvationSeconds,
             long messageRecallWindowSeconds,
             long messageEditWindowSeconds
     ) {
@@ -115,6 +117,7 @@ abstract class ChatRoutingSessionSupport
                 0L,
                 vipPriorityStepSeconds * 1000L
         );
+        this.antiStarvationMillis = Math.max(1L, antiStarvationSeconds) * 1000L;
         this.messageRecallWindowSeconds = Math.max(1L, messageRecallWindowSeconds);
         this.messageEditWindowSeconds = Math.max(1L, messageEditWindowSeconds);
     }
@@ -195,36 +198,40 @@ abstract class ChatRoutingSessionSupport
     protected void fillAvailableAgentCapacity(
             String agentId
     ) {
-        for (
-                int slot = 0;
-                slot < RedisConstants.AGENT_MAX_CONCURRENCY;
-                slot++
-        ) {
-            Long waitingCount =
-                    chatRedisRepository.sortedSetCardinality(
-                                    RedisConstants.QUEUE_PENDING
-                            );
-
-            Double currentLoad =
-                    chatRedisRepository.sortedSetScore(
-                                    RedisConstants.AGENT_LOAD,
-                                    agentId
-                            );
-
-            if (
-                    waitingCount == null ||
-                            waitingCount <= 0 ||
-                            currentLoad == null ||
-                            currentLoad
-                                    >= RedisConstants
-                                    .AGENT_MAX_CONCURRENCY
+        try {
+            for (
+                    int slot = 0;
+                    slot < RedisConstants.AGENT_MAX_CONCURRENCY;
+                    slot++
             ) {
-                return;
-            }
+                Long waitingCount =
+                        chatRedisRepository.sortedSetCardinality(
+                                        RedisConstants.QUEUE_PENDING
+                                );
 
-            processNextWaitingUser(
-                    agentId
-            );
+                Double currentLoad =
+                        chatRedisRepository.sortedSetScore(
+                                        RedisConstants.AGENT_LOAD,
+                                        agentId
+                                );
+
+                if (
+                        waitingCount == null ||
+                                waitingCount <= 0 ||
+                                currentLoad == null ||
+                                currentLoad
+                                        >= RedisConstants
+                                        .AGENT_MAX_CONCURRENCY
+                ) {
+                    return;
+                }
+
+                processNextWaitingUser(
+                        agentId
+                );
+            }
+        } finally {
+            refreshWaitingPositions();
         }
     }
 
@@ -535,12 +542,19 @@ abstract class ChatRoutingSessionSupport
     }
 
     protected Long estimateWaitingSeconds(Long waitingPosition) {
-        if (waitingPosition == null || waitingPosition <= 0) {
-            return null;
-        }
         Long onlineAgentCount = chatRedisRepository.sortedSetCardinality(
                 RedisConstants.AGENT_LOAD
         );
+        return estimateWaitingSeconds(waitingPosition, onlineAgentCount);
+    }
+
+    private Long estimateWaitingSeconds(
+            Long waitingPosition,
+            Long onlineAgentCount
+    ) {
+        if (waitingPosition == null || waitingPosition <= 0) {
+            return null;
+        }
         if (onlineAgentCount == null || onlineAgentCount <= 0) {
             return null;
         }
@@ -557,8 +571,27 @@ abstract class ChatRoutingSessionSupport
         if (userIds == null || userIds.isEmpty()) {
             return;
         }
-        for (String userId : userIds) {
-            notifyWaitingUser(userId, getWaitingPosition(userId));
+        List<String> waitingUserIds = new ArrayList<>(userIds);
+        List<Object> vipLevels = chatRedisRepository.hashMultiGet(
+                RedisConstants.QUEUE_VIP_LEVEL,
+                waitingUserIds
+        );
+        Long onlineAgentCount = chatRedisRepository.sortedSetCardinality(
+                RedisConstants.AGENT_LOAD
+        );
+        for (int index = 0; index < waitingUserIds.size(); index++) {
+            String userId = waitingUserIds.get(index);
+            Object vipLevel = vipLevels != null && index < vipLevels.size()
+                    ? vipLevels.get(index) : null;
+            chatSessionNotificationOperations.notifyWaitingUser(
+                    userId,
+                    createWaitingResult(
+                            userId,
+                            (long) index + 1,
+                            getQueuedVipLevel(userId, vipLevel),
+                            onlineAgentCount
+                    )
+            );
         }
     }
     @Override
@@ -618,6 +651,31 @@ abstract class ChatRoutingSessionSupport
         Long onlineAgentCount = chatRedisRepository.sortedSetCardinality(
                 RedisConstants.AGENT_LOAD
         );
+        return createWaitingResult(
+                userId,
+                waitingPosition,
+                vipLevel,
+                onlineAgentCount
+        );
+    }
+
+    private int getQueuedVipLevel(String userId, Object vipLevel) {
+        if (vipLevel == null) {
+            return getVipLevel(userId);
+        }
+        try {
+            return Math.max(0, Math.min(Integer.parseInt(vipLevel.toString()), 5));
+        } catch (NumberFormatException exception) {
+            return getVipLevel(userId);
+        }
+    }
+
+    private AssignResult createWaitingResult(
+            String userId,
+            Long waitingPosition,
+            int vipLevel,
+            Long onlineAgentCount
+    ) {
         boolean callbackRequired =
                 vipLevel > 0
                         && (onlineAgentCount == null || onlineAgentCount == 0);
@@ -626,7 +684,7 @@ abstract class ChatRoutingSessionSupport
                         ? AssignResult.vipCallbackRequired(waitingPosition)
                         : AssignResult.waiting(
                                 waitingPosition,
-                                estimateWaitingSeconds(waitingPosition)
+                                estimateWaitingSeconds(waitingPosition, onlineAgentCount)
                         );
         if (callbackRequired) {
             chatRedisRepository.sortedSetAdd(

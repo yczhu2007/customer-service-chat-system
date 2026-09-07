@@ -7,6 +7,7 @@ import org.springframework.data.redis.core.script.RedisScript;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Repository;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.Set;
@@ -71,6 +72,7 @@ public class ChatRedisRepository {
                             + "redis.call('ZREM', KEYS[2], ARGV[1]); "
                             + "redis.call('HDEL', KEYS[3], ARGV[1]); "
                             + "redis.call('ZREM', KEYS[4], ARGV[1]); "
+                            + "redis.call('ZREM', KEYS[5], ARGV[1]); "
                             + "return removed;",
                     Long.class
             );
@@ -168,6 +170,10 @@ public class ChatRedisRepository {
         return redisTemplate.opsForHash().get(key, field);
     }
 
+    public List<Object> hashMultiGet(String key, Collection<?> fields) {
+        return redisTemplate.opsForHash().multiGet(key, new ArrayList<>(fields));
+    }
+
     public void hashPut(String key, Object field, Object value) {
         redisTemplate.opsForHash().put(key, field, value);
     }
@@ -257,6 +263,7 @@ public class ChatRedisRepository {
                         RedisConstants.QUEUE_PENDING,
                         RedisConstants.QUEUE_ENQUEUED_AT,
                         RedisConstants.QUEUE_VIP_LEVEL,
+                        RedisConstants.QUEUE_NORMAL_DUE,
                         RedisConstants.VIP_CALLBACK_PENDING
                 ),
                 userId

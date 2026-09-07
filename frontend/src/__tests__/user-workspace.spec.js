@@ -585,6 +585,8 @@ describe('User Workspace', () => {
     try {
       const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
       await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.find('.load-file-btn').trigger('click')
+      await new Promise((resolve) => setTimeout(resolve, 0))
       wrapper.unmount()
 
       expect(createUrl).toHaveBeenCalled()
@@ -637,6 +639,10 @@ describe('User Workspace', () => {
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
+    expect(mockFetch).not.toHaveBeenCalled()
+    await wrapper.findAll('.load-file-btn')[0].trigger('click')
+    await wrapper.findAll('.load-file-btn')[1].trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(wrapper.findAll('.file-preview-btn')).toHaveLength(2)
   })
 

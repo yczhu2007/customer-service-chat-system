@@ -410,6 +410,8 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
         Map<String, Long> unreadCounts = loadUnreadCounts(sessionIds, participantId);
         Map<String, List<String>> tagsBySessionId = loadSessionTags(sessionIds);
+        Map<String, com.example.customerservice.domain.ChatMessage> latestMessages =
+                loadLatestMessages(sessionIds);
 
         List<ChatSessionListItemVO> records = page.getRecords().stream()
                 .map(s -> {
@@ -429,14 +431,11 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                     vo.setMetadataUpdatedAt(s.getMetadataUpdatedAt());
                     vo.setTags(tagsBySessionId.getOrDefault(s.getId(), List.of()));
                     vo.setUnreadCount(unreadCounts.getOrDefault(s.getId(), 0L));
-                    if (messageMapper != null) {
-                        List<com.example.customerservice.domain.ChatMessage> messages = messageMapper.selectLatestHistory(s.getId(), 1);
-                        if (!messages.isEmpty()) {
-                            var last = messages.get(0);
-                            vo.setLastMessageContent(last.getContent());
-                            vo.setLastMessageSenderId(last.getSenderId());
-                            vo.setLastMessageTime(last.getCreateTime());
-                        }
+                    var last = latestMessages.get(s.getId());
+                    if (last != null) {
+                        vo.setLastMessageContent(last.getContent());
+                        vo.setLastMessageSenderId(last.getSenderId());
+                        vo.setLastMessageTime(last.getCreateTime());
                     }
                     return vo;
                 })
@@ -444,6 +443,19 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
 
         return new PageResult<>(
                 page.getCurrent(), page.getSize(), page.getTotal(), page.getPages(), records);
+    }
+
+    private Map<String, com.example.customerservice.domain.ChatMessage> loadLatestMessages(
+            List<String> sessionIds
+    ) {
+        if (messageMapper == null || sessionIds == null || sessionIds.isEmpty()) {
+            return Collections.emptyMap();
+        }
+        Map<String, com.example.customerservice.domain.ChatMessage> result = new HashMap<>();
+        for (var message : messageMapper.selectLatestHistoryBySessionIds(sessionIds)) {
+            result.putIfAbsent(message.getSessionId(), message);
+        }
+        return result;
     }
 
     private com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<ChatSession> buildSessionScopeQuery(

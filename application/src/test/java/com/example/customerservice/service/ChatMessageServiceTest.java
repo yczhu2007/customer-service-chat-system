@@ -103,7 +103,7 @@ class ChatMessageServiceTest {
                 messagePersistService, new ObjectMapper(), sysUserRoleMapper,
                 sysUserMapper,
                 agentOperationsProvider,
-                20, 1, 300, 1_000_000_000L, 120, 300, 200
+                20, 1, 300, 1_000_000_000L, 180, 120, 300, 200
         );
         service = messageOperations;
         routingOperations = routingSessionService;
