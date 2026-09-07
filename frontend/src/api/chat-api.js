@@ -72,6 +72,9 @@ export const uploadAttachment = (sessionId, file) => {
   })
 }
 
+export const fetchAttachmentMetadata = (attachmentId) =>
+  request(`/chat/attachments/${encodeURIComponent(attachmentId)}`)
+
 /**
  * Fetch an attachment blob with auth header (for IMAGE/FILE rendering).
  * Returns a blob URL string.

@@ -2,7 +2,7 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
-import { fetchAttachmentBlob } from '../../api/chat-api'
+import { fetchAttachmentBlob, fetchAttachmentMetadata } from '../../api/chat-api'
 
 const props = defineProps({
   sessionId: { type: String, default: null },
@@ -13,6 +13,7 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const listEl = ref(null)
 const blobCache = ref({})
+const attachmentMetadata = ref({})
 const unavailableAttachmentUrls = new Set()
 const highlightedMessageId = ref(null)
 const filePreview = ref(null)
@@ -93,9 +94,9 @@ function releaseAllBlobs() {
 async function loadBlob(msg) {
   if (!msg.id || unavailableAttachmentUrls.has(msg.content)) {
     if (msg.id) blobCache.value[msg.id] = null
-    return
+    return null
   }
-  if (blobCache.value[msg.id]) return
+  if (blobCache.value[msg.id]) return blobCache.value[msg.id]
   const sessionId = props.sessionId
   try {
     const attachment = await fetchAttachmentBlob(msg.content)
@@ -103,12 +104,31 @@ async function loadBlob(msg) {
       if (attachment?.url && typeof URL.revokeObjectURL === 'function') {
         URL.revokeObjectURL(attachment.url)
       }
-      return
+      return null
     }
     blobCache.value[msg.id] = attachment
+    return attachment
   } catch (error) {
     if (error?.message === 'HTTP 404') unavailableAttachmentUrls.add(msg.content)
     blobCache.value[msg.id] = null
+    return null
+  }
+}
+
+function attachmentId(contentUrl) {
+  return contentUrl?.match(/^\/chat\/attachments\/([A-Za-z0-9]{32,64})\/content$/)?.[1] || null
+}
+
+async function loadAttachmentMetadata(msg) {
+  const id = attachmentId(msg.content)
+  if (!msg.id || !id || attachmentMetadata.value[msg.id]) return
+  try {
+    const result = await fetchAttachmentMetadata(id)
+    if (props.sessionId === msg.sessionId && chat.messages.some((item) => item.id === msg.id)) {
+      attachmentMetadata.value[msg.id] = result?.data || result
+    }
+  } catch {
+    attachmentMetadata.value[msg.id] = null
   }
 }
 
@@ -141,8 +161,8 @@ async function openFilePreview(attachment) {
       const { renderAsync } = await import('docx-preview')
       await renderAsync(attachment.blob, docxPreviewEl.value, null, { inWrapper: false })
       filePreview.value.loading = false
-    } catch {
-      filePreview.value = { kind, name: attachment.name, error: 'DOCX 预览加载失败' }
+    } catch (error) {
+      filePreview.value = { kind, name: attachment.name, error: `DOCX 预览加载失败：${error.message || '文件格式无效'}` }
     }
     return
   }
@@ -165,8 +185,8 @@ async function openFilePreview(attachment) {
           ),
         })),
       }
-    } catch {
-      filePreview.value = { kind, name: attachment.name, error: 'XLSX 预览加载失败' }
+    } catch (error) {
+      filePreview.value = { kind, name: attachment.name, error: `XLSX 预览加载失败：${error.message || '文件格式无效'}` }
     }
     return
   }
@@ -178,6 +198,20 @@ async function openFilePreview(attachment) {
   attachment.blob?.text()
     .then((text) => { if (filePreview.value?.name === attachment.name) filePreview.value.text = text })
     .catch(() => { if (filePreview.value?.name === attachment.name) filePreview.value.text = '文本预览加载失败' })
+}
+
+async function previewFile(msg) {
+  const attachment = await loadBlob(msg)
+  if (attachment) openFilePreview(attachment)
+}
+
+async function downloadFile(msg) {
+  const attachment = await loadBlob(msg)
+  if (!attachment) return
+  const link = document.createElement('a')
+  link.href = attachment.url
+  link.download = attachment.name
+  link.click()
 }
 
 /** Scroll to bottom */
@@ -212,11 +246,17 @@ watch(
     Object.keys(blobCache.value)
       .filter((messageId) => !messageIds.has(messageId))
       .forEach((messageId) => releaseBlob(messageId))
+    Object.keys(attachmentMetadata.value)
+      .filter((messageId) => !messageIds.has(messageId))
+      .forEach((messageId) => delete attachmentMetadata.value[messageId])
     if (chat.focusedMessageId) nextTick(() => focusMessage(chat.focusedMessageId))
     else scrollToBottom()
     chat.messages
       .filter((msg) => msg.type === 'IMAGE' && !msg.recalled)
       .forEach((msg) => loadBlob(msg))
+    chat.messages
+      .filter((msg) => msg.type === 'FILE' && !msg.recalled)
+      .forEach((msg) => loadAttachmentMetadata(msg))
   },
   { immediate: true }
 )
@@ -311,23 +351,19 @@ onUnmounted(() => {
               <span class="reply-preview-label">引用{{ replyAuthorLabel(msg) }}</span>
               <span class="reply-preview-content">{{ replySummary(msg) }}</span>
             </button>
-            <a
-              v-if="blobCache[msg.id]"
-              :href="blobCache[msg.id].url"
-              :download="blobCache[msg.id].name"
-              class="file-link"
-            >
-              <strong>{{ blobCache[msg.id].name }}</strong>
-              <span class="file-info">Download file<span v-if="blobCache[msg.id].size"> · {{ formatFileSize(blobCache[msg.id].size) }}</span></span>
-            </a>
+            <div v-if="attachmentMetadata[msg.id]" class="file-link">
+              <strong>{{ attachmentMetadata[msg.id].originalName }}</strong>
+              <span class="file-info">文件 · {{ formatFileSize(attachmentMetadata[msg.id].fileSize) }}</span>
+            </div>
             <button
-              v-if="previewKind(blobCache[msg.id])"
+              v-if="attachmentMetadata[msg.id] && previewKind({ name: attachmentMetadata[msg.id].originalName, type: attachmentMetadata[msg.id].contentType })"
               type="button"
               class="file-preview-btn"
-              @click="openFilePreview(blobCache[msg.id])"
+              @click="previewFile(msg)"
             >预览</button>
-            <span v-else-if="blobCache[msg.id] === null" class="load-error">文件加载失败</span>
-            <button v-else type="button" class="load-file-btn" @click="loadBlob(msg)">加载文件</button>
+            <button v-if="attachmentMetadata[msg.id]" type="button" class="file-preview-btn" @click="downloadFile(msg)">下载</button>
+            <span v-else-if="attachmentMetadata[msg.id] === null" class="load-error">文件信息加载失败</span>
+            <span v-else class="file-info">文件信息加载中…</span>
           </template>
           <div v-if="isMine(msg) && !msg.recalled" class="message-actions">
             <button v-if="msg.sendState === 'FAILED'" class="message-action" @click="chat.retryMessage(msg.clientMsgId)">重新发送</button>

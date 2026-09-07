@@ -33,6 +33,18 @@ public class ChatAttachmentController {
             @RequestPart("file") MultipartFile file) {
         return Result.success(service.upload(currentUser.getUserId(), sessionId, file));
     }
+    @GetMapping("/{id}")
+    public Result<ChatAttachmentVO> metadata(@PathVariable @NotBlank @Size(max=64) String id) {
+        ChatAttachment attachment = service.requireAccessible(currentUser.getUserId(), id);
+        ChatAttachmentVO result = new ChatAttachmentVO();
+        result.setId(attachment.getId());
+        result.setOriginalName(attachment.getOriginalName());
+        result.setContentType(attachment.getContentType());
+        result.setFileSize(attachment.getFileSize());
+        result.setMessageType(attachment.getMessageType());
+        result.setContentUrl("/chat/attachments/" + attachment.getId() + "/content");
+        return Result.success(result);
+    }
     @GetMapping("/{id}/content")
     public ResponseEntity<Resource> content(@PathVariable @NotBlank @Size(max=64) String id) {
         ChatAttachment attachment = service.requireAccessible(currentUser.getUserId(), id);

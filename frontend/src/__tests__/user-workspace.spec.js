@@ -570,12 +570,18 @@ describe('User Workspace', () => {
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
     const chat = useChatStore()
     chat.activeSessionId = 's1'
-    chat.messages = [{ id: 'm1', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/a' }]
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      blob: () => Promise.resolve(new Blob(['file'], { type: 'text/plain' })),
-      headers: { get: () => 'attachment; filename="a.txt"' },
-    })
+    chat.messages = [{ id: 'm1', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/content' }]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'a.pdf', contentType: 'application/pdf', fileSize: 4 } }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['file'], { type: 'application/pdf' })),
+        headers: { get: () => 'attachment; filename="a.pdf"' },
+      })
     const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:test-file')
     const hadRevokeUrl = typeof URL.revokeObjectURL === 'function'
     const revokeUrl = hadRevokeUrl
@@ -585,7 +591,7 @@ describe('User Workspace', () => {
     try {
       const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
       await new Promise((resolve) => setTimeout(resolve, 0))
-      await wrapper.find('.load-file-btn').trigger('click')
+      await wrapper.find('.file-preview-btn').trigger('click')
       await new Promise((resolve) => setTimeout(resolve, 0))
       wrapper.unmount()
 
@@ -621,46 +627,71 @@ describe('User Workspace', () => {
     const chat = useChatStore()
     chat.activeSessionId = 's1'
     chat.messages = [
-      { id: 'pdf', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/pdf/content' },
-      { id: 'txt', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/txt/content' },
-      { id: 'docx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/docx/content' },
-      { id: 'xlsx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/xlsx/content' },
+      { id: 'pdf', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/11111111111111111111111111111111/content' },
+      { id: 'txt', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/22222222222222222222222222222222/content' },
+      { id: 'docx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/33333333333333333333333333333333/content' },
+      { id: 'xlsx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/44444444444444444444444444444444/content' },
     ]
     mockFetch
       .mockResolvedValueOnce({
         ok: true,
-        blob: () => Promise.resolve(new Blob(['pdf'], { type: 'application/pdf' })),
-        headers: { get: () => 'attachment; filename="guide.pdf"' },
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'guide.pdf', contentType: 'application/pdf', fileSize: 1 } }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        blob: () => Promise.resolve(new Blob(['plain text'], { type: 'text/plain' })),
-        headers: { get: () => 'attachment; filename="notes.txt"' },
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'notes.txt', contentType: 'text/plain', fileSize: 1 } }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        blob: () => Promise.resolve(new Blob(['docx'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })),
-        headers: { get: () => 'attachment; filename="report.docx"' },
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'report.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 1 } }),
       })
       .mockResolvedValueOnce({
         ok: true,
-        blob: () => Promise.resolve(new Blob(['xlsx'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })),
-        headers: { get: () => 'attachment; filename="table.xlsx"' },
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'table.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 1 } }),
       })
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
-    expect(mockFetch).not.toHaveBeenCalled()
-    await wrapper.findAll('.load-file-btn')[0].trigger('click')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    await wrapper.findAll('.load-file-btn')[0].trigger('click')
+    expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(4)
+    expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(4)
+    expect(wrapper.findAll('.load-file-btn')).toHaveLength(0)
+  })
+
+  it('shows file metadata before downloading an attachment body', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'file-message', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/0123456789abcdef0123456789abcdef/content',
+    }]
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({
+        code: 200,
+        data: {
+          originalName: 'table.xlsx',
+          contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          fileSize: 2048,
+        },
+      }),
+    })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
-    await wrapper.findAll('.load-file-btn')[0].trigger('click')
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    await wrapper.findAll('.load-file-btn')[0].trigger('click')
-    await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(wrapper.findAll('.file-preview-btn')).toHaveLength(4)
+
+    expect(wrapper.text()).toContain('table.xlsx')
+    expect(wrapper.text()).toContain('2.0 KB')
+    expect(wrapper.find('.load-file-btn').exists()).toBe(false)
+    expect(wrapper.find('.file-preview-btn').exists()).toBe(true)
   })
 
   describe('chat store — consultation start', () => {
