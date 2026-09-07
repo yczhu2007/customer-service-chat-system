@@ -672,6 +672,7 @@ describe('User Workspace', () => {
       { id: 'xlsx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/44444444444444444444444444444444/content' },
       { id: 'doc', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/55555555555555555555555555555555/content' },
       { id: 'xls', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/66666666666666666666666666666666/content' },
+      { id: 'pptx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/77777777777777777777777777777777/content' },
     ]
     mockFetch
       .mockResolvedValueOnce({
@@ -704,13 +705,18 @@ describe('User Workspace', () => {
         status: 200,
         json: () => Promise.resolve({ code: 200, data: { originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 1 } }),
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ code: 200, data: { originalName: 'slides.pptx', contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', fileSize: 1 } }),
+      })
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(6)
-    expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(6)
+    expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(7)
+    expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(7)
     expect(wrapper.findAll('.load-file-btn')).toHaveLength(0)
   })
 

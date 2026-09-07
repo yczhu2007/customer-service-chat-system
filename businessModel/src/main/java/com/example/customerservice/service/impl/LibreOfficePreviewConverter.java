@@ -17,6 +17,7 @@ import java.time.Duration;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 @Service
@@ -39,8 +40,8 @@ public class LibreOfficePreviewConverter implements OfficePreviewConverter {
     @Override
     public byte[] convertToPdf(String sourceName, InputStream source) {
         String extension = extensionOf(sourceName);
-        if (!"doc".equals(extension) && !"xls".equals(extension)) {
-            throw new IllegalArgumentException("仅支持预览 DOC 和 XLS 文件");
+        if (!Set.of("doc", "xls", "ppt", "pptx").contains(extension)) {
+            throw new IllegalArgumentException("仅支持预览 DOC、XLS、PPT、PPTX 文件");
         }
 
         Path workDirectory = null;

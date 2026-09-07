@@ -44,7 +44,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private static final int MAX_ZIP_COMPRESSION_RATIO = 100;
     private static final int CLEANUP_QUERY_BATCH_SIZE = 500;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "zip"
+            "jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip"
     );
     private static final java.util.Map<String, String> CONTENT_TYPES = java.util.Map.ofEntries(
             java.util.Map.entry("jpg", "image/jpeg"), java.util.Map.entry("jpeg", "image/jpeg"),
@@ -54,6 +54,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
             java.util.Map.entry("docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
             java.util.Map.entry("xls", "application/vnd.ms-excel"),
             java.util.Map.entry("xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"),
+            java.util.Map.entry("ppt", "application/vnd.ms-powerpoint"),
+            java.util.Map.entry("pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
             java.util.Map.entry("zip", "application/zip")
     );
     private final ChatAttachmentMapper attachmentMapper;
@@ -118,7 +120,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         try (InputStream input = file.getInputStream()) {
             byte[] content = input.readAllBytes();
             if (!matchesMagicNumber(content, extension)) throw new IllegalArgumentException("附件内容与文件扩展名不匹配");
-            if (Set.of("zip", "docx", "xlsx").contains(extension)) validateZip(content, extension);
+            if (Set.of("zip", "docx", "xlsx", "pptx").contains(extension)) validateZip(content, extension);
         } catch (IOException exception) {
             throw new IllegalStateException("附件读取失败", exception);
         }
@@ -133,8 +135,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
             case "webp" -> startsWith(content, "RIFF".getBytes(StandardCharsets.US_ASCII))
                     && content.length >= 12 && startsWith(content, 8, "WEBP".getBytes(StandardCharsets.US_ASCII));
             case "pdf" -> startsWith(content, "%PDF-".getBytes(StandardCharsets.US_ASCII));
-            case "zip", "docx", "xlsx" -> startsWith(content, 0x50, 0x4B, 0x03, 0x04);
-            case "doc", "xls" -> startsWith(content, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1);
+            case "zip", "docx", "xlsx", "pptx" -> startsWith(content, 0x50, 0x4B, 0x03, 0x04);
+            case "doc", "xls", "ppt" -> startsWith(content, 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1);
             case "txt" -> isPlainText(content);
             default -> false;
         };
@@ -156,7 +158,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
                 }
                 contentTypes |= "[Content_Types].xml".equals(name);
                 officeDirectory |= ("docx".equals(extension) && name.startsWith("word/"))
-                        || ("xlsx".equals(extension) && name.startsWith("xl/"));
+                        || ("xlsx".equals(extension) && name.startsWith("xl/"))
+                        || ("pptx".equals(extension) && name.startsWith("ppt/"));
                 int read;
                 while ((read = zip.read(buffer)) != -1) {
                     uncompressedBytes += read;
@@ -238,7 +241,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     public AttachmentPreview preview(String userId, String attachmentId) {
         ChatAttachment attachment = requireAccessible(userId, attachmentId);
         String extension = extensionOf(attachment.getOriginalName());
-        if (!Set.of("doc", "xls").contains(extension)) {
+        if (!Set.of("doc", "xls", "ppt", "pptx").contains(extension)) {
             throw new IllegalArgumentException("该附件不支持服务端预览");
         }
         InputStream storedInput;

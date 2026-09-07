@@ -159,6 +159,8 @@ function previewKind(attachment) {
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || name.endsWith('.xlsx')) return 'xlsx'
   if (attachment?.type === 'application/msword' || name.endsWith('.doc')) return 'legacy-office'
   if (attachment?.type === 'application/vnd.ms-excel' || name.endsWith('.xls')) return 'legacy-office'
+  if (attachment?.type === 'application/vnd.ms-powerpoint' || name.endsWith('.ppt')) return 'legacy-office'
+  if (attachment?.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || name.endsWith('.pptx')) return 'legacy-office'
   return null
 }
 

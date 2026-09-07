@@ -39,6 +39,23 @@ class LibreOfficePreviewConverterTest {
     }
 
     @Test
+    void convertsPowerPointFilesViaSamePipeline() throws Exception {
+        MinioAttachmentProperties properties = properties();
+        byte[] pdf = "%PDF-1.7\npreview".getBytes();
+        AtomicReference<List<String>> invokedCommand = new AtomicReference<>();
+        LibreOfficePreviewConverter converter = new LibreOfficePreviewConverter(properties, (command, workingDirectory, timeout) -> {
+            invokedCommand.set(command);
+            Files.write(workingDirectory.resolve("source.pdf"), pdf);
+            return 0;
+        });
+
+        byte[] result = converter.convertToPdf("slides.pptx", new ByteArrayInputStream(new byte[]{1, 2, 3}));
+
+        assertArrayEquals(pdf, result);
+        assertTrue(invokedCommand.get().stream().anyMatch(value -> value.endsWith("source.pptx")));
+    }
+
+    @Test
     void rejectsInvalidConverterOutput() {
         MinioAttachmentProperties properties = properties();
         LibreOfficePreviewConverter converter = new LibreOfficePreviewConverter(properties, (command, workingDirectory, timeout) -> {
