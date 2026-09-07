@@ -16,6 +16,7 @@ const blobCache = ref({})
 const unavailableAttachmentUrls = new Set()
 const highlightedMessageId = ref(null)
 const filePreview = ref(null)
+const docxPreviewEl = ref(null)
 let highlightTimeout = null
 
 function replyMessageId(message) {
@@ -121,14 +122,52 @@ function previewKind(attachment) {
   const name = attachment?.name?.toLowerCase() || ''
   if (attachment?.type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf'
   if (attachment?.type === 'text/plain' || name.endsWith('.txt')) return 'text'
+  if (attachment?.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx')) return 'docx'
+  if (attachment?.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || name.endsWith('.xlsx')) return 'xlsx'
   return null
 }
 
-function openFilePreview(attachment) {
+async function openFilePreview(attachment) {
   const kind = previewKind(attachment)
   if (!kind) return
   if (kind === 'pdf') {
     filePreview.value = { kind, name: attachment.name, url: attachment.url }
+    return
+  }
+  if (kind === 'docx') {
+    filePreview.value = { kind, name: attachment.name, loading: true }
+    await nextTick()
+    try {
+      const { renderAsync } = await import('docx-preview')
+      await renderAsync(attachment.blob, docxPreviewEl.value, null, { inWrapper: false })
+      filePreview.value.loading = false
+    } catch {
+      filePreview.value = { kind, name: attachment.name, error: 'DOCX 预览加载失败' }
+    }
+    return
+  }
+  if (kind === 'xlsx') {
+    filePreview.value = { kind, name: attachment.name, loading: true, sheets: [], sheetIndex: 0 }
+    try {
+      const { Workbook } = await import('exceljs')
+      const workbook = new Workbook()
+      await workbook.xlsx.load(await attachment.blob.arrayBuffer())
+      filePreview.value = {
+        kind,
+        name: attachment.name,
+        sheetIndex: 0,
+        sheets: workbook.worksheets.map((sheet) => ({
+          name: sheet.name,
+          rows: Array.from({ length: Math.min(sheet.rowCount, 100) }, (_, rowIndex) =>
+            Array.from({ length: Math.min(sheet.columnCount, 20) }, (_, columnIndex) =>
+              sheet.getRow(rowIndex + 1).getCell(columnIndex + 1).text
+            )
+          ),
+        })),
+      }
+    } catch {
+      filePreview.value = { kind, name: attachment.name, error: 'XLSX 预览加载失败' }
+    }
     return
   }
   filePreview.value = {
@@ -316,7 +355,21 @@ onUnmounted(() => {
       @close="filePreview = null"
     >
       <iframe v-if="filePreview.kind === 'pdf'" :src="filePreview.url" class="pdf-preview" :title="filePreview.name" />
-      <pre v-else class="text-preview">{{ filePreview.text }}</pre>
+      <pre v-else-if="filePreview.kind === 'text'" class="text-preview">{{ filePreview.text }}</pre>
+      <div v-else-if="filePreview.kind === 'docx'" ref="docxPreviewEl" class="docx-preview">
+        <span v-if="filePreview.loading">加载中…</span>
+        <span v-else-if="filePreview.error">{{ filePreview.error }}</span>
+      </div>
+      <template v-else-if="filePreview.kind === 'xlsx'">
+        <span v-if="filePreview.loading">加载中…</span>
+        <span v-else-if="filePreview.error">{{ filePreview.error }}</span>
+        <template v-else>
+          <select v-model="filePreview.sheetIndex" class="sheet-select">
+            <option v-for="(sheet, index) in filePreview.sheets" :key="sheet.name" :value="index">{{ sheet.name }}</option>
+          </select>
+          <div class="xlsx-preview"><table><tbody><tr v-for="(row, rowIndex) in filePreview.sheets[filePreview.sheetIndex]?.rows" :key="rowIndex"><td v-for="(cell, columnIndex) in row" :key="columnIndex">{{ cell }}</td></tr></tbody></table></div>
+        </template>
+      </template>
     </el-dialog>
   </div>
 </template>
@@ -406,6 +459,11 @@ onUnmounted(() => {
 .file-preview-btn { margin-top: .4rem; border: 0; padding: 0; background: transparent; color: inherit; text-decoration: underline; cursor: pointer; font-size: .8rem; }
 .pdf-preview { display: block; width: 100%; height: min(70vh, 720px); border: 0; }
 .text-preview { max-height: min(70vh, 720px); margin: 0; overflow: auto; white-space: pre-wrap; word-break: break-word; font: inherit; }
+.docx-preview, .xlsx-preview { max-height: min(70vh, 720px); overflow: auto; }
+.docx-preview :deep(img) { max-width: 100%; }
+.sheet-select { margin-bottom: .75rem; max-width: 100%; }
+.xlsx-preview table { border-collapse: collapse; font-size: .85rem; }
+.xlsx-preview td { min-width: 5rem; padding: .3rem .45rem; border: 1px solid #d1d5db; white-space: pre-wrap; vertical-align: top; }
 .load-more-btn { align-self: center; padding: 0.35rem 0.75rem; border: 1px solid #d1d5db; border-radius: 999px; background: white; color: #374151; cursor: pointer; font-size: 0.75rem; }
 .load-more-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .reply-preview {

@@ -615,7 +615,7 @@ describe('User Workspace', () => {
     }
   })
 
-  it('offers in-app preview actions for attached PDF and TXT files', async () => {
+  it('offers in-app preview actions for supported attached files', async () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
     const chat = useChatStore()
@@ -623,6 +623,8 @@ describe('User Workspace', () => {
     chat.messages = [
       { id: 'pdf', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/pdf/content' },
       { id: 'txt', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/txt/content' },
+      { id: 'docx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/docx/content' },
+      { id: 'xlsx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/xlsx/content' },
     ]
     mockFetch
       .mockResolvedValueOnce({
@@ -635,15 +637,30 @@ describe('User Workspace', () => {
         blob: () => Promise.resolve(new Blob(['plain text'], { type: 'text/plain' })),
         headers: { get: () => 'attachment; filename="notes.txt"' },
       })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['docx'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' })),
+        headers: { get: () => 'attachment; filename="report.docx"' },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(new Blob(['xlsx'], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })),
+        headers: { get: () => 'attachment; filename="table.xlsx"' },
+      })
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(mockFetch).not.toHaveBeenCalled()
     await wrapper.findAll('.load-file-btn')[0].trigger('click')
-    await wrapper.findAll('.load-file-btn')[1].trigger('click')
     await new Promise((resolve) => setTimeout(resolve, 0))
-    expect(wrapper.findAll('.file-preview-btn')).toHaveLength(2)
+    await wrapper.findAll('.load-file-btn')[0].trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await wrapper.findAll('.load-file-btn')[0].trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    await wrapper.findAll('.load-file-btn')[0].trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(wrapper.findAll('.file-preview-btn')).toHaveLength(4)
   })
 
   describe('chat store — consultation start', () => {
