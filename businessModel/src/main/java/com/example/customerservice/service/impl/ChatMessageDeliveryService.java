@@ -196,8 +196,9 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                 RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
                 TimeUnit.SECONDS
         );
+        ChatSession session;
         try {
-            ChatSession session = chatSessionMapper.selectById(
+            session = chatSessionMapper.selectById(
                     message.getSessionId()
             );
 
@@ -270,15 +271,36 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         cacheMessage(message);
 
 
+        } catch (RuntimeException exception) {
+            deleteDeduplicationKeySafely(dedupKey);
+            throw exception;
+        } finally {
+            chatRedisRepository.stopLockRenewal(operationLockRenewal);
+            chatRedisRepository.releaseSessionOperationLock(
+                    message.getSessionId(),
+                    operationLockToken
+            );
+        }
+
+        /*
+         * WebSocket 推送移出会话操作锁：
+         * 发送是阻塞调用，客户端连接缓慢或断开时会拉长持锁时间，
+         * 阻塞同会话的转接、结束和超时处理。
+         *
+         * 推送失败不再向外抛出、也不删除去重Key：
+         * 消息已进入待确认列表，客户端可通过离线拉取获得；
+         * 若因推送失败删除去重Key，客户端重试会生成新messageId，
+         * 与待落库补偿叠加产生重复消息。
+         */
         ChatMessageDTO receivedAcknowledgement =
                 ChatMessageDTO.fromEntity(message);
         receivedAcknowledgement.setAckStatus("RECEIVED");
-        messagingTemplate.convertAndSendToUser(
+        sendToUserSafely(
                 message.getSenderId(),
-                "/queue/chat",
-                receivedAcknowledgement
+                receivedAcknowledgement,
+                "RECEIVED回执"
         );
-        routeAndPush(message);
+        routeAndPush(message, session);
         try {
             messagePersistService.persistMessageAsync(message);
         } catch (TaskRejectedException exception) {
@@ -293,14 +315,25 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
 
 
         return 1;
+    }
+
+    private void sendToUserSafely(
+            String userId,
+            Object payload,
+            String description
+    ) {
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    userId,
+                    "/queue/chat",
+                    payload
+            );
         } catch (RuntimeException exception) {
-            deleteDeduplicationKeySafely(dedupKey);
-            throw exception;
-        } finally {
-            chatRedisRepository.stopLockRenewal(operationLockRenewal);
-            chatRedisRepository.releaseSessionOperationLock(
-                    message.getSessionId(),
-                    operationLockToken
+            log.warn(
+                    "WebSocket推送失败（{}），接收者：{}",
+                    description,
+                    userId,
+                    exception
             );
         }
     }
@@ -481,6 +514,16 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                     "聊天会话不存在"
             );
         }
+        routeAndPush(message, session);
+    }
+
+    /**
+     * 会话已加载时的推送路径，避免热路径上重复查询数据库。
+     */
+    private void routeAndPush(
+            ChatMessage message,
+            ChatSession session
+    ) {
         String receiverId;
 
 
@@ -547,13 +590,26 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
 
             return;
         }
-        messagingTemplate.convertAndSendToUser(
-                receiverId,
-                "/queue/chat",
-                ChatMessageDTO.fromEntity(
-                        message
-                )
-        );
+        /*
+         * 推送失败不抛出：消息已在待确认列表中，
+         * 接收者上线或主动拉取时会重新投递。
+         */
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    receiverId,
+                    "/queue/chat",
+                    ChatMessageDTO.fromEntity(
+                            message
+                    )
+            );
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "实时推送失败，消息保留在待确认列表等待重投，接收者：{}",
+                    receiverId,
+                    exception
+            );
+            return;
+        }
 
 
         log.info(

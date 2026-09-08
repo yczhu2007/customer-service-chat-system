@@ -537,21 +537,33 @@ public class ChatPresenceService implements ChatPresenceOperations {
                     ChatConstants.SESSION_STATUS_CLOSED
             );
 
-            messagingTemplate.convertAndSendToUser(
-                    userId,
-                    "/queue/chat",
-                    notice
-            );
+            /*
+             * 单个会话的通知失败不能中断整个下线清理流程，
+             * 否则后续会话不会被关闭和通知。
+             */
+            try {
+                messagingTemplate.convertAndSendToUser(
+                        userId,
+                        "/queue/chat",
+                        notice
+                );
+            } catch (RuntimeException exception) {
+                log.warn("通知用户会话结束失败，userId={}", userId, exception);
+            }
 
             /*
              * 手动离线不会关闭客服的WebSocket连接，因此也要立即通知
              * 当前客服清空已结束的会话，避免客服继续在失效会话中操作。
              */
-            messagingTemplate.convertAndSendToUser(
-                    agentId,
-                    "/queue/chat",
-                    notice
-            );
+            try {
+                messagingTemplate.convertAndSendToUser(
+                        agentId,
+                        "/queue/chat",
+                        notice
+                );
+            } catch (RuntimeException exception) {
+                log.warn("通知客服会话结束失败，agentId={}", agentId, exception);
+            }
 
             /*
              * 用户仍在线时重新进入分配流程。
@@ -626,7 +638,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
             notice.put("event", ChatConstants.EVENT_AGENT_RECONNECTING);
             notice.put("sessionId", session.getId());
             notice.put("graceSeconds", TimeUnit.MILLISECONDS.toSeconds(agentReconnectGraceMillis));
-            messagingTemplate.convertAndSendToUser(session.getUserId(), "/queue/chat", notice);
+            try {
+                messagingTemplate.convertAndSendToUser(session.getUserId(), "/queue/chat", notice);
+            } catch (RuntimeException exception) {
+                log.warn("通知用户客服重连中失败，userId={}", session.getUserId(), exception);
+            }
         }
     }
 

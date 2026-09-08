@@ -161,14 +161,44 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
         int pushedCount = 0;
         for (String messageJson : messageJsonList) {
 
+            final ChatMessage message;
             try {
 
-                ChatMessage message =
+                message =
                         objectMapper.readValue(
                                 messageJson,
                                 ChatMessage.class
                         );
 
+            } catch (Exception e) {
+
+                /*
+                 * 脏数据永远不可能解析成功，
+                 * 不移除会在每次拉取时反复重放失败（毒消息）。
+                 */
+                log.warn(
+                        "待确认消息反序列化失败，移除脏数据，用户：{}，内容：{}",
+                        userId,
+                        messageJson,
+                        e
+                );
+                try {
+                    chatRedisRepository.listRemove(
+                            offlineKey,
+                            1,
+                            messageJson
+                    );
+                } catch (RuntimeException removeException) {
+                    log.warn(
+                            "移除待确认脏数据失败，用户：{}",
+                            userId,
+                            removeException
+                    );
+                }
+                continue;
+            }
+
+            try {
 
                 /*
                  * 推送消息，收到客户端ACK前仍保留在离线消息列表中
@@ -184,30 +214,29 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
 
                 pushedCount++;
 
+            } catch (RuntimeException e) {
 
-                log.info(
-                        "待确认消息已重新推送，用户："
-                                + userId
-                                + "，messageId："
-                                + message.getId()
-                );
-
-            } catch (Exception e) {
-
-                log.info(
-                        "待确认消息反序列化失败："
-                                + messageJson
-                );
-
-
-                log.info(
-                        "失败原因："
-                                + e.getMessage()
+                /*
+                 * 推送失败的消息保留在列表中，等待下次拉取重投。
+                 */
+                log.warn(
+                        "待确认消息重推失败，保留等待下次拉取，用户：{}，messageId：{}",
+                        userId,
+                        message.getId(),
+                        e
                 );
             }
         }
 
-        notifyReplayCompleted(userId, pushedCount);
+        try {
+            notifyReplayCompleted(userId, pushedCount);
+        } catch (RuntimeException exception) {
+            log.warn(
+                    "发送离线消息重放完成通知失败，用户：{}",
+                    userId,
+                    exception
+            );
+        }
 
 
         log.info(
