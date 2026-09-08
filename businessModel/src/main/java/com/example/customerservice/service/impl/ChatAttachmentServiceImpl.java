@@ -47,6 +47,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private static final int MAX_ZIP_COMPRESSION_RATIO = 100;
     private static final int CLEANUP_QUERY_BATCH_SIZE = 500;
     private static final int PREVIEW_CACHE_SIZE = 4;
+    /** 预览转换结果在对象存储中的持久缓存前缀。 */
+    private static final String PREVIEW_OBJECT_PREFIX = "previews/";
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip"
     );
@@ -276,6 +278,23 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         }
         AttachmentPreview cachedPreview = previewCache.get(attachmentId);
         if (cachedPreview != null) return cachedPreview;
+        String baseName = attachment.getOriginalName().substring(
+                0, attachment.getOriginalName().length() - extension.length() - 1
+        );
+        String previewFileName = baseName + ".pdf";
+        String previewObjectName = PREVIEW_OBJECT_PREFIX + attachmentId + ".pdf";
+
+        /*
+         * L2 持久缓存：转换结果按附件ID存入对象存储。
+         * 附件不可变，转换结果可跨实例、跨重启复用，命中即免掉 LibreOffice 转换。
+         */
+        byte[] persistedContent = readPersistedPreview(previewObjectName);
+        if (persistedContent != null) {
+            AttachmentPreview preview = new AttachmentPreview(previewFileName, persistedContent);
+            previewCache.put(attachmentId, preview);
+            return preview;
+        }
+
         InputStream storedInput;
         try {
             storedInput = storage.open(attachment.getStoredName());
@@ -284,14 +303,35 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         }
         try (InputStream input = storedInput) {
             byte[] content = previewConverter.convertToPdf(attachment.getOriginalName(), input);
-            String baseName = attachment.getOriginalName().substring(
-                    0, attachment.getOriginalName().length() - extension.length() - 1
-            );
-            AttachmentPreview preview = new AttachmentPreview(baseName + ".pdf", content);
+            AttachmentPreview preview = new AttachmentPreview(previewFileName, content);
             previewCache.put(attachmentId, preview);
+            writePersistedPreview(previewObjectName, content);
             return preview;
         } catch (IOException exception) {
             throw new IllegalStateException("附件读取失败", exception);
+        }
+    }
+
+    private byte[] readPersistedPreview(String previewObjectName) {
+        try (InputStream input = storage.open(previewObjectName)) {
+            if (input == null) return null;
+            return input.readAllBytes();
+        } catch (IOException exception) {
+            log.warn("读取预览缓存内容失败，转为实时转换，object={}", previewObjectName, exception);
+            return null;
+        } catch (RuntimeException exception) {
+            /* 对象不存在（缓存未命中）或存储暂不可用，都按未命中处理。 */
+            log.debug("预览缓存未命中，object={}", previewObjectName, exception);
+            return null;
+        }
+    }
+
+    private void writePersistedPreview(String previewObjectName, byte[] content) {
+        try {
+            storage.put(previewObjectName, new java.io.ByteArrayInputStream(content), content.length, "application/pdf");
+        } catch (RuntimeException exception) {
+            /* 缓存写失败不影响本次预览，下次请求重新转换即可。 */
+            log.warn("预览结果写入持久缓存失败，object={}", previewObjectName, exception);
         }
     }
 
@@ -316,11 +356,27 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
                     )
                     .forEach(value -> referencedNames.add(value.getStoredName()));
         }
+        /* 预览缓存对象（previews/{附件ID}.pdf）是否保留取决于附件本体是否仍存在。 */
+        Set<String> referencedAttachmentIds = new HashSet<>();
+        for (String referencedName : referencedNames) {
+            int dotIndex = referencedName.lastIndexOf('.');
+            referencedAttachmentIds.add(dotIndex > 0 ? referencedName.substring(0, dotIndex) : referencedName);
+        }
         int removed = 0;
         Instant cutoff = Instant.now().minusSeconds(properties.getOrphanGracePeriodSeconds());
         for (AttachmentObjectStorage.StoredObject object : objects) {
             String objectName = object.objectName();
             if (object.lastModified() != null && object.lastModified().isAfter(cutoff)) continue;
+            if (objectName.startsWith(PREVIEW_OBJECT_PREFIX)) {
+                String attachmentId = objectName.substring(
+                        PREVIEW_OBJECT_PREFIX.length(),
+                        objectName.length() - ".pdf".length()
+                );
+                if (!referencedAttachmentIds.contains(attachmentId) && deleteQuietly(objectName)) {
+                    removed++;
+                }
+                continue;
+            }
             if (!referencedNames.contains(objectName) && deleteQuietly(objectName)) {
                 removed++;
             }

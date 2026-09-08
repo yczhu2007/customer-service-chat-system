@@ -209,8 +209,8 @@ function previewKind(attachment) {
   if (attachment?.type === 'text/plain' || name.endsWith('.txt')) return 'text'
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || name.endsWith('.docx')) return 'docx'
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' || name.endsWith('.xlsx')) return 'xlsx'
+  if (attachment?.type === 'application/vnd.ms-excel' || name.endsWith('.xls')) return 'xlsx'
   if (attachment?.type === 'application/msword' || name.endsWith('.doc')) return 'legacy-office'
-  if (attachment?.type === 'application/vnd.ms-excel' || name.endsWith('.xls')) return 'legacy-office'
   if (attachment?.type === 'application/vnd.ms-powerpoint' || name.endsWith('.ppt')) return 'legacy-office'
   if (attachment?.type === 'application/vnd.openxmlformats-officedocument.presentationml.presentation' || name.endsWith('.pptx')) return 'legacy-office'
   return null
@@ -237,7 +237,26 @@ async function openFilePreview(attachment) {
   }
   if (kind === 'xlsx') {
     filePreview.value = { kind, name: attachment.name, loading: true, sheets: [], sheetIndex: 0 }
+    const isLegacyXls = (attachment.name || '').toLowerCase().endsWith('.xls')
     try {
+      if (isLegacyXls) {
+        /* 老格式 xls 用 SheetJS 在前端解析，无需服务端转换 */
+        const XLSX = await import('xlsx')
+        const workbook = XLSX.read(await attachment.blob.arrayBuffer(), { type: 'array' })
+        filePreview.value = {
+          kind,
+          name: attachment.name,
+          sheetIndex: 0,
+          sheets: workbook.SheetNames.map((sheetName) => ({
+            name: sheetName,
+            rows: XLSX.utils
+              .sheet_to_json(workbook.Sheets[sheetName], { header: 1, raw: false, defval: '' })
+              .slice(0, 100)
+              .map((row) => row.slice(0, 20)),
+          })),
+        }
+        return
+      }
       const { Workbook } = await import('exceljs')
       const workbook = new Workbook()
       await workbook.xlsx.load(await attachment.blob.arrayBuffer())
@@ -256,7 +275,7 @@ async function openFilePreview(attachment) {
         })),
       }
     } catch (error) {
-      filePreview.value = { kind, name: attachment.name, error: `XLSX 预览加载失败：${error.message || '文件格式无效'}` }
+      filePreview.value = { kind, name: attachment.name, error: `${isLegacyXls ? 'XLS' : 'XLSX'} 预览加载失败：${error.message || '文件格式无效'}` }
     }
     return
   }

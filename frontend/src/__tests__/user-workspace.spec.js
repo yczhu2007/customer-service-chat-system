@@ -847,14 +847,14 @@ describe('User Workspace', () => {
     }
   })
 
-  it('opens a legacy Excel attachment through the authenticated PDF preview endpoint', async () => {
+  it('opens a legacy Word attachment through the authenticated PDF preview endpoint', async () => {
     const auth = useAuthStore()
     auth.login({ token: 'token-1', userId: 'u1', role: 'USER' })
     const chat = useChatStore()
     chat.activeSessionId = 's1'
     chat.messages = [{
-      id: 'xls', sessionId: 's1', senderId: 'u2', type: 'FILE',
-      content: '/chat/attachments/66666666666666666666666666666666/content',
+      id: 'doc', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/55555555555555555555555555555555/content',
     }]
     mockFetch
       .mockResolvedValueOnce({
@@ -862,7 +862,7 @@ describe('User Workspace', () => {
         status: 200,
         json: () => Promise.resolve({
           code: 200,
-          data: { originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 12 },
+          data: { originalName: 'legacy.doc', contentType: 'application/msword', fileSize: 12 },
         }),
       })
       .mockResolvedValueOnce({
@@ -878,7 +878,7 @@ describe('User Workspace', () => {
     await new Promise((resolve) => setTimeout(resolve, 0))
 
     expect(mockFetch).toHaveBeenLastCalledWith(
-      '/chat/attachments/66666666666666666666666666666666/preview',
+      '/chat/attachments/55555555555555555555555555555555/preview',
       { headers: { Authorization: 'Bearer token-1' } }
     )
     expect(wrapper.find('.pdf-preview').exists()).toBe(true)
@@ -890,6 +890,67 @@ describe('User Workspace', () => {
 
     expect(mockFetch).toHaveBeenCalledTimes(2)
   })
+
+  it('previews XLS files in the frontend with SheetJS without the preview endpoint', async () => {
+    const XLSX = await import('xlsx')
+    const { markRaw } = await import('vue')
+    const workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, XLSX.utils.aoa_to_sheet([['实验名称', '单摆测重力加速度'], ['地点', '物理实验室']]), 'Sheet1')
+    const fileBytes = XLSX.write(workbook, { bookType: 'biff8', type: 'array' })
+    const arrayBuffer = new Uint8Array(fileBytes).buffer
+    const file = markRaw({
+      size: arrayBuffer.byteLength,
+      type: 'application/vnd.ms-excel',
+      arrayBuffer: () => Promise.resolve(arrayBuffer),
+    })
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'xls-message', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/66666666666666666666666666666666/content',
+    }]
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({
+          code: 200,
+          data: {
+            originalName: 'schedule.xls',
+            contentType: 'application/vnd.ms-excel',
+            fileSize: file.size,
+          },
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        blob: () => Promise.resolve(file),
+        headers: { get: () => 'attachment; filename="schedule.xls"' },
+      })
+
+    const createUrl = vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:schedule-xls')
+    try {
+      const wrapper = mount(MessageList, {
+        attachTo: document.body,
+        props: { sessionId: 's1' },
+        global: { stubs: { ElDialog: { template: '<div class="preview-dialog"><slot /></div>' } } },
+      })
+      await new Promise((resolve) => setTimeout(resolve, 0))
+      await wrapper.find('.file-preview-btn').trigger('click')
+
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(2))
+      await vi.waitFor(() => expect(document.body.textContent).toContain('单摆测重力加速度'), { timeout: 5000 })
+      expect(document.body.textContent).toContain('物理实验室')
+      expect(document.body.textContent).not.toContain('XLS 预览加载失败')
+      /* 只请求了元数据和文件内容，没有调用服务端预览转换端点 */
+      expect(mockFetch.mock.calls.some(([url]) => String(url).endsWith('/preview'))).toBe(false)
+      wrapper.unmount()
+    } finally {
+      createUrl.mockRestore()
+    }
+  }, 10_000)
 
   it('previews XLSX files with empty merged cells', async () => {
     const { Workbook } = await import('exceljs')

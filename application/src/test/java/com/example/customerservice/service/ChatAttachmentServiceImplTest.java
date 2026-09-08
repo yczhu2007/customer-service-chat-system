@@ -125,6 +125,65 @@ class ChatAttachmentServiceImplTest {
     }
 
     @Test
+    void servesPreviewFromPersistedStorageCacheWithoutConversion() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        OfficePreviewConverter converter = mock(OfficePreviewConverter.class);
+        ChatAttachment attachment = new ChatAttachment();
+        attachment.setId("A1");
+        attachment.setSessionId("S1");
+        attachment.setOriginalName("schedule.doc");
+        attachment.setStoredName("A1.doc");
+        ChatSession session = new ChatSession();
+        session.setId("S1");
+        session.setUserId("U1");
+        when(attachmentMapper.selectById("A1")).thenReturn(attachment);
+        when(sessionMapper.selectById("S1")).thenReturn(session);
+        when(storage.open("previews/A1.pdf"))
+                .thenAnswer(invocation -> new ByteArrayInputStream("%PDF-cached".getBytes()));
+        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
+                attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties(), converter
+        );
+
+        AttachmentPreview preview = service.preview("U1", "A1");
+
+        assertEquals("schedule.pdf", preview.filename());
+        assertArrayEquals("%PDF-cached".getBytes(), preview.content());
+        verify(converter, never()).convertToPdf(any(), any());
+        verify(storage, never()).open("A1.doc");
+    }
+
+    @Test
+    void persistsConvertedPreviewToStorageCache() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        OfficePreviewConverter converter = mock(OfficePreviewConverter.class);
+        ChatAttachment attachment = new ChatAttachment();
+        attachment.setId("A1");
+        attachment.setSessionId("S1");
+        attachment.setOriginalName("slides.pptx");
+        attachment.setStoredName("A1.pptx");
+        ChatSession session = new ChatSession();
+        session.setId("S1");
+        session.setUserId("U1");
+        when(attachmentMapper.selectById("A1")).thenReturn(attachment);
+        when(sessionMapper.selectById("S1")).thenReturn(session);
+        when(storage.open("previews/A1.pdf")).thenThrow(new RuntimeException("not found"));
+        when(storage.open("A1.pptx")).thenAnswer(invocation -> new ByteArrayInputStream(new byte[]{1, 2, 3}));
+        when(converter.convertToPdf(eq("slides.pptx"), any())).thenReturn("%PDF-preview".getBytes());
+        ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
+                attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties(), converter
+        );
+
+        AttachmentPreview preview = service.preview("U1", "A1");
+
+        assertArrayEquals("%PDF-preview".getBytes(), preview.content());
+        verify(storage).put(eq("previews/A1.pdf"), any(), eq((long) "%PDF-preview".getBytes().length), eq("application/pdf"));
+    }
+
+    @Test
     void returnsOnlyAccessibleAttachmentMetadataInOneBatch() {
         ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
         ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
