@@ -1,22 +1,15 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import LoginView from '../views/LoginView.vue'
-import UserWorkspaceView from '../views/UserWorkspaceView.vue'
-import AgentWorkspaceView from '../views/AgentWorkspaceView.vue'
-import AdminWorkspaceView from '../views/AdminWorkspaceView.vue'
-import RegisterView from '../views/RegisterView.vue'
-import ForgotPasswordView from '../views/ForgotPasswordView.vue'
-import AccountView from '../views/AccountView.vue'
 
 const routes = [
   { path: '/index.html', redirect: '/login' },
-  { path: '/login', component: LoginView },
-  { path: '/register', component: RegisterView },
-  { path: '/forgot-password', component: ForgotPasswordView },
-  { path: '/account', component: AccountView, meta: { requiresAuth: true } },
-  { path: '/user', component: UserWorkspaceView, meta: { requiresAuth: true, role: 'USER' } },
-  { path: '/agent', component: AgentWorkspaceView, meta: { requiresAuth: true, role: 'AGENT' } },
-  { path: '/admin', component: AdminWorkspaceView, meta: { requiresAuth: true, role: 'ADMIN' } },
+  { path: '/login', component: () => import('../views/LoginView.vue') },
+  { path: '/register', component: () => import('../views/RegisterView.vue') },
+  { path: '/forgot-password', component: () => import('../views/ForgotPasswordView.vue') },
+  { path: '/account', component: () => import('../views/AccountView.vue'), meta: { requiresAuth: true } },
+  { path: '/user', component: () => import('../views/UserWorkspaceView.vue'), meta: { requiresAuth: true, role: 'USER' } },
+  { path: '/agent', component: () => import('../views/AgentWorkspaceView.vue'), meta: { requiresAuth: true, role: 'AGENT' } },
+  { path: '/admin', component: () => import('../views/AdminWorkspaceView.vue'), meta: { requiresAuth: true, role: 'ADMIN' } },
   { path: '/', redirect: '/login' },
 ]
 

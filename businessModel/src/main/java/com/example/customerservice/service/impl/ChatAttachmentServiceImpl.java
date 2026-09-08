@@ -27,9 +27,12 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.zip.ZipEntry;
@@ -43,6 +46,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private static final int MAX_ZIP_ENTRIES = 1_000;
     private static final int MAX_ZIP_COMPRESSION_RATIO = 100;
     private static final int CLEANUP_QUERY_BATCH_SIZE = 500;
+    private static final int PREVIEW_CACHE_SIZE = 4;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
             "jpg", "jpeg", "png", "gif", "webp", "pdf", "txt", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "zip"
     );
@@ -63,6 +67,14 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     private final AttachmentObjectStorage storage;
     private final MinioAttachmentProperties properties;
     private final OfficePreviewConverter previewConverter;
+    private final Map<String, AttachmentPreview> previewCache = Collections.synchronizedMap(
+            new LinkedHashMap<>(PREVIEW_CACHE_SIZE + 1, 1.0f, true) {
+                @Override
+                protected boolean removeEldestEntry(Map.Entry<String, AttachmentPreview> eldest) {
+                    return size() > PREVIEW_CACHE_SIZE;
+                }
+            }
+    );
 
     @Autowired
     public ChatAttachmentServiceImpl(ChatAttachmentMapper attachmentMapper, ChatSessionMapper sessionMapper,
@@ -229,6 +241,24 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
     }
 
     @Override
+    public List<ChatAttachmentVO> findAccessibleMetadata(String userId, List<String> attachmentIds) {
+        List<String> ids = attachmentIds.stream().filter(StringUtils::hasText).distinct().limit(50).toList();
+        if (ids.isEmpty()) return List.of();
+        List<ChatAttachment> attachments = attachmentMapper.selectByIds(ids);
+        if (attachments.isEmpty()) return List.of();
+        Map<String, ChatSession> sessions = new java.util.HashMap<>();
+        sessionMapper.selectByIds(attachments.stream().map(ChatAttachment::getSessionId).distinct().toList())
+                .forEach(session -> sessions.put(session.getId(), session));
+        return attachments.stream()
+                .filter(attachment -> {
+                    ChatSession session = sessions.get(attachment.getSessionId());
+                    return session != null && (userId.equals(session.getUserId()) || userId.equals(session.getAgentId()));
+                })
+                .map(this::toVO)
+                .toList();
+    }
+
+    @Override
     public Resource load(ChatAttachment attachment) {
         try {
             return new InputStreamResource(storage.open(attachment.getStoredName()));
@@ -244,6 +274,8 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         if (!Set.of("doc", "xls", "ppt", "pptx").contains(extension)) {
             throw new IllegalArgumentException("该附件不支持服务端预览");
         }
+        AttachmentPreview cachedPreview = previewCache.get(attachmentId);
+        if (cachedPreview != null) return cachedPreview;
         InputStream storedInput;
         try {
             storedInput = storage.open(attachment.getStoredName());
@@ -255,7 +287,9 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
             String baseName = attachment.getOriginalName().substring(
                     0, attachment.getOriginalName().length() - extension.length() - 1
             );
-            return new AttachmentPreview(baseName + ".pdf", content);
+            AttachmentPreview preview = new AttachmentPreview(baseName + ".pdf", content);
+            previewCache.put(attachmentId, preview);
+            return preview;
         } catch (IOException exception) {
             throw new IllegalStateException("附件读取失败", exception);
         }

@@ -1,15 +1,16 @@
 <script setup>
-import { ref } from 'vue'
-import AdminDashboard from '../components/admin/AdminDashboard.vue'
-import AdminReportPanel from '../components/admin/AdminReportPanel.vue'
-import UserManagementPanel from '../components/admin/UserManagementPanel.vue'
-import RoleManagementPanel from '../components/admin/RoleManagementPanel.vue'
-import SessionAuditPanel from '../components/admin/SessionAuditPanel.vue'
-import ArchiveStatsPanel from '../components/admin/ArchiveStatsPanel.vue'
-import DeadLetterPanel from '../components/admin/DeadLetterPanel.vue'
-import VipSkillPanel from '../components/admin/VipSkillPanel.vue'
-import AdminMessageSearchPanel from '../components/admin/AdminMessageSearchPanel.vue'
-import AdminTicketPanel from '../components/admin/AdminTicketPanel.vue'
+import { defineAsyncComponent, ref } from 'vue'
+
+const AdminDashboard = defineAsyncComponent(() => import('../components/admin/AdminDashboard.vue'))
+const AdminReportPanel = defineAsyncComponent(() => import('../components/admin/AdminReportPanel.vue'))
+const UserManagementPanel = defineAsyncComponent(() => import('../components/admin/UserManagementPanel.vue'))
+const RoleManagementPanel = defineAsyncComponent(() => import('../components/admin/RoleManagementPanel.vue'))
+const SessionAuditPanel = defineAsyncComponent(() => import('../components/admin/SessionAuditPanel.vue'))
+const ArchiveStatsPanel = defineAsyncComponent(() => import('../components/admin/ArchiveStatsPanel.vue'))
+const DeadLetterPanel = defineAsyncComponent(() => import('../components/admin/DeadLetterPanel.vue'))
+const VipSkillPanel = defineAsyncComponent(() => import('../components/admin/VipSkillPanel.vue'))
+const AdminMessageSearchPanel = defineAsyncComponent(() => import('../components/admin/AdminMessageSearchPanel.vue'))
+const AdminTicketPanel = defineAsyncComponent(() => import('../components/admin/AdminTicketPanel.vue'))
 
 const activeTab = ref('dashboard')
 const focusedTicket = ref(null)

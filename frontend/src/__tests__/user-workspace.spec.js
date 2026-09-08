@@ -7,6 +7,7 @@ import { useAuthStore } from '../stores/auth'
 import MessageComposer from '../components/chat/MessageComposer.vue'
 import MessageList from '../components/chat/MessageList.vue'
 import UserSessionList from '../components/session/UserSessionList.vue'
+import ConnectionStatus from '../components/common/ConnectionStatus.vue'
 import { fetchAttachmentBlob } from '../api/chat-api'
 import { previewCellText } from '../components/chat/xlsx-preview'
 
@@ -241,8 +242,30 @@ describe('User Workspace', () => {
 
       expect(chat.connectionState).toBe('reconnecting')
       expect(chat.connectionError).toContain('请求超时')
+      expect(chat.nextReconnectAt).toBe(Date.now() + 1_000)
       vi.useRealTimers()
     })
+  })
+
+  it('shows the reconnect failure, attempt and remaining wait time', () => {
+    vi.useFakeTimers()
+    try {
+      vi.setSystemTime(new Date('2026-09-08T10:00:00'))
+      const chat = useChatStore()
+      chat.connectionState = 'reconnecting'
+      chat.connectionError = 'WebSocket 连接错误'
+      chat.reconnectAttempts = 2
+      chat.nextReconnectAt = Date.now() + 3_000
+
+      const wrapper = mount(ConnectionStatus)
+
+      expect(wrapper.text()).toContain('WebSocket 连接错误')
+      expect(wrapper.text()).toContain('第 2 次重连')
+      expect(wrapper.text()).toContain('3 秒后')
+      wrapper.unmount()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('restores agent availability after an unexpected WebSocket reconnect', async () => {
@@ -405,6 +428,8 @@ describe('User Workspace', () => {
   })
 
   it('shows an active-session notice while the assigned agent is reconnecting', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-09-08T10:00:00'))
     const chat = useChatStore()
     chat.connectStomp = vi.fn()
     chat.loadQueueStatus = vi.fn()
@@ -419,8 +444,14 @@ describe('User Workspace', () => {
       global: { stubs: { ChatWindow: true, UserSessionList: true, SessionRatingForm: true, ConnectionStatus: true, SupportTicketPanel: true } },
     })
 
-    expect(wrapper.text()).toContain('客服重连中，请稍候（最长约 20 秒）')
-    wrapper.unmount()
+    try {
+      expect(wrapper.text()).toContain('客服重连中，请稍候（剩余 20 秒）')
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(wrapper.text()).toContain('客服重连中，请稍候（剩余 17 秒）')
+    } finally {
+      wrapper.unmount()
+      vi.useRealTimers()
+    }
   })
 
   it('keeps the consultation action labeled as a new consultation when history is closed', async () => {
@@ -674,42 +705,19 @@ describe('User Workspace', () => {
       { id: 'xls', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/66666666666666666666666666666666/content' },
       { id: 'pptx', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/77777777777777777777777777777777/content' },
     ]
-    mockFetch
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'guide.pdf', contentType: 'application/pdf', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'notes.txt', contentType: 'text/plain', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'report.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'table.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'legacy.doc', contentType: 'application/msword', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 1 } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve({ code: 200, data: { originalName: 'slides.pptx', contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', fileSize: 1 } }),
-      })
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: [
+        { id: '11111111111111111111111111111111', originalName: 'guide.pdf', contentType: 'application/pdf', fileSize: 1 },
+        { id: '22222222222222222222222222222222', originalName: 'notes.txt', contentType: 'text/plain', fileSize: 1 },
+        { id: '33333333333333333333333333333333', originalName: 'report.docx', contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', fileSize: 1 },
+        { id: '44444444444444444444444444444444', originalName: 'table.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 1 },
+        { id: '55555555555555555555555555555555', originalName: 'legacy.doc', contentType: 'application/msword', fileSize: 1 },
+        { id: '66666666666666666666666666666666', originalName: 'legacy.xls', contentType: 'application/vnd.ms-excel', fileSize: 1 },
+        { id: '77777777777777777777777777777777', originalName: 'slides.pptx', contentType: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', fileSize: 1 },
+      ] }),
+    })
 
     const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
     await new Promise((resolve) => setTimeout(resolve, 0))
@@ -718,6 +726,125 @@ describe('User Workspace', () => {
     expect(wrapper.findAll('button').filter((button) => button.text() === '预览')).toHaveLength(7)
     expect(wrapper.findAll('button').filter((button) => button.text() === '下载')).toHaveLength(7)
     expect(wrapper.findAll('.load-file-btn')).toHaveLength(0)
+  })
+
+  it('does not download an image twice while its blob is loading', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'image-message', sessionId: 's1', senderId: 'u2', type: 'IMAGE',
+      content: '/chat/attachments/12345678901234567890123456789012/content',
+    }]
+    let resolveBlob
+    const blobPromise = new Promise((resolve) => { resolveBlob = resolve })
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: { get: () => 'inline; filename="photo.png"' },
+      blob: () => blobPromise,
+    })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+
+    chat.messages.push({ id: 'trigger', sessionId: 's1', senderId: 'u2', type: 'TEXT', content: 'new message' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    resolveBlob(new Blob(['image'], { type: 'image/png' }))
+    await vi.waitFor(() => expect(wrapper.find('img').exists()).toBe(true))
+    wrapper.unmount()
+  })
+
+  it('does not fetch file metadata twice while the first response is loading', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [{
+      id: 'file-message', sessionId: 's1', senderId: 'u2', type: 'FILE',
+      content: '/chat/attachments/abcdefabcdefabcdefabcdefabcdefab/content',
+    }]
+    let resolveJson
+    const jsonPromise = new Promise((resolve) => { resolveJson = resolve })
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: () => jsonPromise })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+
+    chat.messages.push({ id: 'trigger', sessionId: 's1', senderId: 'u2', type: 'TEXT', content: 'new message' })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    resolveJson({ code: 200, data: { originalName: 'table.xlsx', contentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', fileSize: 1 } })
+    await vi.waitFor(() => expect(wrapper.text()).toContain('table.xlsx'))
+    wrapper.unmount()
+  })
+
+  it('loads metadata for multiple files with one request', async () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.messages = [
+      { id: 'file-a', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/11111111111111111111111111111111/content' },
+      { id: 'file-b', sessionId: 's1', senderId: 'u2', type: 'FILE', content: '/chat/attachments/22222222222222222222222222222222/content' },
+    ]
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: () => Promise.resolve({ code: 200, data: [
+        { id: '11111111111111111111111111111111', originalName: 'one.pdf', contentType: 'application/pdf', fileSize: 1 },
+        { id: '22222222222222222222222222222222', originalName: 'two.pdf', contentType: 'application/pdf', fileSize: 2 },
+      ] }),
+    })
+
+    const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+
+    await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+    expect(mockFetch).toHaveBeenCalledWith('/chat/attachments/metadata', expect.objectContaining({ method: 'POST' }))
+    await vi.waitFor(() => expect(wrapper.text()).toContain('one.pdf'))
+    expect(wrapper.text()).toContain('two.pdf')
+    wrapper.unmount()
+  })
+
+  it('waits until an image enters the viewport before downloading it', async () => {
+    const observers = []
+    class MockIntersectionObserver {
+      constructor(callback) { this.callback = callback; observers.push(this) }
+      observe(element) { this.element = element }
+      unobserve() {}
+      disconnect() {}
+    }
+    vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
+    try {
+      const auth = useAuthStore()
+      auth.login({ token: 't', userId: 'u1', role: 'USER' })
+      const chat = useChatStore()
+      chat.activeSessionId = 's1'
+      chat.messages = [{
+        id: 'image-message', sessionId: 's1', senderId: 'u2', type: 'IMAGE',
+        content: '/chat/attachments/33333333333333333333333333333333/content',
+      }]
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: { get: () => 'inline; filename="photo.png"' },
+        blob: () => Promise.resolve(new Blob(['image'], { type: 'image/png' })),
+      })
+
+      const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+
+      expect(mockFetch).not.toHaveBeenCalled()
+      expect(observers).toHaveLength(1)
+      observers[0].callback([{ isIntersecting: true, target: observers[0].element }])
+      await vi.waitFor(() => expect(mockFetch).toHaveBeenCalledTimes(1))
+      wrapper.unmount()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('opens a legacy Excel attachment through the authenticated PDF preview endpoint', async () => {

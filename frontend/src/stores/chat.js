@@ -42,7 +42,7 @@ export const useChatStore = defineStore('chat', {
     queueCancelling: false,
     queueNotice: null,
     consultationStarting: false,
-    /** Map of active session IDs to the remaining agent reconnect grace seconds. */
+    /** Map of active session IDs to the agent reconnect grace deadline in milliseconds. */
     agentReconnectGraceBySession: {},
     /** Map of sessionId -> unread count */
     unreadCounts: {},
@@ -56,6 +56,7 @@ export const useChatStore = defineStore('chat', {
     connectionError: null,
     connectionLogs: [],
     reconnectAttempts: 0,
+    nextReconnectAt: null,
     lastActivityAt: null,
     manualDisconnect: false,
     _restoreAgentOnlineAfterReconnect: false,
@@ -173,6 +174,7 @@ export const useChatStore = defineStore('chat', {
     reconnectStomp() {
       if (this.reconnectAttempts >= 5) {
         this.connectionError = '自动重连次数已达上限，请手动重连'
+        this.nextReconnectAt = null
         return
       }
       // This reconnect path schedules its own timer; suppress the close callback
@@ -180,6 +182,7 @@ export const useChatStore = defineStore('chat', {
       this.disconnectStomp({ manual: true })
       this.reconnectAttempts += 1
       const delay = Math.min(1000 * 2 ** (this.reconnectAttempts - 1), 10000)
+      this.nextReconnectAt = Date.now() + delay
       this.connectionState = 'reconnecting'
       this.logConnection(`正在进行第 ${this.reconnectAttempts} 次重连`)
       this._reconnectTimer = setTimeout(() => this.connectStomp(), delay)
@@ -261,7 +264,10 @@ export const useChatStore = defineStore('chat', {
       }
 
       if (event === 'AGENT_RECONNECTING') {
-        if (body.sessionId) this.agentReconnectGraceBySession[body.sessionId] = body.graceSeconds
+        const graceSeconds = Number(body.graceSeconds)
+        if (body.sessionId && Number.isFinite(graceSeconds) && graceSeconds > 0) {
+          this.agentReconnectGraceBySession[body.sessionId] = Date.now() + graceSeconds * 1000
+        }
         return
       }
 

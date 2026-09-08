@@ -2,7 +2,7 @@
 import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
-import { fetchAttachmentBlob, fetchAttachmentMetadata, fetchAttachmentPreview } from '../../api/chat-api'
+import { fetchAttachmentBlob, fetchAttachmentMetadataBatch, fetchAttachmentPreview } from '../../api/chat-api'
 import { previewCellText } from './xlsx-preview'
 
 const props = defineProps({
@@ -14,13 +14,16 @@ const chat = useChatStore()
 const auth = useAuthStore()
 const listEl = ref(null)
 const blobCache = ref({})
+const pendingBlobLoads = new Map()
 const legacyPreviewCache = new Map()
 const attachmentMetadata = ref({})
+const pendingMetadataLoads = new Set()
 const unavailableAttachmentUrls = new Set()
 const highlightedMessageId = ref(null)
 const filePreview = ref(null)
 const docxPreviewEl = ref(null)
 let highlightTimeout = null
+let imageObserver = null
 
 function replyMessageId(message) {
   return message.replyToMessageId || message.reply_to_message_id || null
@@ -109,22 +112,31 @@ async function loadBlob(msg) {
     if (msg.id) blobCache.value[msg.id] = null
     return null
   }
-  if (blobCache.value[msg.id]) return blobCache.value[msg.id]
-  const sessionId = props.sessionId
-  try {
-    const attachment = await fetchAttachmentBlob(msg.content)
-    if (sessionId !== props.sessionId || !chat.messages.some((item) => item.id === msg.id)) {
-      if (attachment?.url && typeof URL.revokeObjectURL === 'function') {
-        URL.revokeObjectURL(attachment.url)
+  if (Object.hasOwn(blobCache.value, msg.id)) return blobCache.value[msg.id]
+  if (pendingBlobLoads.has(msg.id)) return pendingBlobLoads.get(msg.id)
+  const load = (async () => {
+    const sessionId = props.sessionId
+    try {
+      const attachment = await fetchAttachmentBlob(msg.content)
+      if (sessionId !== props.sessionId || !chat.messages.some((item) => item.id === msg.id)) {
+        if (attachment?.url && typeof URL.revokeObjectURL === 'function') {
+          URL.revokeObjectURL(attachment.url)
+        }
+        return null
       }
+      blobCache.value[msg.id] = attachment
+      return attachment
+    } catch (error) {
+      if (error?.message === 'HTTP 404') unavailableAttachmentUrls.add(msg.content)
+      blobCache.value[msg.id] = null
       return null
     }
-    blobCache.value[msg.id] = attachment
-    return attachment
-  } catch (error) {
-    if (error?.message === 'HTTP 404') unavailableAttachmentUrls.add(msg.content)
-    blobCache.value[msg.id] = null
-    return null
+  })()
+  pendingBlobLoads.set(msg.id, load)
+  try {
+    return await load
+  } finally {
+    pendingBlobLoads.delete(msg.id)
   }
 }
 
@@ -132,16 +144,56 @@ function attachmentId(contentUrl) {
   return contentUrl?.match(/^\/chat\/attachments\/([A-Za-z0-9]{32,64})\/content$/)?.[1] || null
 }
 
-async function loadAttachmentMetadata(msg) {
-  const id = attachmentId(msg.content)
-  if (!msg.id || !id || attachmentMetadata.value[msg.id]) return
+function observeImage(el, msg) {
+  if (!msg) return
+  el._imageMessage = msg
+  if (typeof IntersectionObserver === 'undefined') {
+    loadBlob(msg)
+    return
+  }
+  if (!imageObserver) {
+    imageObserver = new IntersectionObserver((entries) => {
+      entries.filter((entry) => entry.isIntersecting).forEach((entry) => {
+        imageObserver.unobserve(entry.target)
+        loadBlob(entry.target._imageMessage)
+      })
+    }, { root: listEl.value, rootMargin: '240px 0px' })
+  }
+  imageObserver.observe(el)
+}
+
+const vLoadImage = {
+  mounted(el, binding) { observeImage(el, binding.value) },
+  updated(el, binding) {
+    if (el._imageMessage?.id !== binding.value?.id) observeImage(el, binding.value)
+  },
+  unmounted(el) { imageObserver?.unobserve(el) },
+}
+
+async function loadAttachmentMetadata(messages) {
+  const pending = messages
+    .map((msg) => ({ msg, id: attachmentId(msg.content) }))
+    .filter(({ msg, id }) => msg.id && id && !Object.hasOwn(attachmentMetadata.value, msg.id) && !pendingMetadataLoads.has(msg.id))
+  if (!pending.length) return
+  pending.forEach(({ msg }) => pendingMetadataLoads.add(msg.id))
   try {
-    const result = await fetchAttachmentMetadata(id)
-    if (props.sessionId === msg.sessionId && chat.messages.some((item) => item.id === msg.id)) {
-      attachmentMetadata.value[msg.id] = result?.data || result
+    const result = await fetchAttachmentMetadataBatch(pending.map(({ id }) => id))
+    const records = result?.data || result || []
+    const metadataById = new Map((Array.isArray(records) ? records : [records])
+      .filter((attachment) => attachment?.id)
+      .map((attachment) => [attachment.id, attachment]))
+    if (pending.length === 1 && metadataById.size === 0 && records?.originalName) {
+      metadataById.set(pending[0].id, records)
     }
+    pending.forEach(({ msg, id }) => {
+      if (props.sessionId === msg.sessionId && chat.messages.some((item) => item.id === msg.id)) {
+        attachmentMetadata.value[msg.id] = metadataById.get(id) || null
+      }
+    })
   } catch {
-    attachmentMetadata.value[msg.id] = null
+    pending.forEach(({ msg }) => { attachmentMetadata.value[msg.id] = null })
+  } finally {
+    pending.forEach(({ msg }) => pendingMetadataLoads.delete(msg.id))
   }
 }
 
@@ -313,12 +365,7 @@ watch(
     })
     if (chat.focusedMessageId) nextTick(() => focusMessage(chat.focusedMessageId))
     else scrollToBottom()
-    chat.messages
-      .filter((msg) => msg.type === 'IMAGE' && !msg.recalled)
-      .forEach((msg) => loadBlob(msg))
-    chat.messages
-      .filter((msg) => msg.type === 'FILE' && !msg.recalled)
-      .forEach((msg) => loadAttachmentMetadata(msg))
+    loadAttachmentMetadata(chat.messages.filter((msg) => msg.type === 'FILE' && !msg.recalled))
   },
   { immediate: true }
 )
@@ -326,6 +373,8 @@ watch(
 onMounted(() => scrollToBottom())
 onUnmounted(() => {
   if (highlightTimeout) clearTimeout(highlightTimeout)
+  imageObserver?.disconnect()
+  imageObserver = null
   closeFilePreview()
   releaseAllBlobs()
 })
@@ -378,7 +427,7 @@ onUnmounted(() => {
         </div>
 
         <!-- IMAGE message -->
-        <div v-else-if="msg.type === 'IMAGE'" class="message-bubble image-bubble">
+        <div v-else-if="msg.type === 'IMAGE'" v-load-image="msg.recalled ? null : msg" class="message-bubble image-bubble">
           <template v-if="msg.recalled">
             <span class="recalled-hint">图片已撤回</span>
           </template>

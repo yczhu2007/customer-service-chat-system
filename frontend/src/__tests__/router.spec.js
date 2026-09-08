@@ -18,6 +18,16 @@ describe('auth routing foundation', () => {
     expect(router.resolve('/index.html').matched).not.toHaveLength(0)
   })
 
+  it('defers page modules until their routes are entered', async () => {
+    const pageRoutes = router.getRoutes().filter((route) => route.components?.default)
+
+    for (const route of pageRoutes) {
+      const loadPage = route.components.default
+      expect(loadPage).toBeTypeOf('function')
+      await expect(loadPage()).resolves.toBeTruthy()
+    }
+  })
+
   it('protects account and workspace routes while enforcing roles', async () => {
     setActivePinia(createPinia())
     const auth = useAuthStore()

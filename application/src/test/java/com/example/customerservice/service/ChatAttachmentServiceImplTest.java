@@ -109,17 +109,44 @@ class ChatAttachmentServiceImplTest {
         session.setUserId("U1");
         when(attachmentMapper.selectById("A1")).thenReturn(attachment);
         when(sessionMapper.selectById("S1")).thenReturn(session);
-        when(storage.open("A1.xls")).thenReturn(new ByteArrayInputStream(new byte[]{1, 2, 3}));
+        when(storage.open("A1.xls")).thenAnswer(invocation -> new ByteArrayInputStream(new byte[]{1, 2, 3}));
         when(converter.convertToPdf(eq("schedule.xls"), any())).thenReturn("%PDF-preview".getBytes());
         ChatAttachmentServiceImpl service = new ChatAttachmentServiceImpl(
                 attachmentMapper, sessionMapper, storage, new MinioAttachmentProperties(), converter
         );
 
         AttachmentPreview preview = service.preview("U1", "A1");
+        AttachmentPreview cachedPreview = service.preview("U1", "A1");
 
         assertEquals("schedule.pdf", preview.filename());
         assertArrayEquals("%PDF-preview".getBytes(), preview.content());
-        verify(converter).convertToPdf(eq("schedule.xls"), any());
+        assertArrayEquals(preview.content(), cachedPreview.content());
+        verify(converter, times(1)).convertToPdf(eq("schedule.xls"), any());
+    }
+
+    @Test
+    void returnsOnlyAccessibleAttachmentMetadataInOneBatch() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        ChatAttachment visible = new ChatAttachment();
+        visible.setId("A1"); visible.setSessionId("S1"); visible.setOriginalName("visible.xlsx");
+        ChatAttachment hidden = new ChatAttachment();
+        hidden.setId("A2"); hidden.setSessionId("S2"); hidden.setOriginalName("hidden.xlsx");
+        ChatSession visibleSession = new ChatSession();
+        visibleSession.setId("S1"); visibleSession.setUserId("U1");
+        ChatSession hiddenSession = new ChatSession();
+        hiddenSession.setId("S2"); hiddenSession.setUserId("U2");
+        when(attachmentMapper.selectByIds(List.of("A1", "A2"))).thenReturn(List.of(visible, hidden));
+        when(sessionMapper.selectByIds(List.of("S1", "S2"))).thenReturn(List.of(visibleSession, hiddenSession));
+        ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
+
+        var result = service.findAccessibleMetadata("U1", List.of("A1", "A2"));
+
+        assertEquals(1, result.size());
+        assertEquals("A1", result.get(0).getId());
+        verify(attachmentMapper).selectByIds(List.of("A1", "A2"));
+        verify(sessionMapper).selectByIds(List.of("S1", "S2"));
     }
 
     private ChatAttachmentServiceImpl service(ChatAttachmentMapper attachmentMapper,

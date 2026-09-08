@@ -9,6 +9,7 @@ connectStomp() {
   if (this.connected || this.connectionState === 'connecting') return
   this.connectionState = 'connecting'
   this.connectionError = null
+  this.nextReconnectAt = null
   this.manualDisconnect = false
   this.logConnection('正在连接 WebSocket')
   const attempt = ++this._connectAttempt
@@ -41,6 +42,7 @@ connectStomp() {
         this.connected = true
         this.connectionState = 'connected'
         this.reconnectAttempts = 0
+        this.nextReconnectAt = null
         this.logConnection('WebSocket 已连接')
         this.startHeartbeat()
         // Subscribe to chat events
@@ -128,6 +130,7 @@ disconnectStomp({ manual = true } = {}) {
   }
   this.connectionState = 'disconnected'
   this.connected = false
+  this.nextReconnectAt = null
   if (manual) this.logConnection('已手动断开 WebSocket')
 },
 

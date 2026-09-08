@@ -97,7 +97,7 @@ CREATE DATABASE springboot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 sql/chat_ddl.sql
 ```
 
-对于已存在的旧数据库，按实际版本按顺序执行 `sql/` 中对应的升级脚本。当前脚本包括用户昵称、消息回复、会话元数据、工单、工单用户反馈和角色种子等升级内容。升级前请先备份数据库；同一升级脚本只应在确认可重复执行后再次运行。
+对于已存在的旧数据库，按实际版本按顺序执行 `sql/` 中对应的升级脚本。当前脚本包括用户昵称、消息回复、会话元数据、工单、工单用户反馈、管理员报表索引和角色种子等升级内容。升级前请先备份数据库；同一升级脚本只应在确认可重复执行后再次运行。
 
 ### 3. 配置并启动后端
 
@@ -136,7 +136,7 @@ npm run build
 ## 数据库升级
 
 - 全新环境：执行 `sql/chat_ddl.sql`，并根据需要执行 `user_ddl.sql`、`rbac_ddl.sql` 与示例种子脚本。
-- 已部署环境：只执行尚未应用的 `*_upgrade.sql`，例如工单基础结构使用 `support_ticket_upgrade.sql`，用户确认/继续处理与工单历史补充使用 `support_ticket_user_feedback_upgrade.sql`。
+- 已部署环境：只执行尚未应用的 `*_upgrade.sql`，例如工单基础结构使用 `support_ticket_upgrade.sql`，用户确认/继续处理与工单历史补充使用 `support_ticket_user_feedback_upgrade.sql`，管理员报表查询索引使用 `admin_report_index_upgrade.sql`。
 - 每次升级前执行备份；应用启动成功后再验证相关页面和接口。
 
 ## 验证与构建

@@ -7,6 +7,7 @@ import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
 import com.example.customerservice.service.AttachmentPreview;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import org.springframework.core.io.Resource;
 import org.springframework.core.io.ByteArrayResource;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 @RestController
 @RequestMapping("/chat/attachments")
@@ -34,6 +36,11 @@ public class ChatAttachmentController {
             @RequestParam @NotBlank @Size(max=64) String sessionId,
             @RequestPart("file") MultipartFile file) {
         return Result.success(service.upload(currentUser.getUserId(), sessionId, file));
+    }
+    @PostMapping("/metadata")
+    public Result<List<ChatAttachmentVO>> metadata(
+            @RequestBody @Size(min = 1, max = 50) List<@Pattern(regexp = "[A-Za-z0-9]{32,64}") String> ids) {
+        return Result.success(service.findAccessibleMetadata(currentUser.getUserId(), ids));
     }
     @GetMapping("/{id}")
     public Result<ChatAttachmentVO> metadata(@PathVariable @NotBlank @Size(max=64) String id) {

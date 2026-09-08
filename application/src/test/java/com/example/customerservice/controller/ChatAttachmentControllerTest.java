@@ -1,6 +1,7 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.domain.ChatAttachment;
+import com.example.customerservice.dto.ChatAttachmentVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
 import com.example.customerservice.service.AttachmentPreview;
@@ -11,12 +12,32 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 class ChatAttachmentControllerTest {
+    @Test
+    void returnsOnlyAuthorizedAttachmentMetadataInOneRequest() throws Exception {
+        ChatAttachmentService service = mock(ChatAttachmentService.class);
+        CurrentUser currentUser = mock(CurrentUser.class);
+        ChatAttachmentVO attachment = new ChatAttachmentVO();
+        attachment.setId("11111111111111111111111111111111");
+        attachment.setOriginalName("table.xlsx");
+        when(currentUser.getUserId()).thenReturn("U1");
+        when(service.findAccessibleMetadata("U1", java.util.List.of("11111111111111111111111111111111")))
+                .thenReturn(java.util.List.of(attachment));
+        MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new ChatAttachmentController(service, currentUser)).build();
+
+        mockMvc.perform(post("/chat/attachments/metadata")
+                        .contentType("application/json")
+                        .content("[\"11111111111111111111111111111111\"]"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].originalName").value("table.xlsx"));
+    }
+
     @Test
     void returnsAccessibleAttachmentMetadataWithoutLoadingItsContent() throws Exception {
         ChatAttachmentService service = mock(ChatAttachmentService.class);

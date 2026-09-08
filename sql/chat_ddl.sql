@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS support_ticket
     PRIMARY KEY (id),
     UNIQUE KEY uk_support_ticket_session (session_id),
     KEY idx_support_ticket_status_updated (status, updated_at),
+    KEY idx_support_ticket_created_status (created_at, status),
 
     CONSTRAINT fk_support_ticket_session
         FOREIGN KEY (session_id) REFERENCES chat_session (id)
@@ -312,6 +313,7 @@ CREATE TABLE IF NOT EXISTS chat_session_rating
     comment     VARCHAR(500) NULL COMMENT '评价文字',
     create_time DATETIME(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
     PRIMARY KEY (session_id),
+    KEY idx_chat_session_rating_create_time (create_time),
     CONSTRAINT fk_chat_session_rating_session FOREIGN KEY (session_id)
         REFERENCES chat_session (id) ON UPDATE CASCADE ON DELETE CASCADE,
     CONSTRAINT fk_chat_session_rating_user FOREIGN KEY (user_id)

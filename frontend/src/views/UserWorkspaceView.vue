@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { useChatStore } from '../stores/chat'
 import { useAuthStore } from '../stores/auth'
@@ -12,13 +12,18 @@ import SupportTicketPanel from '../components/session/SupportTicketPanel.vue'
 const chat = useChatStore()
 const auth = useAuthStore()
 let queueTimer = null
+let reconnectNoticeTimer = null
+const reconnectNoticeNow = ref(Date.now())
 
 const activeSession = computed(() => chat.activeSession)
 const isClosed = computed(() => activeSession.value?.status === 'CLOSED')
 const showRating = computed(() => isClosed.value && activeSession.value)
-const agentReconnectGraceSeconds = computed(() =>
-  activeSession.value ? chat.agentReconnectGraceBySession[activeSession.value.sessionId] : null
-)
+const agentReconnectGraceSeconds = computed(() => {
+  const deadline = activeSession.value ? chat.agentReconnectGraceBySession[activeSession.value.sessionId] : null
+  if (!deadline) return null
+  const seconds = Math.max(0, Math.ceil((deadline - reconnectNoticeNow.value) / 1000))
+  return seconds || null
+})
 const consultationButtonLabel = computed(() => {
   if (chat.consultationState === 'STARTING') return '正在提交…'
   if (chat.consultationState === 'QUEUED') return '排队中'
@@ -70,12 +75,17 @@ onMounted(() => {
   queueTimer = setInterval(() => {
     chat.loadQueueStatus()
   }, 15000)
+  reconnectNoticeTimer = setInterval(() => { reconnectNoticeNow.value = Date.now() }, 1000)
 })
 
 onUnmounted(() => {
   if (queueTimer) {
     clearInterval(queueTimer)
     queueTimer = null
+  }
+  if (reconnectNoticeTimer) {
+    clearInterval(reconnectNoticeTimer)
+    reconnectNoticeTimer = null
   }
 })
 </script>
@@ -121,7 +131,7 @@ onUnmounted(() => {
 
     <el-main class="center-panel">
       <p v-if="agentReconnectGraceSeconds" class="agent-reconnect-notice">
-        客服重连中，请稍候（最长约 {{ agentReconnectGraceSeconds }} 秒）
+        客服重连中，请稍候（剩余 {{ agentReconnectGraceSeconds }} 秒）
       </p>
       <ChatWindow class="user-chat-window" />
     </el-main>
