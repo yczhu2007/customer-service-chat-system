@@ -5,6 +5,8 @@ import com.example.customerservice.dto.LoginRequest;
 import com.example.customerservice.dto.LoginResponse;
 import com.example.customerservice.dto.WebSocketTicketResponse;
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.PermissionCodes;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.mapper.SysRolePermissionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
@@ -130,13 +132,13 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Override
     public void requireChatSubscriptionPermission(String userId) {
         Set<String> roleCodes = findRoleCodesByUserId(userId);
-        if (roleCodes.contains("AGENT") || roleCodes.contains("ADMIN")) {
+        if (roleCodes.contains(RoleCodes.AGENT) || roleCodes.contains(RoleCodes.ADMIN)) {
             return;
         }
-        if (!roleCodes.contains("USER")) {
+        if (!roleCodes.contains(RoleCodes.USER)) {
             throw new IllegalArgumentException("当前用户角色不允许订阅聊天队列");
         }
-        requirePermission(userId, "chat:user:access");
+        requirePermission(userId, PermissionCodes.CHAT_USER_ACCESS);
     }
 
     @Override

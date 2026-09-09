@@ -2,6 +2,7 @@ package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.domain.ChatAgentSkill;
@@ -120,7 +121,7 @@ public class ChatAgentService implements ChatAgentOperations {
             throw new IllegalArgumentException("客服不存在");
         }
         Set<String> roleCodes = sysUserRoleMapper.findRoleCodesByUserId(agentId);
-        if (roleCodes == null || !roleCodes.contains("AGENT")) {
+        if (roleCodes == null || !roleCodes.contains(RoleCodes.AGENT)) {
             throw new IllegalArgumentException("该用户不具有AGENT角色");
         }
         if (enabled) {
@@ -159,7 +160,7 @@ public class ChatAgentService implements ChatAgentOperations {
             throw new IllegalArgumentException("客服登录编号不存在或账号已禁用");
         }
         Set<String> roles = sysUserRoleMapper.findRoleCodesByUserId(agent.getId());
-        if (roles == null || !roles.contains("AGENT")) {
+        if (roles == null || !roles.contains(RoleCodes.AGENT)) {
             throw new IllegalArgumentException("该登录编号不是客服账号");
         }
         setAgentVipSkill(agent.getId(), enabled);

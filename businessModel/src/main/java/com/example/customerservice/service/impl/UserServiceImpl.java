@@ -2,6 +2,7 @@ package com.example.customerservice.service.impl;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.domain.SysRole;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
@@ -455,7 +456,7 @@ public class UserServiceImpl
          */
         if (
                 isDefaultAdmin(user) &&
-                        "ADMIN".equals(role.getRoleCode())
+                        RoleCodes.ADMIN.equals(role.getRoleCode())
         ) {
             throw new IllegalArgumentException(
                     "不能移除默认管理员的ADMIN角色"

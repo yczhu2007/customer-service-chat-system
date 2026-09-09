@@ -14,6 +14,8 @@ public final class PermissionCodes {
     public static final String CHAT_RATING_STATS_VIEW = "chat:rating:stats:view";
     public static final String CHAT_SESSION_TRANSFER_LOG_VIEW = "chat:session:transfer-log:view";
     public static final String CHAT_SESSION_RATE = "chat:session:rate";
+    public static final String CHAT_SESSION_END = "chat:session:end";
+    public static final String CHAT_SESSION_TRANSFER = "chat:session:transfer";
     public static final String CHAT_USER_PROFILE_VIEW = "chat:user-profile:view";
     public static final String CHAT_SESSION_METADATA_UPDATE = "chat:session:metadata:update";
     public static final String CHAT_SESSION_ARCHIVE = "chat:session:archive";

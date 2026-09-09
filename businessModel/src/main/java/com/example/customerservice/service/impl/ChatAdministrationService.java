@@ -3,6 +3,7 @@ package com.example.customerservice.service.impl;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.constant.ChatConstants;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -46,8 +47,8 @@ public class ChatAdministrationService implements ChatAdministrationOperations {
     public SessionSummaryVO createSession(String userLoginNumber, String agentLoginNumber) {
         SysUser user = requireEnabledUser(userLoginNumber, "用户");
         SysUser agent = requireEnabledUser(agentLoginNumber, "客服");
-        requireRole(user, "USER", "用户登录编号对应的账号没有USER角色");
-        requireRole(agent, "AGENT", "客服登录编号对应的账号没有AGENT角色");
+        requireRole(user, RoleCodes.USER, "用户登录编号对应的账号没有USER角色");
+        requireRole(agent, RoleCodes.AGENT, "客服登录编号对应的账号没有AGENT角色");
         if (sessionMapper.findActiveByUserId(user.getId()) != null) {
             throw new IllegalArgumentException("该用户已有进行中的会话");
         }

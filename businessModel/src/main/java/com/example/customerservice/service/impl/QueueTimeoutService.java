@@ -1,10 +1,10 @@
 package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatRoutingOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -33,20 +33,20 @@ public class QueueTimeoutService {
                     Long.class
             );
 
-    private final StringRedisTemplate redisTemplate;
+    private final ChatRedisRepository chatRedisRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final long timeoutMillis;
     private final long vipTimeoutMillis;
     private final ChatRoutingOperations chatRoutingOperations;
 
     public QueueTimeoutService(
-            StringRedisTemplate redisTemplate,
+            ChatRedisRepository chatRedisRepository,
             SimpMessagingTemplate messagingTemplate,
             ChatRoutingOperations chatRoutingOperations,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds
     ) {
-        this.redisTemplate = redisTemplate;
+        this.chatRedisRepository = chatRedisRepository;
         this.messagingTemplate = messagingTemplate;
         this.timeoutMillis = timeoutSeconds * 1000L;
         this.vipTimeoutMillis = vipTimeoutSeconds * 1000L;
@@ -58,7 +58,7 @@ public class QueueTimeoutService {
         long now = System.currentTimeMillis();
         long earliestDeadline =
                 now - Math.min(timeoutMillis, vipTimeoutMillis);
-        Set<String> userIds = redisTemplate.opsForZSet().rangeByScore(
+        Set<String> userIds = chatRedisRepository.sortedSetRangeByScore(
                 RedisConstants.QUEUE_ENQUEUED_AT,
                 0,
                 earliestDeadline,
@@ -70,23 +70,23 @@ public class QueueTimeoutService {
         }
         Set<String> onlineAgentIds = null;
         for (String userId : userIds) {
-            Long removedVipMarker = redisTemplate.execute(
-                    REMOVE_TIMED_OUT_USER_SCRIPT,
-                    java.util.List.of(
-                            RedisConstants.QUEUE_PENDING,
-                            RedisConstants.QUEUE_ENQUEUED_AT,
-                            RedisConstants.QUEUE_VIP_LEVEL,
-                            RedisConstants.QUEUE_NORMAL_DUE,
-                            RedisConstants.VIP_CALLBACK_PENDING
-                    ),
-                    userId,
-                    String.valueOf(now),
-                    String.valueOf(timeoutMillis),
-                    String.valueOf(vipTimeoutMillis)
-            );
-            if (removedVipMarker != null && removedVipMarker > 0) {
-                int vipLevel = Math.toIntExact(removedVipMarker - 1);
-                try {
+            try {
+                Long removedVipMarker = chatRedisRepository.execute(
+                        REMOVE_TIMED_OUT_USER_SCRIPT,
+                        java.util.List.of(
+                                RedisConstants.QUEUE_PENDING,
+                                RedisConstants.QUEUE_ENQUEUED_AT,
+                                RedisConstants.QUEUE_VIP_LEVEL,
+                                RedisConstants.QUEUE_NORMAL_DUE,
+                                RedisConstants.VIP_CALLBACK_PENDING
+                        ),
+                        userId,
+                        String.valueOf(now),
+                        String.valueOf(timeoutMillis),
+                        String.valueOf(vipTimeoutMillis)
+                );
+                if (removedVipMarker != null && removedVipMarker > 0) {
+                    int vipLevel = Math.toIntExact(removedVipMarker - 1);
                     messagingTemplate.convertAndSendToUser(
                             userId,
                             "/queue/chat",
@@ -95,23 +95,19 @@ public class QueueTimeoutService {
                                     "message", "排队超时，请稍后重新发起咨询"
                             )
                     );
-                } catch (RuntimeException exception) {
-                    log.warn("发送排队超时通知失败，userId={}", userId, exception);
-                }
-                if (vipLevel > 0) {
-                    if (onlineAgentIds == null) {
-                        onlineAgentIds = redisTemplate.opsForZSet().range(
-                                RedisConstants.AGENT_LOAD,
-                                0,
-                                -1
-                        );
+                    if (vipLevel > 0) {
+                        if (onlineAgentIds == null) {
+                            onlineAgentIds = chatRedisRepository.sortedSetRange(
+                                    RedisConstants.AGENT_LOAD,
+                                    0,
+                                    -1
+                            );
+                        }
+                        notifyAgentsAboutVipTimeout(userId, vipLevel, onlineAgentIds);
                     }
-                    notifyAgentsAboutVipTimeout(
-                            userId,
-                            vipLevel,
-                            onlineAgentIds
-                    );
                 }
+            } catch (RuntimeException exception) {
+                log.warn("处理排队超时用户失败，userId={}", userId, exception);
             }
         }
         chatRoutingOperations.refreshWaitingPositions();
@@ -119,7 +115,7 @@ public class QueueTimeoutService {
 
     /** 为升级前的排队数据补齐独立的真实入队时间索引。 */
     private void backfillMissingEnqueueTimes() {
-        Set<String> queuedUserIds = redisTemplate.opsForZSet().range(
+        Set<String> queuedUserIds = chatRedisRepository.sortedSetRange(
                 RedisConstants.QUEUE_PENDING,
                 0,
                 99
@@ -129,7 +125,7 @@ public class QueueTimeoutService {
         }
         java.util.List<String> missingUserIds = new java.util.ArrayList<>();
         for (String userId : queuedUserIds) {
-            Double enqueuedAt = redisTemplate.opsForZSet().score(
+            Double enqueuedAt = chatRedisRepository.sortedSetScore(
                     RedisConstants.QUEUE_ENQUEUED_AT,
                     userId
             );
