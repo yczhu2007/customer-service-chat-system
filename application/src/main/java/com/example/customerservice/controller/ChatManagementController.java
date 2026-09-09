@@ -1,5 +1,9 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.PermissionCodes;
+
+import com.example.customerservice.constant.RoleCodes;
+
 import com.example.customerservice.common.Result;
 import com.example.customerservice.constant.AgentSessionView;
 import com.example.customerservice.dto.AdminDashboardVO;
@@ -80,8 +84,8 @@ public class ChatManagementController {
 
     @DeleteMapping("/admin/messages/{messageId}")
     public Result<Void> deleteAdminMessage(@PathVariable String messageId) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:session:audit:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
         administrationOperations.deleteMessage(messageId);
         return Result.successMessage("消息已删除");
     }
@@ -105,14 +109,14 @@ public class ChatManagementController {
     }
 
     private void requireSessionManagementPermission() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:session:audit:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
     }
 
     @GetMapping("/agent/dashboard")
     public Result<AgentDashboardVO> findAgentDashboard() {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:agent:dashboard:view");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_DASHBOARD_VIEW);
         return Result.success(
                 managementQueryService.findAgentDashboard(currentUser.getUserId())
         );
@@ -120,8 +124,8 @@ public class ChatManagementController {
 
     @GetMapping("/agent/views")
     public Result<List<AgentSessionViewCountVO>> findAgentSessionViews() {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:view-own");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_VIEW_OWN);
         return Result.success(
                 managementQueryService.findAgentSessionViews(currentUser.getUserId())
         );
@@ -135,8 +139,8 @@ public class ChatManagementController {
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:view-own");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_VIEW_OWN);
 
         AgentSessionView view = AgentSessionView.fromCode(viewCode);
 
@@ -154,8 +158,8 @@ public class ChatManagementController {
 
     @GetMapping("/admin/dashboard")
     public Result<AdminDashboardVO> findAdminDashboard() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:admin:dashboard:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_ADMIN_DASHBOARD_VIEW);
         return Result.success(managementQueryService.findAdminDashboard());
     }
 
@@ -169,8 +173,8 @@ public class ChatManagementController {
             LocalDateTime to,
             @RequestParam(required = false) String granularity
     ) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:admin:dashboard:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_ADMIN_DASHBOARD_VIEW);
         AdminReportQueryDTO query = new AdminReportQueryDTO();
         query.setFrom(from);
         query.setTo(to);
@@ -180,8 +184,8 @@ public class ChatManagementController {
 
     @GetMapping("/admin/monitoring")
     public Result<SystemMonitoringSnapshotVO> findMonitoring() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:admin:dashboard:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_ADMIN_DASHBOARD_VIEW);
         return Result.success(monitoringService.findSnapshot());
     }
 
@@ -194,8 +198,8 @@ public class ChatManagementController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime to
     ) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:rating:stats:view");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_RATING_STATS_VIEW);
         return Result.success(
                 managementQueryService.findRatingSummary(
                         currentUser.getUserId(),
@@ -215,8 +219,8 @@ public class ChatManagementController {
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
             LocalDateTime to
     ) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:rating:stats:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_RATING_STATS_VIEW);
         return Result.success(
                 managementQueryService.findRatingSummary(agentId, from, to)
         );
@@ -242,8 +246,8 @@ public class ChatManagementController {
             @RequestParam(defaultValue = "1") @Min(value = 1, message = "页码必须大于0") long pageNo,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0") @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:session:audit:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
         return Result.success(
                 managementQueryService.searchSessions(
                         userLoginNumber,
@@ -265,15 +269,15 @@ public class ChatManagementController {
 
     @GetMapping("/admin/messages/search")
     public Result<PageResult<ChatMessageSearchVO>> searchAdminMessages(@RequestParam @NotBlank @Size(max = 100) String keyword, @RequestParam(required = false) String agentId, @RequestParam(defaultValue = "1") @Min(1) long pageNo, @RequestParam(defaultValue = "20") @Min(1) @Max(100) long pageSize) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:session:audit:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
         return Result.success(managementQueryService.searchMessages(keyword, agentId, pageNo, pageSize));
     }
 
     @GetMapping("/agent/messages/search")
     public Result<PageResult<ChatMessageSearchVO>> searchAgentMessages(@RequestParam @NotBlank @Size(max = 100) String keyword, @RequestParam(defaultValue = "1") @Min(1) long pageNo, @RequestParam(defaultValue = "20") @Min(1) @Max(100) long pageSize) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:view-own");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_VIEW_OWN);
         return Result.success(managementQueryService.searchMessages(keyword, currentUser.getUserId(), pageNo, pageSize));
     }
     @GetMapping("/sessions/{sessionId}/transfers")
@@ -286,10 +290,10 @@ public class ChatManagementController {
         boolean admin = currentUser.hasRole("ADMIN");
         boolean agent = currentUser.hasRole("AGENT");
         if (!admin && !agent) {
-            currentUser.requireRole("USER");
+            currentUser.requireRole(RoleCodes.USER);
         }
         if (agent || admin) {
-            currentUser.requirePermission("chat:session:transfer-log:view");
+            currentUser.requirePermission(PermissionCodes.CHAT_SESSION_TRANSFER_LOG_VIEW);
         }
         return Result.success(
                 managementQueryService.findTransferLogs(

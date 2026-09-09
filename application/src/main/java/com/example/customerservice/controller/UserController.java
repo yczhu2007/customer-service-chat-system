@@ -1,5 +1,9 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.PermissionCodes;
+
+import com.example.customerservice.constant.RoleCodes;
+
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
 import com.example.customerservice.dto.UserVO;
@@ -222,8 +226,8 @@ public class UserController {
     }
 
     private void requireUserRoleManagementPermission() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("user:manage");
-        currentUser.requirePermission("role:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.USER_MANAGE);
+        currentUser.requirePermission(PermissionCodes.ROLE_MANAGE);
     }
 }

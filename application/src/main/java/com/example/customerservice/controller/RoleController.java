@@ -1,5 +1,9 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.PermissionCodes;
+
+import com.example.customerservice.constant.RoleCodes;
+
 import com.example.customerservice.dto.*;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.IRoleService;
@@ -243,19 +247,19 @@ public class RoleController {
     }
 
     private void requireRoleManagementPermission() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("role:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.ROLE_MANAGE);
     }
 
     private void requirePermissionManagementPermission() {
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(RoleCodes.ADMIN);
         currentUser.requirePermission(
                 "permission:manage"
         );
     }
     private void requireRolePermissionManagementPermission() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("role:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.ROLE_MANAGE);
         currentUser.requirePermission(
                 "permission:manage"
         );

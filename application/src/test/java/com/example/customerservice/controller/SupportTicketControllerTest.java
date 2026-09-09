@@ -9,6 +9,7 @@ import com.example.customerservice.dto.SupportTicketStatusCountVO;
 import com.example.customerservice.dto.SupportTicketUpdateDTO;
 import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
+import com.example.customerservice.dto.SupportTicketUserFeedbackDTO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.SupportTicketService;
 import org.junit.jupiter.api.Test;
@@ -27,6 +28,20 @@ import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class SupportTicketControllerTest {
+
+    @Test
+    void userFeedbackDelegatesToSingleServiceEntry() {
+        SupportTicketUserFeedbackDTO request = new SupportTicketUserFeedbackDTO();
+        request.setAction("CONFIRM"); request.setVersion(1);
+        SupportTicketVO ticket = new SupportTicketVO();
+        when(currentUser.getUserId()).thenReturn("U001");
+        when(supportTicketService.submitUserFeedback("U001", "TK-00000125", request)).thenReturn(ticket);
+
+        Result<SupportTicketVO> result = controller.submitUserFeedback("TK-00000125", request);
+
+        assertEquals(ticket, result.getData());
+        verify(supportTicketService).submitUserFeedback("U001", "TK-00000125", request);
+    }
 
     @Mock private SupportTicketService supportTicketService;
     @Mock private CurrentUser currentUser;

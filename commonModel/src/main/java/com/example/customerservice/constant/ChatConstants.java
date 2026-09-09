@@ -11,10 +11,6 @@ public final class ChatConstants {
     }
 
     public static final String SESSION_STATUS_ACTIVE = "ACTIVE";
-    public static final String ROLE_USER = "USER";
-    public static final String ROLE_AGENT = "AGENT";
-    public static final String ROLE_ADMIN = "ADMIN";
-    public static final String PERMISSION_CHAT_USER_ACCESS = "chat:user:access";
     public static final String TICKET_FEEDBACK_CONFIRM = "CONFIRM";
     public static final String SESSION_STATUS_CLOSED = "CLOSED";
     public static final String EVENT_SESSION_CLOSED = "SESSION_CLOSED";

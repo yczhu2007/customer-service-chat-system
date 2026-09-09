@@ -1,7 +1,9 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.constant.PermissionCodes;
 import com.example.customerservice.constant.ChatConstants;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.AdminSupportTicketListItemVO;
 import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
@@ -78,7 +80,7 @@ public class SupportTicketController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SupportTicketCreateDTO request
     ) {
-        currentUser.requireRole(ChatConstants.ROLE_AGENT);
+        currentUser.requireRole(RoleCodes.AGENT);
         return Result.success(supportTicketService.createTicket(
                 currentUser.getUserId(), sessionId, request
         ));
@@ -89,7 +91,7 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUpdateDTO request
     ) {
-        currentUser.requireRole(ChatConstants.ROLE_AGENT);
+        currentUser.requireRole(RoleCodes.AGENT);
         return Result.success(supportTicketService.updateTicket(
                 currentUser.getUserId(), ticketNo, request
         ));
@@ -109,7 +111,7 @@ public class SupportTicketController {
     public Result<PageResult<AdminSupportTicketListItemVO>> findAdminTickets(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
+        currentUser.requireRole(RoleCodes.ADMIN);
         return Result.success(supportTicketService.findAdminTickets(query));
     }
 
@@ -117,7 +119,7 @@ public class SupportTicketController {
     public Result<List<SupportTicketStatusCountVO>> findAdminTicketStatusCounts(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
+        currentUser.requireRole(RoleCodes.ADMIN);
         return Result.success(supportTicketService.findAdminTicketStatusCounts(query));
     }
 
@@ -126,7 +128,7 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUserFeedbackDTO request
     ) {
-        currentUser.requireRole(ChatConstants.ROLE_USER);
+        currentUser.requireRole(RoleCodes.USER);
         SupportTicketVO ticket = supportTicketService.submitUserFeedback(
                 currentUser.getUserId(), ticketNo, request);
         return Result.success(ticket);
@@ -136,12 +138,12 @@ public class SupportTicketController {
         WorkspaceRoleResolver resolver = workspaceRoleResolver == null ? new WorkspaceRoleResolver() : workspaceRoleResolver;
         String workspaceRole = resolver.resolve(
                 httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role"),
-                currentUser.getRoleCodes(), ChatConstants.ROLE_USER, ChatConstants.ROLE_AGENT, ChatConstants.ROLE_ADMIN);
-        if (!ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
+                currentUser.getRoleCodes(), RoleCodes.USER, RoleCodes.AGENT, RoleCodes.ADMIN);
+        if (!RoleCodes.ADMIN.equals(workspaceRole)) {
             return false;
         }
-        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
-        currentUser.requirePermission("chat:session:audit:view");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
         return true;
     }
 }

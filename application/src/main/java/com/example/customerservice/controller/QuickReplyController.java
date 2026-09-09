@@ -1,5 +1,9 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.PermissionCodes;
+
+import com.example.customerservice.constant.RoleCodes;
+
 import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.QuickReplySaveDTO;
 import com.example.customerservice.dto.QuickReplyVO;
@@ -38,5 +42,5 @@ public class QuickReplyController {
     public Result<Void> delete(@PathVariable @NotBlank @Size(max=64) String id) {
         requireAgent(); service.delete(currentUser.getUserId(), id); return Result.successMessage("快捷回复删除成功");
     }
-    private void requireAgent() { currentUser.requireRole("AGENT"); currentUser.requirePermission("chat:quick-reply:manage"); }
+    private void requireAgent() { currentUser.requireRole(RoleCodes.AGENT); currentUser.requirePermission(PermissionCodes.CHAT_QUICK_REPLY_MANAGE); }
 }

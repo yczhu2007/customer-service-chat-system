@@ -1,5 +1,9 @@
 package com.example.customerservice.controller;
 
+import com.example.customerservice.constant.PermissionCodes;
+
+import com.example.customerservice.constant.RoleCodes;
+
 import com.example.customerservice.common.Result;
 import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.dto.ArchiveStatsVO;
@@ -53,7 +57,7 @@ public class ChatSessionController {
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "每页数量必须大于0")
             @Max(value = 100, message = "每页数量不能超过100") long pageSize
     ) {
-        currentUser.requirePermission("chat:session:view-own");
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_VIEW_OWN);
         return Result.success(chatSessionQueryService.findMySessions(
                 currentUser.getUserId(), resolveSessionParticipantType(), status, archiveStatus, pageNo, pageSize));
     }
@@ -62,7 +66,7 @@ public class ChatSessionController {
     public Result<SessionRatingVO> getSessionRating(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        currentUser.requireRole("USER");
+        currentUser.requireRole(RoleCodes.USER);
         return Result.success(chatSessionQueryService.getSessionRating(currentUser.getUserId(), sessionId));
     }
 
@@ -71,8 +75,8 @@ public class ChatSessionController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SessionRatingDTO request
     ) {
-        currentUser.requireRole("USER");
-        currentUser.requirePermission("chat:session:rate");
+        currentUser.requireRole(RoleCodes.USER);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_RATE);
         return Result.success(chatSessionQueryService.rateSession(currentUser.getUserId(), sessionId, request));
     }
 
@@ -80,8 +84,8 @@ public class ChatSessionController {
     public Result<UserProfileSidebarVO> getUserProfileSidebar(
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:user-profile:view");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_USER_PROFILE_VIEW);
         return Result.success(chatSessionQueryService.getUserProfileSidebar(currentUser.getUserId(), sessionId));
     }
 
@@ -92,11 +96,11 @@ public class ChatSessionController {
         String actorId = currentUser.getUserId();
         String workspaceRole = resolveWorkspaceRole("AGENT", "USER", "ADMIN");
         if ("ADMIN".equals(workspaceRole)) {
-            currentUser.requireRole("ADMIN");
-            currentUser.requirePermission("chat:session:audit:view");
+            currentUser.requireRole(RoleCodes.ADMIN);
+            currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
             return Result.success(chatSessionQueryService.getSessionMetadata(actorId, true, sessionId));
         }
-        currentUser.requirePermission("chat:session:view-own");
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_VIEW_OWN);
         return Result.success(chatSessionQueryService.getSessionMetadata(actorId, false, sessionId));
     }
 
@@ -106,8 +110,8 @@ public class ChatSessionController {
             @Valid @RequestBody ChatSessionMetadataUpdateDTO request
     ) {
         resolveWorkspaceRole("AGENT");
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:metadata:update");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_METADATA_UPDATE);
         return Result.success(chatSessionQueryService.updateSessionMetadata(currentUser.getUserId(), sessionId, request));
     }
 
@@ -121,8 +125,8 @@ public class ChatSessionController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SessionArchiveDTO request
     ) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:archive");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_ARCHIVE);
         chatSessionQueryService.setArchiveStatus(currentUser.getUserId(), sessionId, request);
         return Result.successMessage("归档状态更新成功");
     }
@@ -132,16 +136,16 @@ public class ChatSessionController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SessionArchiveRemarkDTO request
     ) {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:session:archive");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_SESSION_ARCHIVE);
         chatSessionQueryService.saveArchiveRemark(currentUser.getUserId(), sessionId, request);
         return Result.successMessage("归档备注保存成功");
     }
 
     @GetMapping("/admin/archive-stats")
     public Result<ArchiveStatsVO> findArchiveStats() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:archive:stats");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_ARCHIVE_STATS);
         return Result.success(chatSessionQueryService.findArchiveStats());
     }
 
