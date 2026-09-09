@@ -123,9 +123,8 @@ public class SupportTicketController {
             @Valid @RequestBody SupportTicketUserFeedbackDTO request
     ) {
         currentUser.requireRole(ChatConstants.ROLE_USER);
-        SupportTicketVO ticket = ChatConstants.TICKET_FEEDBACK_CONFIRM.equals(request.getAction())
-                ? supportTicketService.confirmResolution(currentUser.getUserId(), ticketNo, request.getVersion())
-                : supportTicketService.requestFurtherHandling(currentUser.getUserId(), ticketNo, request.getVersion());
+        SupportTicketVO ticket = supportTicketService.submitUserFeedback(
+                currentUser.getUserId(), ticketNo, request);
         return Result.success(ticket);
     }
 
