@@ -12,6 +12,7 @@ import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.security.WorkspaceRoleResolver;
 import com.example.customerservice.service.SupportTicketService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -38,15 +39,18 @@ public class SupportTicketController {
     private final SupportTicketService supportTicketService;
     private final CurrentUser currentUser;
     private final HttpServletRequest httpServletRequest;
+    private final WorkspaceRoleResolver workspaceRoleResolver;
 
     public SupportTicketController(
             SupportTicketService supportTicketService,
             CurrentUser currentUser,
-            HttpServletRequest httpServletRequest
+            HttpServletRequest httpServletRequest,
+            WorkspaceRoleResolver workspaceRoleResolver
     ) {
         this.supportTicketService = supportTicketService;
         this.currentUser = currentUser;
         this.httpServletRequest = httpServletRequest;
+        this.workspaceRoleResolver = workspaceRoleResolver;
     }
 
     @GetMapping("/sessions/{sessionId}/ticket")
@@ -129,16 +133,9 @@ public class SupportTicketController {
     }
 
     private boolean isAdministratorWorkspace() {
-        String workspaceRole = httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role");
-        if (workspaceRole == null || workspaceRole.isBlank()) {
-            return currentUser.getRoleCodes().contains(ChatConstants.ROLE_ADMIN);
-        }
-        if (!ChatConstants.ROLE_USER.equals(workspaceRole) && !ChatConstants.ROLE_AGENT.equals(workspaceRole) && !ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
-            throw new IllegalArgumentException("当前工作台角色无效");
-        }
-        if (!currentUser.getRoleCodes().contains(workspaceRole)) {
-            throw new IllegalArgumentException("当前工作台角色无效");
-        }
+        String workspaceRole = workspaceRoleResolver.resolve(
+                httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role"),
+                currentUser.getRoleCodes(), ChatConstants.ROLE_USER, ChatConstants.ROLE_AGENT, ChatConstants.ROLE_ADMIN);
         if (!ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
             return false;
         }
