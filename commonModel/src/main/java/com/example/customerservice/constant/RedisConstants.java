@@ -225,11 +225,6 @@ public class RedisConstants {
         return AGENT_PREFIX + agentId + AGENT_SESSIONS_SUFFIX;
     }
 
-    /*
-     * 当前心跳超时扫描采用90秒。
-     */
-    public static final long HEARTBEAT_TIMEOUT_MILLIS =
-            90_000L;
 
     /*
      * Redis只保留会话最近200条消息。
@@ -242,9 +237,6 @@ public class RedisConstants {
      */
     public static final long ONLINE_TTL_SECONDS =
             300L;
-
-    public static final String SESSION_STATUS_CLOSED =
-            "CLOSED";
 
     public static final String ONLINE_USERS =
             "online:users";
