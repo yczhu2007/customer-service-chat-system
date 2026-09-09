@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.MybatisConfiguration;
 import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.domain.ChatSession;
+import com.example.customerservice.dto.AttachmentDownload;
 import com.example.customerservice.config.MinioAttachmentProperties;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -24,6 +25,37 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
 
 class ChatAttachmentServiceImplTest {
+    @Test
+    void publicAttachmentServiceDoesNotExposePersistenceEntity() {
+        boolean exposesEntity = java.util.Arrays.stream(ChatAttachmentService.class.getMethods())
+                .anyMatch(method -> method.getReturnType() == ChatAttachment.class
+                        || java.util.Arrays.asList(method.getParameterTypes()).contains(ChatAttachment.class));
+        assertFalse(exposesEntity);
+    }
+
+    @Test
+    void returnsAccessibleDownloadDescription() {
+        ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);
+        ChatSessionMapper sessionMapper = mock(ChatSessionMapper.class);
+        AttachmentObjectStorage storage = mock(AttachmentObjectStorage.class);
+        ChatAttachment attachment = new ChatAttachment();
+        attachment.setId("A1"); attachment.setSessionId("S1"); attachment.setStoredName("A1.xlsx");
+        attachment.setOriginalName("schedule.xlsx"); attachment.setContentType("application/test");
+        attachment.setFileSize(123L); attachment.setMessageType("FILE");
+        ChatSession session = new ChatSession(); session.setId("S1"); session.setUserId("U1");
+        when(attachmentMapper.selectById("A1")).thenReturn(attachment);
+        when(sessionMapper.selectById("S1")).thenReturn(session);
+        when(storage.open("A1.xlsx")).thenAnswer(invocation -> new ByteArrayInputStream(new byte[]{1}));
+
+        AttachmentDownload download = service(attachmentMapper, sessionMapper, storage)
+                .loadAccessibleDownload("U1", "A1");
+
+        assertEquals("schedule.xlsx", download.filename());
+        assertEquals("application/test", download.contentType());
+        assertEquals(123L, download.size());
+        assertEquals("FILE", download.messageType());
+        assertNotNull(download.resource());
+    }
     @Test
     void uploadIgnoresForgedContentTypeAndUsesServerMimeMapping() {
         ChatAttachmentMapper attachmentMapper = mock(ChatAttachmentMapper.class);

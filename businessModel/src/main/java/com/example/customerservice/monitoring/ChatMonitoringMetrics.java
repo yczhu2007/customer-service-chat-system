@@ -1,5 +1,6 @@
 package com.example.customerservice.monitoring;
 
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.dto.SystemMonitoringSnapshotVO;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.Gauge;
@@ -20,8 +21,6 @@ import java.util.function.DoubleSupplier;
 @Component
 public class ChatMonitoringMetrics {
 
-    private static final String USER = "USER";
-    private static final String AGENT = "AGENT";
 
     private final MeterRegistry meterRegistry;
     private final Timer messagePersistenceTimer;
@@ -133,10 +132,10 @@ public class ChatMonitoringMetrics {
         if (roleCodes == null) {
             return null;
         }
-        if (roleCodes.contains(AGENT)) {
+        if (roleCodes.contains(RoleCodes.AGENT)) {
             return ConnectionRole.AGENT;
         }
-        return roleCodes.contains(USER) ? ConnectionRole.USER : null;
+        return roleCodes.contains(RoleCodes.USER) ? ConnectionRole.USER : null;
     }
 
     private AtomicInteger counterFor(ConnectionRole role) {

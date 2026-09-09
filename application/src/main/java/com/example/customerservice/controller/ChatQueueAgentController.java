@@ -1,7 +1,8 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
-import com.example.customerservice.constant.ChatConstants;
+import com.example.customerservice.constant.PermissionCodes;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.dto.DeadLetterMessageVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
@@ -35,8 +36,8 @@ public class ChatQueueAgentController {
 
     @PostMapping("/queue/cancel")
     public Result<Void> cancelQueue() {
-        currentUser.requireRole(ChatConstants.ROLE_USER);
-        currentUser.requirePermission(ChatConstants.PERMISSION_CHAT_USER_ACCESS);
+        currentUser.requireRole(RoleCodes.USER);
+        currentUser.requirePermission(PermissionCodes.CHAT_USER_ACCESS);
         String userId = currentUser.getUserId();
         boolean cancelled = chatRoutingOperations.cancelWaitingUser(userId);
         return Result.successMessage(cancelled ? "已取消排队" : "当前未在等待队列中");
@@ -44,16 +45,16 @@ public class ChatQueueAgentController {
 
     @PostMapping("/agent/online")
     public Result<Void> agentOnline() {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:agent:online");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_ONLINE);
         chatAgentOperations.agentOnline(currentUser.getUserId());
         return Result.successMessage("上线成功");
     }
 
     @PostMapping("/agent/offline")
     public Result<Void> agentOffline() {
-        currentUser.requireRole("AGENT");
-        currentUser.requirePermission("chat:agent:offline");
+        currentUser.requireRole(RoleCodes.AGENT);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_OFFLINE);
         chatAgentOperations.agentOffline(currentUser.getUserId());
         return Result.successMessage("下线成功");
     }
@@ -63,8 +64,8 @@ public class ChatQueueAgentController {
             @PathVariable @NotBlank(message = "客服登录编号不能为空")
             @Size(max = 64, message = "客服登录编号长度不能超过64个字符") String agentLoginNumber
     ) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_VIP_SKILL_MANAGE);
         chatAgentOperations.setAgentVipSkillByLoginNumber(agentLoginNumber, true);
         return Result.successMessage("已加入VIP坐席技能组");
     }
@@ -74,16 +75,16 @@ public class ChatQueueAgentController {
             @PathVariable @NotBlank(message = "客服登录编号不能为空")
             @Size(max = 64, message = "客服登录编号长度不能超过64个字符") String agentLoginNumber
     ) {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_VIP_SKILL_MANAGE);
         chatAgentOperations.setAgentVipSkillByLoginNumber(agentLoginNumber, false);
         return Result.successMessage("已移出VIP坐席技能组");
     }
 
     @GetMapping("/agents/vip-skill")
     public Result<Set<String>> findVipSkillAgents() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:agent:vip-skill:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_AGENT_VIP_SKILL_MANAGE);
         return Result.success(chatAgentOperations.findVipSkillAgentLoginNumbers());
     }
 
@@ -120,7 +121,7 @@ public class ChatQueueAgentController {
     }
 
     private void requireDeadLetterManagementPermission() {
-        currentUser.requireRole("ADMIN");
-        currentUser.requirePermission("chat:message:deadletter:manage");
+        currentUser.requireRole(RoleCodes.ADMIN);
+        currentUser.requirePermission(PermissionCodes.CHAT_MESSAGE_DEADLETTER_MANAGE);
     }
 }

@@ -2,6 +2,7 @@ package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.ChatSessionTransferLog;
 import com.example.customerservice.domain.SysUser;
@@ -137,7 +138,7 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
             Set<String> targetRoleCodes = targetAgent == null
                     ? Set.of()
                     : sysUserRoleMapper.findRoleCodesByUserId(resolvedTargetAgentId);
-            if (targetRoleCodes == null || !targetRoleCodes.contains("AGENT")) {
+            if (targetRoleCodes == null || !targetRoleCodes.contains(RoleCodes.AGENT)) {
                 throw new IllegalArgumentException("目标用户不是客服");
             }
 

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.ChatMessageType;
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.MessageMutationResult;
@@ -239,14 +240,14 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                         .equals(session.getUserId())
         ) {
 
-            message.setSenderRole("USER");
+            message.setSenderRole(RoleCodes.USER);
 
         } else if (
                 message.getSenderId()
                         .equals(session.getAgentId())
         ) {
 
-            message.setSenderRole("AGENT");
+            message.setSenderRole(RoleCodes.AGENT);
 
         } else {
 

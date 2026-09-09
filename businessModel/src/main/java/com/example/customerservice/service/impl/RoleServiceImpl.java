@@ -3,6 +3,8 @@ package com.example.customerservice.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.domain.SysPermission;
+import com.example.customerservice.constant.PermissionCodes;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.dto.*;
 import com.example.customerservice.exception.NotFoundException;
@@ -213,9 +215,9 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
         SysRole role = requireRole(id);
 
         if (
-                "ADMIN".equals(role.getRoleCode()) ||
-                        "AGENT".equals(role.getRoleCode()) ||
-                        "USER".equals(role.getRoleCode())
+                RoleCodes.ADMIN.equals(role.getRoleCode()) ||
+                        RoleCodes.AGENT.equals(role.getRoleCode()) ||
+                        RoleCodes.USER.equals(role.getRoleCode())
         ) {
             throw new IllegalArgumentException(
                     "系统基础角色不允许删除"
@@ -598,15 +600,15 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
          * 所有管理员都无法继续管理系统。
          */
         if (
-                "ADMIN".equals(role.getRoleCode()) &&
+                RoleCodes.ADMIN.equals(role.getRoleCode()) &&
                         (
-                                "user:manage".equals(
+                                PermissionCodes.USER_MANAGE.equals(
                                         permission.getPermissionCode()
                                 ) ||
-                                        "role:manage".equals(
+                                        PermissionCodes.ROLE_MANAGE.equals(
                                                 permission.getPermissionCode()
                                         ) ||
-                                        "permission:manage".equals(
+                                        PermissionCodes.PERMISSION_MANAGE.equals(
                                                 permission.getPermissionCode()
                                         )
                         )

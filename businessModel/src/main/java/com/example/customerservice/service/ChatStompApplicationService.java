@@ -1,5 +1,7 @@
 package com.example.customerservice.service;
 
+import com.example.customerservice.constant.PermissionCodes;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.*;
 import lombok.extern.slf4j.Slf4j;
@@ -57,7 +59,7 @@ public class ChatStompApplicationService {
 
         if (
                 roleCodes == null ||
-                        !roleCodes.contains("USER")
+                        !roleCodes.contains(RoleCodes.USER)
         ) {
             throw new IllegalArgumentException(
                     "只有普通用户可以发起咨询"
@@ -66,7 +68,7 @@ public class ChatStompApplicationService {
 
         requireWebSocketPermission(
                 userId,
-                "chat:user:access"
+                PermissionCodes.CHAT_USER_ACCESS
         );
         chatRoutingOperations.onUserConnected(
                 userId
@@ -211,13 +213,13 @@ public class ChatStompApplicationService {
 
         requireWebSocketRole(
                 agentId,
-                "AGENT"
+                RoleCodes.AGENT
         );
 
 
         requireWebSocketPermission(
                 agentId,
-                "chat:session:end"
+                PermissionCodes.CHAT_SESSION_END
         );
 
 
@@ -246,8 +248,8 @@ public class ChatStompApplicationService {
         }
         requireValidStompPayload(request, "转接会话请求不能为空");
         String sourceAgentId = principal.getName();
-        requireWebSocketRole(sourceAgentId, "AGENT");
-        requireWebSocketPermission(sourceAgentId, "chat:session:transfer");
+        requireWebSocketRole(sourceAgentId, RoleCodes.AGENT);
+        requireWebSocketPermission(sourceAgentId, PermissionCodes.CHAT_SESSION_TRANSFER);
         chatSessionOperations.transferSession(
                 request.getSessionId(),
                 sourceAgentId,

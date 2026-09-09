@@ -24,6 +24,7 @@ import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
 import com.example.customerservice.service.impl.ChatOfflineMessageService;
 import com.example.customerservice.service.impl.ChatRoutingSessionService;
+import com.example.customerservice.service.impl.QueueTimeoutService;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.transaction.support.TransactionSynchronizationUtils;
 import org.springframework.core.task.TaskRejectedException;
@@ -106,6 +107,7 @@ class ChatMessageServiceTest {
                 messagePersistService, new ObjectMapper(), sysUserRoleMapper,
                 sysUserMapper,
                 agentOperationsProvider,
+                org.mockito.Mockito.mock(QueueTimeoutService.class),
                 20, 1, 300, 1_000_000_000L, 180, 120, 300, 200
         );
         service = messageOperations;

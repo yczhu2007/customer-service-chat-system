@@ -65,6 +65,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     private final ChatSessionReconciliationService reconciliationService;
     private final ChatSessionInactivityService inactivityService;
     private final ObjectProvider<ChatAgentOperations> agentOperationsProvider;
+    private final QueueTimeoutService queueTimeoutService;
 
     public ChatRoutingSessionService(
             ChatRedisRepository chatRedisRepository,
@@ -81,6 +82,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
             SysUserRoleMapper sysUserRoleMapper,
             SysUserMapper sysUserMapper,
             ObjectProvider<ChatAgentOperations> agentOperationsProvider,
+            QueueTimeoutService queueTimeoutService,
             long agentReconnectGraceSeconds,
             int vipReservedSlots,
             long averageHandleSeconds,
@@ -112,7 +114,14 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                 this
         );
         this.agentOperationsProvider = agentOperationsProvider;
+        this.queueTimeoutService = queueTimeoutService;
     }
+
+    @Override
+    public void removeTimedOutWaitingUsers() {
+        queueTimeoutService.removeTimedOutUsers(this);
+    }
+
     @Override
     public AssignResult onUserConnected(
             String userId

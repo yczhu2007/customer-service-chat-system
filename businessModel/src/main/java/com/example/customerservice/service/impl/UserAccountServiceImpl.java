@@ -1,6 +1,7 @@
 package com.example.customerservice.service.impl;
 
 import com.example.customerservice.domain.SysRole;
+import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.domain.SysPasswordRecovery;
 import com.example.customerservice.dto.PasswordResetDTO;
@@ -59,7 +60,7 @@ public class UserAccountServiceImpl implements UserAccountService {
         if (userMapper.findByUsername(username) != null) {
             throw new IllegalArgumentException("用户名已经存在");
         }
-        SysRole defaultRole = roleMapper.findByCode("USER");
+        SysRole defaultRole = roleMapper.findByCode(RoleCodes.USER);
         if (defaultRole == null || !"ENABLED".equals(defaultRole.getStatus())) {
             throw new IllegalStateException("系统默认USER角色未配置或已禁用");
         }
