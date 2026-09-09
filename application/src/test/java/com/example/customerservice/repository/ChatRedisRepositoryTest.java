@@ -1,5 +1,7 @@
 package com.example.customerservice.repository;
 
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -7,6 +9,8 @@ import org.springframework.data.redis.core.script.RedisScript;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
@@ -19,12 +23,26 @@ import static org.mockito.Mockito.when;
 class ChatRedisRepositoryTest {
 
     @Test
+    void failedSessionLockAttemptIsRecordedWithoutChangingResult() {
+        StringRedisTemplate template = mock(StringRedisTemplate.class);
+        org.springframework.data.redis.core.ValueOperations<String, String> values = mock(org.springframework.data.redis.core.ValueOperations.class);
+        when(template.opsForValue()).thenReturn(values);
+        when(values.setIfAbsent(anyString(), anyString(), org.mockito.ArgumentMatchers.anyLong(), any()))
+                .thenReturn(false);
+        ChatMonitoringMetrics metrics = new ChatMonitoringMetrics(new SimpleMeterRegistry());
+        ChatRedisRepository repository = new ChatRedisRepository(template, metrics);
+
+        assertNull(repository.acquireSessionOperationLock("S001"));
+        assertEquals(1, metrics.sessionLockFailureCount());
+    }
+
+    @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void renewLockUsesOwnerTokenAndConfiguredTtl() {
         StringRedisTemplate template = mock(StringRedisTemplate.class);
         when(template.execute(any(RedisScript.class), anyList(), any(Object[].class)))
                 .thenReturn(1L);
-        ChatRedisRepository repository = new ChatRedisRepository(template);
+        ChatRedisRepository repository = new ChatRedisRepository(template, new ChatMonitoringMetrics(new SimpleMeterRegistry()));
 
         assertTrue(repository.renewLock("session:operation:lock:S001", "owner-a", 30));
 
@@ -38,7 +56,7 @@ class ChatRedisRepositoryTest {
 
     @Test
     void renewLockRejectsExpiredOrInvalidLeaseArguments() {
-        ChatRedisRepository repository = new ChatRedisRepository(mock(StringRedisTemplate.class));
+        ChatRedisRepository repository = new ChatRedisRepository(mock(StringRedisTemplate.class), new ChatMonitoringMetrics(new SimpleMeterRegistry()));
 
         assertFalse(repository.renewLock("key", "token", 0));
         assertFalse(repository.renewLock("key", null, 30));
@@ -50,7 +68,7 @@ class ChatRedisRepositoryTest {
         StringRedisTemplate template = mock(StringRedisTemplate.class);
         when(template.execute(any(RedisScript.class), anyList(), any(Object[].class)))
                 .thenReturn(1L);
-        ChatRedisRepository repository = new ChatRedisRepository(template);
+        ChatRedisRepository repository = new ChatRedisRepository(template, new ChatMonitoringMetrics(new SimpleMeterRegistry()));
 
         repository.cancelQueueEntry("U001");
 

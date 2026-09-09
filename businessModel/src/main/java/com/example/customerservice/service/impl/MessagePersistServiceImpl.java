@@ -7,6 +7,7 @@ import com.example.customerservice.dto.DeadLetterMessageVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.mapper.ChatMessageMapper;
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
 import com.example.customerservice.service.MessagePersistService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DuplicateKeyException;
@@ -90,6 +91,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
     private final ObjectMapper objectMapper;
     private final SimpMessagingTemplate messagingTemplate;
     private final ThreadPoolTaskExecutor messagePersistExecutor;
+    private final ChatMonitoringMetrics monitoringMetrics;
 
     public MessagePersistServiceImpl(
             ChatMessageMapper chatMessageMapper,
@@ -97,13 +99,15 @@ public class MessagePersistServiceImpl implements MessagePersistService {
             ObjectMapper objectMapper,
             SimpMessagingTemplate messagingTemplate,
             @Qualifier("messagePersistExecutor")
-            ThreadPoolTaskExecutor messagePersistExecutor
+            ThreadPoolTaskExecutor messagePersistExecutor,
+            ChatMonitoringMetrics monitoringMetrics
     ) {
         this.chatMessageMapper = chatMessageMapper;
         this.redisTemplate = redisTemplate;
         this.objectMapper = objectMapper;
         this.messagingTemplate = messagingTemplate;
         this.messagePersistExecutor = messagePersistExecutor;
+        this.monitoringMetrics = monitoringMetrics;
     }
 
     @Override
@@ -386,8 +390,19 @@ public class MessagePersistServiceImpl implements MessagePersistService {
 
     private void markStored(ChatMessage message) {
         String messageId = message.getId();
+        Double pendingSince = redisTemplate.opsForZSet().score(
+                RedisConstants.PERSIST_PENDING,
+                messageId
+        );
         redisTemplate.opsForZSet().remove(RedisConstants.PERSIST_PENDING, messageId);
         redisTemplate.delete(RedisConstants.PERSIST_PENDING_PAYLOAD + messageId);
+        if (pendingSince != null) {
+            monitoringMetrics.recordMessagePersisted(
+                    java.time.Duration.ofMillis(
+                            Math.max(0L, System.currentTimeMillis() - pendingSince.longValue())
+                    )
+            );
+        }
         ChatMessageDTO acknowledgement = ChatMessageDTO.fromEntity(message);
         acknowledgement.setAckStatus("STORED");
         messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/chat", acknowledgement);

@@ -1,5 +1,7 @@
 package com.example.customerservice.listener;
 
+import com.example.customerservice.config.WebSocketUserPrincipal;
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
 import com.example.customerservice.service.ChatPresenceOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
@@ -16,14 +18,17 @@ import java.security.Principal;
 public class WebSocketEventListener {
 
     private final ChatPresenceOperations chatPresenceOperations;
+    private final ChatMonitoringMetrics monitoringMetrics;
 
 
     public WebSocketEventListener(
-            ChatPresenceOperations chatPresenceOperations
+            ChatPresenceOperations chatPresenceOperations,
+            ChatMonitoringMetrics monitoringMetrics
     ) {
 
         this.chatPresenceOperations =
                 chatPresenceOperations;
+        this.monitoringMetrics = monitoringMetrics;
     }
 
 
@@ -90,6 +95,12 @@ public class WebSocketEventListener {
                 userId,
                 sessionId
         );
+        if (principal instanceof WebSocketUserPrincipal authenticatedPrincipal) {
+            monitoringMetrics.registerConnection(
+                    sessionId,
+                    authenticatedPrincipal.getRoleCodes()
+            );
+        }
 
 
         log.info(
@@ -156,6 +167,8 @@ public class WebSocketEventListener {
                     sessionId,
                     e
             );
+        } finally {
+            monitoringMetrics.unregisterConnection(sessionId);
         }
 
 

@@ -15,10 +15,12 @@ import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
+import com.example.customerservice.dto.SystemMonitoringSnapshotVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
 import com.example.customerservice.service.ChatAdministrationOperations;
 import com.example.customerservice.service.ChatManagementQueryService;
+import com.example.customerservice.service.ChatMonitoringService;
 import com.example.customerservice.service.ChatSessionQueryService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
@@ -49,17 +51,20 @@ public class ChatManagementController {
     private final ChatManagementQueryService managementQueryService;
     private final ChatAdministrationOperations administrationOperations;
     private final ChatSessionQueryService sessionQueryService;
+    private final ChatMonitoringService monitoringService;
     private final CurrentUser currentUser;
 
     public ChatManagementController(
             ChatManagementQueryService managementQueryService,
             ChatAdministrationOperations administrationOperations,
             ChatSessionQueryService sessionQueryService,
+            ChatMonitoringService monitoringService,
             CurrentUser currentUser
     ) {
         this.managementQueryService = managementQueryService;
         this.administrationOperations = administrationOperations;
         this.sessionQueryService = sessionQueryService;
+        this.monitoringService = monitoringService;
         this.currentUser = currentUser;
     }
 
@@ -171,6 +176,13 @@ public class ChatManagementController {
         query.setTo(to);
         query.setGranularity(granularity);
         return Result.success(managementQueryService.findAdminReportOverview(query));
+    }
+
+    @GetMapping("/admin/monitoring")
+    public Result<SystemMonitoringSnapshotVO> findMonitoring() {
+        currentUser.requireRole("ADMIN");
+        currentUser.requirePermission("chat:admin:dashboard:view");
+        return Result.success(monitoringService.findSnapshot());
     }
 
     @GetMapping("/agent/ratings/summary")

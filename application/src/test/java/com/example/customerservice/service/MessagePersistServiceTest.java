@@ -3,6 +3,8 @@ package com.example.customerservice.service;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.service.impl.MessagePersistServiceImpl;
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -27,6 +29,47 @@ import static org.mockito.ArgumentMatchers.anyDouble;
 class MessagePersistServiceTest {
 
     @Test
+    void successfulPersistenceRecordsPendingToStoredLatency() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        org.springframework.data.redis.core.ValueOperations<String, String> values =
+                mock(org.springframework.data.redis.core.ValueOperations.class);
+        org.springframework.data.redis.core.ZSetOperations<String, String> sortedSet =
+                mock(org.springframework.data.redis.core.ZSetOperations.class);
+        com.example.customerservice.mapper.ChatMessageMapper mapper =
+                mock(com.example.customerservice.mapper.ChatMessageMapper.class);
+        when(redisTemplate.opsForValue()).thenReturn(values);
+        when(redisTemplate.opsForZSet()).thenReturn(sortedSet);
+        when(values.setIfAbsent(anyString(), anyString(), any(Long.class), any(java.util.concurrent.TimeUnit.class)))
+                .thenReturn(true);
+        when(sortedSet.score(RedisConstants.PERSIST_PENDING, "M-latency"))
+                .thenReturn((double) (System.currentTimeMillis() - 20L));
+        ChatMessage message = new ChatMessage();
+        message.setId("M-latency");
+        message.setSessionId("S001");
+        message.setSenderId("U001");
+        message.setClientMsgId("C-latency");
+        message.setType("TEXT");
+        message.setContent("hello");
+        when(mapper.insert(message)).thenReturn(1);
+        ChatMonitoringMetrics metrics = new ChatMonitoringMetrics(new SimpleMeterRegistry());
+        MessagePersistServiceImpl service = new MessagePersistServiceImpl(
+                mapper,
+                redisTemplate,
+                new ObjectMapper(),
+                mock(SimpMessagingTemplate.class),
+                mock(ThreadPoolTaskExecutor.class),
+                metrics
+        );
+
+        service.persistMessageAsync(message);
+
+        org.junit.jupiter.api.Assertions.assertEquals(
+                1,
+                metrics.messagePersistenceLatency().count()
+        );
+    }
+
+    @Test
     @SuppressWarnings({"rawtypes", "unchecked"})
     void deadLetterReplayMovesMessageBackToPendingAtomically() throws Exception {
         StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
@@ -47,7 +90,7 @@ class MessagePersistServiceTest {
                 redisTemplate,
                 objectMapper,
                 mock(SimpMessagingTemplate.class),
-                executor
+                executor, new ChatMonitoringMetrics(new SimpleMeterRegistry())
         );
 
         service.replayDeadLetter("M001");
@@ -73,7 +116,7 @@ class MessagePersistServiceTest {
                 redisTemplate,
                 new ObjectMapper(),
                 mock(SimpMessagingTemplate.class),
-                mock(ThreadPoolTaskExecutor.class)
+                mock(ThreadPoolTaskExecutor.class), new ChatMonitoringMetrics(new SimpleMeterRegistry())
         );
 
         org.junit.jupiter.api.Assertions.assertThrows(
@@ -103,7 +146,7 @@ class MessagePersistServiceTest {
         when(mapper.findByClientMessage("S001", "U001", "C001")).thenReturn(conflicting);
 
         MessagePersistServiceImpl service = new MessagePersistServiceImpl(
-                mapper, redisTemplate, new ObjectMapper(), messaging, mock(ThreadPoolTaskExecutor.class)
+                mapper, redisTemplate, new ObjectMapper(), messaging, mock(ThreadPoolTaskExecutor.class), new ChatMonitoringMetrics(new SimpleMeterRegistry())
         );
         service.persistMessageAsync(request);
 
@@ -134,7 +177,7 @@ class MessagePersistServiceTest {
         when(mapper.insert(request)).thenThrow(new IllegalStateException("database unavailable"));
         MessagePersistServiceImpl service = new MessagePersistServiceImpl(
                 mapper, redisTemplate, new ObjectMapper(), mock(SimpMessagingTemplate.class),
-                mock(ThreadPoolTaskExecutor.class)
+                mock(ThreadPoolTaskExecutor.class), new ChatMonitoringMetrics(new SimpleMeterRegistry())
         );
 
         assertTimeoutPreemptively(Duration.ofSeconds(1), () -> service.persistMessageAsync(request));
@@ -168,7 +211,7 @@ class MessagePersistServiceTest {
                 .when(executor).execute(any(Runnable.class));
         MessagePersistServiceImpl service = new MessagePersistServiceImpl(
                 mock(com.example.customerservice.mapper.ChatMessageMapper.class), redisTemplate,
-                new ObjectMapper(), mock(SimpMessagingTemplate.class), executor
+                new ObjectMapper(), mock(SimpMessagingTemplate.class), executor, new ChatMonitoringMetrics(new SimpleMeterRegistry())
         );
 
         service.retryFailedMessages();

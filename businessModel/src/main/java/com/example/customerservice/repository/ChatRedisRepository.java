@@ -1,6 +1,7 @@
 package com.example.customerservice.repository;
 
 import com.example.customerservice.constant.RedisConstants;
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -12,6 +13,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -87,9 +89,14 @@ public class ChatRedisRepository {
             );
 
     private final StringRedisTemplate redisTemplate;
+    private final ChatMonitoringMetrics monitoringMetrics;
 
-    public ChatRedisRepository(StringRedisTemplate redisTemplate) {
+    public ChatRedisRepository(
+            StringRedisTemplate redisTemplate,
+            ChatMonitoringMetrics monitoringMetrics
+    ) {
         this.redisTemplate = redisTemplate;
+        this.monitoringMetrics = monitoringMetrics;
     }
 
     public String getValue(String key) {
@@ -155,11 +162,23 @@ public class ChatRedisRepository {
     }
 
     public String acquireSessionOperationLock(String sessionId) {
-        return acquireLock(
-                RedisConstants.SESSION_OPERATION_LOCK + sessionId,
-                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
-                TimeUnit.SECONDS
-        );
+        long startedAt = System.nanoTime();
+        try {
+            String token = acquireLock(
+                    RedisConstants.SESSION_OPERATION_LOCK + sessionId,
+                    RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
+                    TimeUnit.SECONDS
+            );
+            monitoringMetrics.recordSessionLockAttempt(
+                    Duration.ofNanos(System.nanoTime() - startedAt), token != null
+            );
+            return token;
+        } catch (RuntimeException exception) {
+            monitoringMetrics.recordSessionLockAttempt(
+                    Duration.ofNanos(System.nanoTime() - startedAt), false
+            );
+            throw exception;
+        }
     }
 
     public void releaseSessionOperationLock(String sessionId, String token) {

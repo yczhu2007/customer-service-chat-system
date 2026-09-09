@@ -145,14 +145,7 @@ abstract class ChatRoutingSessionSupport
     }
 
     protected String acquireSessionOperationLock(String sessionId) {
-        String lockToken = UUID.randomUUID().toString();
-        Boolean acquired = chatRedisRepository.setValueIfAbsent(
-                RedisConstants.SESSION_OPERATION_LOCK + sessionId,
-                lockToken,
-                RedisConstants.SESSION_OPERATION_LOCK_TTL_SECONDS,
-                TimeUnit.SECONDS
-        );
-        return Boolean.TRUE.equals(acquired) ? lockToken : null;
+        return chatRedisRepository.acquireSessionOperationLock(sessionId);
     }
 
     protected void releaseSessionOperationLock(
@@ -162,13 +155,7 @@ abstract class ChatRoutingSessionSupport
         if (sessionId == null || lockToken == null) {
             return;
         }
-        chatRedisRepository.execute(
-                RELEASE_ASSIGNMENT_LOCK_SCRIPT,
-                Collections.singletonList(
-                        RedisConstants.SESSION_OPERATION_LOCK + sessionId
-                ),
-                lockToken
-        );
+        chatRedisRepository.releaseSessionOperationLock(sessionId, lockToken);
     }
 
 

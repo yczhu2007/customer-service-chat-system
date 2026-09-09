@@ -8,9 +8,11 @@ import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.SessionTransferLogVO;
+import com.example.customerservice.dto.SystemMonitoringSnapshotVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatManagementQueryService;
 import com.example.customerservice.service.ChatAdministrationOperations;
+import com.example.customerservice.service.ChatMonitoringService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -36,8 +38,27 @@ class ChatManagementControllerTest {
 
     @Mock private ChatManagementQueryService managementQueryService;
     @Mock private ChatAdministrationOperations administrationOperations;
+    @Mock private ChatMonitoringService monitoringService;
     @Mock private CurrentUser currentUser;
     @InjectMocks private ChatManagementController controller;
+
+    @Test
+    void adminCanReadMonitoringSnapshotWithDashboardPermission() {
+        SystemMonitoringSnapshotVO snapshot = new SystemMonitoringSnapshotVO(
+                true, 1L, 2L, new SystemMonitoringSnapshotVO.OnlineConnections(3, 4),
+                new SystemMonitoringSnapshotVO.LatencySummary(0, null, null, null, 0),
+                new SystemMonitoringSnapshotVO.LatencySummary(0, null, null, null, 0),
+                java.time.Instant.now()
+        );
+        when(monitoringService.findSnapshot()).thenReturn(snapshot);
+
+        Result<SystemMonitoringSnapshotVO> result = controller.findMonitoring();
+
+        assertEquals(snapshot, result.getData());
+        verify(currentUser).requireRole("ADMIN");
+        verify(currentUser).requirePermission("chat:admin:dashboard:view");
+        verify(monitoringService).findSnapshot();
+    }
 
     @Test
     void agentCanReadOwnSessionViews() {

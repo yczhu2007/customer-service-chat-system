@@ -16,6 +16,8 @@ import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
 import com.example.customerservice.mapper.SysUserRoleMapper;
 import com.example.customerservice.repository.ChatRedisRepository;
+import com.example.customerservice.monitoring.ChatMonitoringMetrics;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import com.example.customerservice.service.impl.ChatMessageService;
 import com.example.customerservice.service.impl.ChatMessageDeliveryService;
 import com.example.customerservice.service.impl.ChatMessageManagementService;
@@ -92,7 +94,7 @@ class ChatMessageServiceTest {
         lenient().when(redisTemplate.opsForList()).thenReturn(listOperations);
         lenient().when(redisTemplate.opsForZSet()).thenReturn(zSetOperations);
         lenient().when(redisTemplate.opsForSet()).thenReturn(setOperations);
-        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate);
+        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate, new ChatMonitoringMetrics(new SimpleMeterRegistry()));
         ChatMessageOperations messageOperations = newMessageOperations(
                 chatRedisRepository, new ObjectMapper()
         );
@@ -237,7 +239,7 @@ class ChatMessageServiceTest {
         ChatMessage second = textMessage();
         second.setId("M002");
         ObjectMapper mapper = new ObjectMapper();
-        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate);
+        ChatRedisRepository chatRedisRepository = new ChatRedisRepository(redisTemplate, new ChatMonitoringMetrics(new SimpleMeterRegistry()));
         ChatMessageOperations messageOperations = newMessageOperations(
                 chatRedisRepository, mapper
         );
