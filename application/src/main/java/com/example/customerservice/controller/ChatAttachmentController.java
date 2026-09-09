@@ -1,7 +1,7 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
-import com.example.customerservice.domain.ChatAttachment;
+import com.example.customerservice.dto.AttachmentDownload;
 import com.example.customerservice.dto.ChatAttachmentVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
@@ -44,31 +44,25 @@ public class ChatAttachmentController {
     }
     @GetMapping("/{id}")
     public Result<ChatAttachmentVO> metadata(@PathVariable @NotBlank @Size(max=64) String id) {
-        ChatAttachment attachment = service.requireAccessible(currentUser.getUserId(), id);
-        ChatAttachmentVO result = new ChatAttachmentVO();
-        result.setId(attachment.getId());
-        result.setOriginalName(attachment.getOriginalName());
-        result.setContentType(attachment.getContentType());
-        result.setFileSize(attachment.getFileSize());
-        result.setMessageType(attachment.getMessageType());
-        result.setContentUrl("/chat/attachments/" + attachment.getId() + "/content");
-        return Result.success(result);
+        List<ChatAttachmentVO> results = service.findAccessibleMetadata(currentUser.getUserId(), List.of(id));
+        if (results.isEmpty()) throw new IllegalArgumentException("附件不存在或无权访问");
+        return Result.success(results.get(0));
     }
     @GetMapping("/{id}/content")
     public ResponseEntity<Resource> content(@PathVariable @NotBlank @Size(max=64) String id) {
-        ChatAttachment attachment = service.requireAccessible(currentUser.getUserId(), id);
+        AttachmentDownload download = service.loadAccessibleDownload(currentUser.getUserId(), id);
         MediaType type;
-        try { type = MediaType.parseMediaType(attachment.getContentType()); }
+        try { type = MediaType.parseMediaType(download.contentType()); }
         catch (Exception ignored) { type = MediaType.APPLICATION_OCTET_STREAM; }
-        ContentDisposition disposition = "IMAGE".equals(attachment.getMessageType())
-                ? ContentDisposition.inline().filename(attachment.getOriginalName(), StandardCharsets.UTF_8).build()
-                : ContentDisposition.attachment().filename(attachment.getOriginalName(), StandardCharsets.UTF_8).build();
+        ContentDisposition disposition = "IMAGE".equals(download.messageType())
+                ? ContentDisposition.inline().filename(download.filename(), StandardCharsets.UTF_8).build()
+                : ContentDisposition.attachment().filename(download.filename(), StandardCharsets.UTF_8).build();
         return ResponseEntity.ok()
                 .contentType(type)
-                .contentLength(attachment.getFileSize())
+                .contentLength(download.size())
                 .header("X-Content-Type-Options", "nosniff")
                 .header(HttpHeaders.CONTENT_DISPOSITION, disposition.toString())
-                .body(service.load(attachment));
+                .body(download.resource());
     }
 
     @GetMapping("/{id}/preview")

@@ -4,6 +4,7 @@ import com.example.customerservice.config.MinioAttachmentProperties;
 import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.ChatAttachmentVO;
+import com.example.customerservice.dto.AttachmentDownload;
 import com.example.customerservice.exception.NotFoundException;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -267,6 +268,13 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         } catch (RuntimeException exception) {
             throw new NotFoundException("附件文件不存在");
         }
+    }
+
+    @Override
+    public AttachmentDownload loadAccessibleDownload(String userId, String attachmentId) {
+        ChatAttachment attachment = requireAccessible(userId, attachmentId);
+        return new AttachmentDownload(attachment.getOriginalName(), attachment.getContentType(),
+                attachment.getFileSize(), attachment.getMessageType(), load(attachment));
     }
 
     @Override
