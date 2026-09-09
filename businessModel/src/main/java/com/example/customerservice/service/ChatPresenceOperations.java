@@ -3,6 +3,10 @@ package com.example.customerservice.service;
 /** WebSocket在线状态、心跳、断线与客服重连宽限期操作。 */
 public interface ChatPresenceOperations {
 
+    void handleExpiredHeartbeatUsers(long nowMillis, int batchSize);
+
+    void handleExpiredReconnectGracePeriods(long nowMillis, int batchSize);
+
     void handleDisconnect(String userId);
 
     void handleHeartbeat(String userId, String wsSessionId);

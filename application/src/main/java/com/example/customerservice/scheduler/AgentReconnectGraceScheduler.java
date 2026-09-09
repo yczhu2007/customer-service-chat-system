@@ -1,27 +1,21 @@
 package com.example.customerservice.scheduler;
 
-import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.service.ChatPresenceOperations;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.util.Set;
 
 /** 宽限期结束后，才对未重连客服执行完整断线清理。 */
 @Component
 public class AgentReconnectGraceScheduler {
 
-    private final StringRedisTemplate redisTemplate;
     private final ChatPresenceOperations chatPresenceOperations;
     private final DistributedSchedulerLock schedulerLock;
 
     public AgentReconnectGraceScheduler(
-            StringRedisTemplate redisTemplate,
             ChatPresenceOperations chatPresenceOperations,
             DistributedSchedulerLock schedulerLock
     ) {
-        this.redisTemplate = redisTemplate;
         this.chatPresenceOperations = chatPresenceOperations;
         this.schedulerLock = schedulerLock;
     }
@@ -35,7 +29,7 @@ public class AgentReconnectGraceScheduler {
     }
 
     private void handleExpiredGracePeriodsLocked() {
-        Set<String> agentIds = redisTemplate.opsForZSet().rangeByScore(
+        /* Set<String> agentIds = redisTemplate.opsForZSet().rangeByScore(
                 RedisConstants.AGENT_RECONNECT_GRACE,
                 0,
                 System.currentTimeMillis(),
@@ -47,6 +41,7 @@ public class AgentReconnectGraceScheduler {
         }
         for (String agentId : agentIds) {
             chatPresenceOperations.handleAgentReconnectGraceTimeout(agentId);
-        }
+        } */
+        chatPresenceOperations.handleExpiredReconnectGracePeriods(System.currentTimeMillis(), 100);
     }
 }

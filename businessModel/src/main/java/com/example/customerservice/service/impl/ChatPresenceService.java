@@ -63,6 +63,28 @@ public class ChatPresenceService implements ChatPresenceOperations {
     private ChatPresenceCallbacks callbacks() {
         return callbacksProvider.getObject();
     }
+
+    @Override
+    public void handleExpiredHeartbeatUsers(long nowMillis, int batchSize) {
+        Set<String> userIds = chatRedisRepository.sortedSetRangeByScore(
+                RedisConstants.ONLINE_HEARTBEAT, 0, nowMillis, 0, batchSize);
+        if (userIds == null) return;
+        for (String userId : userIds) {
+            try { handleHeartbeatTimeout(userId); }
+            catch (Exception e) { log.warn("处理心跳超时失败，userId={}", userId, e); }
+        }
+    }
+
+    @Override
+    public void handleExpiredReconnectGracePeriods(long nowMillis, int batchSize) {
+        Set<String> agentIds = chatRedisRepository.sortedSetRangeByScore(
+                RedisConstants.AGENT_RECONNECT_GRACE, 0, nowMillis, 0, batchSize);
+        if (agentIds == null) return;
+        for (String agentId : agentIds) {
+            try { handleAgentReconnectGraceTimeout(agentId); }
+            catch (Exception e) { log.warn("处理客服重连宽限期失败，agentId={}", agentId, e); }
+        }
+    }
     @Override
     @Transactional
     public void handleDisconnect(
