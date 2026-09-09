@@ -1,6 +1,7 @@
 package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
+import jakarta.annotation.PreDestroy;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.dto.DeadLetterMessageVO;
@@ -41,6 +42,11 @@ import org.springframework.data.redis.core.ZSetOperations;
 @Service
 @Slf4j
 public class MessagePersistServiceImpl implements MessagePersistService {
+
+    @PreDestroy
+    public void shutdownRetryLeaseWatchdog() {
+        RETRY_LEASE_WATCHDOG.shutdownNow();
+    }
 
     /** 首次执行 + 3 次指数退避重试。 */
     private static final int MAX_ATTEMPTS = 4;
