@@ -51,6 +51,17 @@ import java.util.concurrent.TimeUnit;
 public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupport
         implements ChatMaintenanceOperations, ChatPresenceCallbacks {
 
+    @Override
+    public void handleInactiveSessions(long cutoffMillis, int batchSize) {
+        Set<String> sessionIds = chatRedisRepository.sortedSetRangeByScore(
+                RedisConstants.SESSION_LAST_ACTIVITY, 0, cutoffMillis, 0, batchSize);
+        if (sessionIds == null) return;
+        for (String sessionId : sessionIds) {
+            try { handleSessionInactivityTimeout(sessionId, cutoffMillis); }
+            catch (Exception exception) { log.error("会话无活动超时转分配失败，sessionId={}", sessionId, exception); }
+        }
+    }
+
     private final ChatSessionReconciliationService reconciliationService;
     private final ChatSessionInactivityService inactivityService;
     private final ObjectProvider<ChatAgentOperations> agentOperationsProvider;
