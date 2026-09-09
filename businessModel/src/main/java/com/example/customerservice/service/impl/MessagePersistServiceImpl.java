@@ -44,6 +44,23 @@ import org.springframework.data.redis.core.ZSetOperations;
 public class MessagePersistServiceImpl implements MessagePersistService {
 
     @Override
+    public int cleanupExpiredRedisData(long deadLetterCutoff, long statsCutoff, int batchSize) {
+        int total = cleanupExpiredDeadLetters(deadLetterCutoff, batchSize);
+        total += cleanupStatistics(RedisConstants.STATS_VIP_WAIT_CREATED_AT, RedisConstants.STATS_VIP_WAIT, statsCutoff, batchSize);
+        total += cleanupStatistics(RedisConstants.STATS_VIP_RESOLVE_CREATED_AT, RedisConstants.STATS_VIP_RESOLVE, statsCutoff, batchSize);
+        return total;
+    }
+
+    private int cleanupStatistics(String timestampKey, String valueKey, long cutoff, int batchSize) {
+        Set<String> ids = redisTemplate.opsForZSet().rangeByScore(timestampKey, 0, cutoff, 0, batchSize);
+        if (ids == null || ids.isEmpty()) return 0;
+        Object[] values = ids.toArray();
+        redisTemplate.opsForZSet().remove(timestampKey, values);
+        redisTemplate.opsForZSet().remove(valueKey, values);
+        return ids.size();
+    }
+
+    @Override
     public void retryAndCheckBacklog(long alertThreshold) {
         retryFailedMessages();
         Long pendingCount = redisTemplate.opsForZSet().zCard(RedisConstants.PERSIST_PENDING);

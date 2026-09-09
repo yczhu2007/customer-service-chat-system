@@ -8,6 +8,8 @@ public interface MessagePersistService {
 
     void retryAndCheckBacklog(long alertThreshold);
 
+    int cleanupExpiredRedisData(long deadLetterCutoff, long statsCutoff, int batchSize);
+
     void markPending(ChatMessage message);
 
     void persistMessageAsync(ChatMessage message);
