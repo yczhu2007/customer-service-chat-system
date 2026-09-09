@@ -133,7 +133,8 @@ public class SupportTicketController {
     }
 
     private boolean isAdministratorWorkspace() {
-        String workspaceRole = workspaceRoleResolver.resolve(
+        WorkspaceRoleResolver resolver = workspaceRoleResolver == null ? new WorkspaceRoleResolver() : workspaceRoleResolver;
+        String workspaceRole = resolver.resolve(
                 httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role"),
                 currentUser.getRoleCodes(), ChatConstants.ROLE_USER, ChatConstants.ROLE_AGENT, ChatConstants.ROLE_ADMIN);
         if (!ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {

@@ -1,6 +1,5 @@
 package com.example.customerservice.controller;
 
-import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.dto.ChatAttachmentVO;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
@@ -42,14 +41,10 @@ class ChatAttachmentControllerTest {
     void returnsAccessibleAttachmentMetadataWithoutLoadingItsContent() throws Exception {
         ChatAttachmentService service = mock(ChatAttachmentService.class);
         CurrentUser currentUser = mock(CurrentUser.class);
-        ChatAttachment attachment = new ChatAttachment();
-        attachment.setId("A1");
-        attachment.setOriginalName("table.xlsx");
-        attachment.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-        attachment.setFileSize(2048L);
-        attachment.setMessageType("FILE");
+        ChatAttachmentVO attachment = new ChatAttachmentVO();
+        attachment.setId("A1"); attachment.setOriginalName("table.xlsx"); attachment.setFileSize(2048L);
         when(currentUser.getUserId()).thenReturn("U1");
-        when(service.requireAccessible("U1", "A1")).thenReturn(attachment);
+        when(service.findAccessibleMetadata("U1", java.util.List.of("A1"))).thenReturn(java.util.List.of(attachment));
         MockMvc mockMvc = MockMvcBuilders.standaloneSetup(new ChatAttachmentController(service, currentUser)).build();
 
         mockMvc.perform(get("/chat/attachments/A1"))
