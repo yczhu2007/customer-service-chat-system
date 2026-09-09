@@ -44,10 +44,19 @@ import org.springframework.data.redis.core.ZSetOperations;
 public class MessagePersistServiceImpl implements MessagePersistService {
 
     @Override
-    public int cleanupExpiredRedisData(long deadLetterCutoff, long statsCutoff, int batchSize) {
+    public int cleanupExpiredRedisData(long nowMillis, int batchSize) {
+        long deadLetterCutoff = nowMillis - TimeUnit.DAYS.toMillis(
+                RedisConstants.PERSIST_DEADLETTER_RETENTION_DAYS
+        );
+        long statsCutoff = nowMillis - TimeUnit.DAYS.toMillis(
+                RedisConstants.VIP_STATS_RETENTION_DAYS
+        );
         int total = cleanupExpiredDeadLetters(deadLetterCutoff, batchSize);
         total += cleanupStatistics(RedisConstants.STATS_VIP_WAIT_CREATED_AT, RedisConstants.STATS_VIP_WAIT, statsCutoff, batchSize);
         total += cleanupStatistics(RedisConstants.STATS_VIP_RESOLVE_CREATED_AT, RedisConstants.STATS_VIP_RESOLVE, statsCutoff, batchSize);
+        if (total > 0) {
+            log.info("Redis过期数据清理完成，cleaned={}", total);
+        }
         return total;
     }
 

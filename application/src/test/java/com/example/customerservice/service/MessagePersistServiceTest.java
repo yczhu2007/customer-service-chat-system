@@ -14,6 +14,7 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
@@ -25,8 +26,40 @@ import static org.junit.jupiter.api.Assertions.assertTimeoutPreemptively;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyDouble;
+import static org.mockito.ArgumentMatchers.eq;
 
 class MessagePersistServiceTest {
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void redisRetentionCutoffsAreCalculatedInsideService() {
+        StringRedisTemplate redisTemplate = mock(StringRedisTemplate.class);
+        org.springframework.data.redis.core.ZSetOperations<String, String> sortedSet =
+                mock(org.springframework.data.redis.core.ZSetOperations.class);
+        when(redisTemplate.opsForZSet()).thenReturn(sortedSet);
+        MessagePersistServiceImpl service = new MessagePersistServiceImpl(
+                mock(com.example.customerservice.mapper.ChatMessageMapper.class),
+                redisTemplate,
+                new ObjectMapper(),
+                mock(SimpMessagingTemplate.class),
+                mock(ThreadPoolTaskExecutor.class),
+                new ChatMonitoringMetrics(new SimpleMeterRegistry())
+        );
+        long now = TimeUnit.DAYS.toMillis(100);
+
+        service.cleanupExpiredRedisData(now, 500);
+
+        verify(sortedSet).rangeByScore(
+                eq(RedisConstants.PERSIST_DEADLETTER), eq(0D),
+                eq((double) (now - TimeUnit.DAYS.toMillis(RedisConstants.PERSIST_DEADLETTER_RETENTION_DAYS))),
+                eq(0L), eq(500L)
+        );
+        verify(sortedSet).rangeByScore(
+                eq(RedisConstants.STATS_VIP_WAIT_CREATED_AT), eq(0D),
+                eq((double) (now - TimeUnit.DAYS.toMillis(RedisConstants.VIP_STATS_RETENTION_DAYS))),
+                eq(0L), eq(500L)
+        );
+    }
 
     @Test
     void successfulPersistenceRecordsPendingToStoredLatency() {

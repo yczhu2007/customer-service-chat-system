@@ -19,6 +19,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -28,6 +29,9 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.spy;
 
 @ExtendWith(MockitoExtension.class)
 class ChatPresenceServiceTest {
@@ -177,5 +181,33 @@ class ChatPresenceServiceTest {
         verify(messagingTemplate).convertAndSendToUser(eq("A001"), eq("/queue/chat"), event.capture());
         assertEquals("TYPING", event.getValue().get("event"));
         assertEquals(true, event.getValue().get("typing"));
+    }
+
+    @Test
+    void heartbeatBatchContinuesAfterOneUserFails() {
+        ChatPresenceService presenceService = spy(service);
+        when(chatRedisRepository.sortedSetRangeByScore(
+                RedisConstants.ONLINE_HEARTBEAT, 0, 1000, 0, 100
+        )).thenReturn(new LinkedHashSet<>(List.of("U001", "U002")));
+        doThrow(new RuntimeException("boom")).when(presenceService).handleHeartbeatTimeout("U001");
+        doNothing().when(presenceService).handleHeartbeatTimeout("U002");
+
+        presenceService.handleExpiredHeartbeatUsers(1000, 100);
+
+        verify(presenceService).handleHeartbeatTimeout("U002");
+    }
+
+    @Test
+    void reconnectGraceBatchContinuesAfterOneAgentFails() {
+        ChatPresenceService presenceService = spy(service);
+        when(chatRedisRepository.sortedSetRangeByScore(
+                RedisConstants.AGENT_RECONNECT_GRACE, 0, 1000, 0, 100
+        )).thenReturn(new LinkedHashSet<>(List.of("A001", "A002")));
+        doThrow(new RuntimeException("boom")).when(presenceService).handleAgentReconnectGraceTimeout("A001");
+        doNothing().when(presenceService).handleAgentReconnectGraceTimeout("A002");
+
+        presenceService.handleExpiredReconnectGracePeriods(1000, 100);
+
+        verify(presenceService).handleAgentReconnectGraceTimeout("A002");
     }
 }

@@ -17,5 +17,7 @@ public interface ChatRoutingOperations {
 
     void refreshWaitingPositions();
 
+    void removeTimedOutWaitingUsers();
+
     void processNextWaitingUser(String agentId);
 }

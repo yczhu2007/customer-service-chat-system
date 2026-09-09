@@ -30,6 +30,7 @@ import com.example.customerservice.service.impl.ChatAgentSessionRecoveryService;
 import com.example.customerservice.service.impl.ChatAgentService;
 import com.example.customerservice.service.impl.ChatSessionTransferService;
 import com.example.customerservice.service.impl.ChatSessionNotificationService;
+import com.example.customerservice.service.impl.QueueTimeoutService;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -211,6 +212,7 @@ public class ChatServiceConfiguration {
             SysUserRoleMapper sysUserRoleMapper,
             SysUserMapper sysUserMapper,
             ObjectProvider<ChatAgentOperations> agentOperationsProvider,
+            QueueTimeoutService queueTimeoutService,
             @Value("${app.chat.agent-reconnect-grace-seconds:20}") long agentReconnectGraceSeconds,
             @Value("${app.chat.vip.reserved-slots:1}") int vipReservedSlots,
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
@@ -236,6 +238,7 @@ public class ChatServiceConfiguration {
                 sysUserRoleMapper,
                 sysUserMapper,
                 agentOperationsProvider,
+                queueTimeoutService,
                 agentReconnectGraceSeconds,
                 vipReservedSlots,
                 averageHandleSeconds,

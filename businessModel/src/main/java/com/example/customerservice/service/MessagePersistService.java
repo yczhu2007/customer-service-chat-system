@@ -8,7 +8,7 @@ public interface MessagePersistService {
 
     void retryAndCheckBacklog(long alertThreshold);
 
-    int cleanupExpiredRedisData(long deadLetterCutoff, long statsCutoff, int batchSize);
+    int cleanupExpiredRedisData(long nowMillis, int batchSize);
 
     void markPending(ChatMessage message);
 

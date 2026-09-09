@@ -37,12 +37,9 @@ public class QueueTimeoutService {
     private final SimpMessagingTemplate messagingTemplate;
     private final long timeoutMillis;
     private final long vipTimeoutMillis;
-    private final ChatRoutingOperations chatRoutingOperations;
-
     public QueueTimeoutService(
             ChatRedisRepository chatRedisRepository,
             SimpMessagingTemplate messagingTemplate,
-            ChatRoutingOperations chatRoutingOperations,
             @Value("${app.chat.queue.timeout-seconds:300}") long timeoutSeconds,
             @Value("${app.chat.queue.vip-timeout-seconds:120}") long vipTimeoutSeconds
     ) {
@@ -50,11 +47,10 @@ public class QueueTimeoutService {
         this.messagingTemplate = messagingTemplate;
         this.timeoutMillis = timeoutSeconds * 1000L;
         this.vipTimeoutMillis = vipTimeoutSeconds * 1000L;
-        this.chatRoutingOperations = chatRoutingOperations;
     }
 
-    public void removeTimedOutUsers() {
-        backfillMissingEnqueueTimes();
+    public void removeTimedOutUsers(ChatRoutingOperations routingOperations) {
+        backfillMissingEnqueueTimes(routingOperations);
         long now = System.currentTimeMillis();
         long earliestDeadline =
                 now - Math.min(timeoutMillis, vipTimeoutMillis);
@@ -110,11 +106,11 @@ public class QueueTimeoutService {
                 log.warn("处理排队超时用户失败，userId={}", userId, exception);
             }
         }
-        chatRoutingOperations.refreshWaitingPositions();
+        routingOperations.refreshWaitingPositions();
     }
 
     /** 为升级前的排队数据补齐独立的真实入队时间索引。 */
-    private void backfillMissingEnqueueTimes() {
+    private void backfillMissingEnqueueTimes(ChatRoutingOperations routingOperations) {
         Set<String> queuedUserIds = chatRedisRepository.sortedSetRange(
                 RedisConstants.QUEUE_PENDING,
                 0,
@@ -134,7 +130,7 @@ public class QueueTimeoutService {
             }
         }
         if (!missingUserIds.isEmpty()) {
-            chatRoutingOperations.backfillWaitingUsers(missingUserIds);
+            routingOperations.backfillWaitingUsers(missingUserIds);
         }
     }
 
