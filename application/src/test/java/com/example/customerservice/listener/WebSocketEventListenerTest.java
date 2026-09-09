@@ -13,6 +13,8 @@ import org.springframework.web.socket.messaging.SessionConnectEvent;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 
 class WebSocketEventListenerTest {
@@ -31,6 +33,25 @@ class WebSocketEventListenerTest {
                 .build();
 
         listener.connect(new SessionConnectEvent(this, message));
+
+        assertEquals(1, metrics.userConnections());
+    }
+
+    @Test
+    void localConnectionMetricSurvivesRedisPresenceFailure() {
+        ChatMonitoringMetrics metrics = new ChatMonitoringMetrics(new SimpleMeterRegistry());
+        ChatPresenceOperations presenceOperations = mock(ChatPresenceOperations.class);
+        doThrow(new IllegalStateException("Redis unavailable"))
+                .when(presenceOperations).registerOnline("U001", "ws-1");
+        WebSocketEventListener listener = new WebSocketEventListener(presenceOperations, metrics);
+        Message<byte[]> message = MessageBuilder.withPayload(new byte[0])
+                .setHeader(SimpMessageHeaderAccessor.SESSION_ID_HEADER, "ws-1")
+                .setHeader(SimpMessageHeaderAccessor.USER_HEADER,
+                        new WebSocketUserPrincipal("U001", Set.of("USER")))
+                .build();
+
+        assertThrows(IllegalStateException.class,
+                () -> listener.connect(new SessionConnectEvent(this, message)));
 
         assertEquals(1, metrics.userConnections());
     }

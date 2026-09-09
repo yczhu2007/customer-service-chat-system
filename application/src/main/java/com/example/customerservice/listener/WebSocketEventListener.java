@@ -91,16 +91,16 @@ public class WebSocketEventListener {
          * 统一登记在线状态、双向连接映射、
          * 300秒TTL和初始心跳超时时间。
          */
-        chatPresenceOperations.registerOnline(
-                userId,
-                sessionId
-        );
         if (principal instanceof WebSocketUserPrincipal authenticatedPrincipal) {
             monitoringMetrics.registerConnection(
                     sessionId,
                     authenticatedPrincipal.getRoleCodes()
             );
         }
+        chatPresenceOperations.registerOnline(
+                userId,
+                sessionId
+        );
 
 
         log.info(
