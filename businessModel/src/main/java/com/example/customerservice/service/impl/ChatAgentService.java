@@ -22,6 +22,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** 客服可用状态、上线恢复、接待容量和技能组领域服务。 */
 @Slf4j
@@ -152,6 +153,19 @@ public class ChatAgentService implements ChatAgentOperations {
     }
 
     @Override
+    public void setAgentVipSkillByLoginNumber(String loginNumber, boolean enabled) {
+        SysUser agent = sysUserMapper.findByUsername(loginNumber == null ? null : loginNumber.trim());
+        if (agent == null || !"ENABLED".equals(agent.getStatus())) {
+            throw new IllegalArgumentException("客服登录编号不存在或账号已禁用");
+        }
+        Set<String> roles = sysUserRoleMapper.findRoleCodesByUserId(agent.getId());
+        if (roles == null || !roles.contains("AGENT")) {
+            throw new IllegalArgumentException("该登录编号不是客服账号");
+        }
+        setAgentVipSkill(agent.getId(), enabled);
+    }
+
+    @Override
     public Set<String> findVipSkillAgentIds() {
         Set<String> agentIds = chatRedisRepository.setMembers(
                 RedisConstants.AGENT_SKILL_VIP
@@ -177,6 +191,15 @@ public class ChatAgentService implements ChatAgentOperations {
             );
         }
         return Set.copyOf(persistedAgentIds);
+    }
+
+    @Override
+    public Set<String> findVipSkillAgentLoginNumbers() {
+        return findVipSkillAgentIds().stream()
+                .map(sysUserMapper::selectById)
+                .filter(user -> user != null && user.getUsername() != null && !user.getUsername().isBlank())
+                .map(SysUser::getUsername)
+                .collect(Collectors.toSet());
     }
 
     private void refreshVipSkillCacheAfterCommit() {

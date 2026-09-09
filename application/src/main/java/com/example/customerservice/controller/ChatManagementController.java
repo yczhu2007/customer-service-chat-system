@@ -16,23 +16,15 @@ import com.example.customerservice.dto.RatingSummaryVO;
 import com.example.customerservice.dto.SessionSummaryVO;
 import com.example.customerservice.dto.SessionTransferLogVO;
 import com.example.customerservice.security.CurrentUser;
-import com.example.customerservice.domain.ChatSession;
-import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.ChatSessionMetadataUpdateDTO;
-import com.example.customerservice.mapper.ChatSessionMapper;
-import com.example.customerservice.mapper.ChatMessageMapper;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.service.ChatAdministrationOperations;
 import com.example.customerservice.service.ChatManagementQueryService;
-import com.example.customerservice.service.ChatSessionOperations;
-import com.example.customerservice.service.ChatSessionDeletionService;
 import com.example.customerservice.service.ChatSessionQueryService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -47,7 +39,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 /** 客服工作台、管理员仪表盘和会话质检接口。 */
 @RestController
@@ -56,34 +47,19 @@ import java.util.Set;
 public class ChatManagementController {
 
     private final ChatManagementQueryService managementQueryService;
+    private final ChatAdministrationOperations administrationOperations;
+    private final ChatSessionQueryService sessionQueryService;
     private final CurrentUser currentUser;
-
-    @Autowired
-    private ChatSessionQueryService sessionQueryService;
-
-    @Autowired
-    private ChatSessionOperations sessionOperations;
-
-    @Autowired
-    private ChatSessionDeletionService sessionDeletionService;
-
-    @Autowired
-    private ChatSessionMapper sessionMapper;
-
-    @Autowired
-    private ChatMessageMapper messageMapper;
-
-    @Autowired
-    private SysUserMapper userMapper;
-
-    @Autowired
-    private SysUserRoleMapper userRoleMapper;
 
     public ChatManagementController(
             ChatManagementQueryService managementQueryService,
+            ChatAdministrationOperations administrationOperations,
+            ChatSessionQueryService sessionQueryService,
             CurrentUser currentUser
     ) {
         this.managementQueryService = managementQueryService;
+        this.administrationOperations = administrationOperations;
+        this.sessionQueryService = sessionQueryService;
         this.currentUser = currentUser;
     }
 
@@ -92,24 +68,8 @@ public class ChatManagementController {
             @Valid @RequestBody AdminSessionCreateDTO request
     ) {
         requireSessionManagementPermission();
-        SysUser user = requireUserByLoginNumber(request.getUserLoginNumber());
-        SysUser agent = requireUserByLoginNumber(request.getAgentLoginNumber());
-        Set<String> userRoles = userRoleMapper.findRoleCodesByUserId(user.getId());
-        Set<String> agentRoles = userRoleMapper.findRoleCodesByUserId(agent.getId());
-        if (userRoles == null || !userRoles.contains("USER")) {
-            throw new IllegalArgumentException("用户登录编号对应的账号没有USER角色");
-        }
-        if (agentRoles == null || !agentRoles.contains("AGENT")) {
-            throw new IllegalArgumentException("客服登录编号对应的账号没有AGENT角色");
-        }
-        if (sessionMapper.findActiveByUserId(user.getId()) != null) {
-            throw new IllegalArgumentException("该用户已有进行中的会话");
-        }
-        ChatSession session = sessionOperations.createSession(user.getId(), agent.getId());
-        sessionOperations.notifyBothParties(session);
-        return Result.success(new SessionSummaryVO(
-                session.getId(), user.getId(), user.getUsername(), agent.getId(), agent.getUsername(),
-                session.getStatus(), session.getTitle(), session.getCreateTime(), session.getEndTime(), null, null, 0L, null, null, null
+        return Result.success(administrationOperations.createSession(
+                request.getUserLoginNumber(), request.getAgentLoginNumber()
         ));
     }
 
@@ -117,12 +77,7 @@ public class ChatManagementController {
     public Result<Void> deleteAdminMessage(@PathVariable String messageId) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:session:audit:view");
-        if (messageId == null || messageId.isBlank() || messageId.length() > 64) {
-            throw new IllegalArgumentException("消息ID无效");
-        }
-        if (messageMapper.deleteById(messageId) == 0) {
-            throw new IllegalArgumentException("消息不存在");
-        }
+        administrationOperations.deleteMessage(messageId);
         return Result.successMessage("消息已删除");
     }
 
@@ -140,28 +95,13 @@ public class ChatManagementController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
         requireSessionManagementPermission();
-        ChatSession session = sessionMapper.selectById(sessionId);
-        if (session == null) {
-            throw new IllegalArgumentException("会话不存在");
-        }
-        if ("ACTIVE".equals(session.getStatus()) && session.getAgentId() != null) {
-            sessionOperations.endSessionByAgent(sessionId, session.getAgentId());
-        }
-        sessionDeletionService.deleteSession(sessionId);
+        administrationOperations.deleteSession(sessionId);
         return Result.successMessage("会话已永久删除");
     }
 
     private void requireSessionManagementPermission() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:session:audit:view");
-    }
-
-    private SysUser requireUserByLoginNumber(String loginNumber) {
-        SysUser user = userMapper.findByUsername(loginNumber == null ? null : loginNumber.trim());
-        if (user == null || !"ENABLED".equals(user.getStatus())) {
-            throw new IllegalArgumentException("登录编号不存在或账号已禁用");
-        }
-        return user;
     }
 
     @GetMapping("/agent/dashboard")

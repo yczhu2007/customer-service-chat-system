@@ -52,7 +52,8 @@ class ChatPresenceServiceTest {
                 messagingTemplate,
                 sysUserRoleMapper,
                 callbacksProvider,
-                30
+                30,
+                5
         );
     }
 
@@ -156,5 +157,25 @@ class ChatPresenceServiceTest {
         assertEquals("AGENT_RECONNECTING", notice.getValue().get("event"));
         assertEquals("S001", notice.getValue().get("sessionId"));
         assertEquals(30L, notice.getValue().get("graceSeconds"));
+    }
+
+    @Test
+    void typingEventIsStoredAndSentToTheOtherSessionParticipant() {
+        ChatSession session = new ChatSession();
+        session.setId("S001");
+        session.setUserId("U001");
+        session.setAgentId("A001");
+        when(chatSessionMapper.selectById("S001")).thenReturn(session);
+
+        service.handleTyping("S001", "U001", true);
+
+        verify(chatRedisRepository).setValue(
+                RedisConstants.SESSION_TYPING + "S001:U001", "1", 5, java.util.concurrent.TimeUnit.SECONDS
+        );
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<Map<String, Object>> event = ArgumentCaptor.forClass(Map.class);
+        verify(messagingTemplate).convertAndSendToUser(eq("A001"), eq("/queue/chat"), event.capture());
+        assertEquals("TYPING", event.getValue().get("event"));
+        assertEquals(true, event.getValue().get("typing"));
     }
 }

@@ -3,6 +3,7 @@ package com.example.customerservice.controller;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.HistoryRequest;
 import com.example.customerservice.service.ChatMessageOperations;
+import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.IAuthenticationService;
 import jakarta.validation.Validator;
@@ -26,6 +27,7 @@ class ChatControllerTest {
 
     @Mock private ChatRoutingOperations chatRoutingOperations;
     @Mock private ChatMessageOperations chatMessageOperations;
+    @Mock private ChatPresenceOperations chatPresenceOperations;
     @Mock private IAuthenticationService authenticationService;
     @Mock private Validator validator;
     @InjectMocks private ChatController controller;
@@ -53,5 +55,12 @@ class ChatControllerTest {
         Map<String, Object> response = controller.getHistory(request, () -> "U001");
 
         assertEquals("history-1", response.get("requestId"));
+    }
+
+    @Test
+    void typingEventIsDelegatedToPresenceOperations() {
+        controller.handleTyping(Map.of("sessionId", "S001", "typing", true), () -> "U001");
+
+        verify(chatPresenceOperations).handleTyping("S001", "U001", true);
     }
 }

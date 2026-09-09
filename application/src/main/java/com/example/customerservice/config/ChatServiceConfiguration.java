@@ -74,7 +74,10 @@ public class ChatServiceConfiguration {
             MessagePersistService messagePersistService,
             ObjectMapper objectMapper,
             ChatOfflineMessageOperations chatOfflineMessageOperations,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
+            @Value("${app.chat.message.recall-window-seconds}") long messageRecallWindowSeconds,
+            @Value("${app.chat.message.edit-window-seconds}") long messageEditWindowSeconds,
+            @Value("${app.chat.message.rate-limit.max-messages}") long messageRateLimitMax,
+            @Value("${app.chat.message.rate-limit.window-seconds}") long messageRateLimitWindowSeconds
     ) {
         return new ChatMessageDeliveryService(
                 chatRedisRepository,
@@ -87,7 +90,9 @@ public class ChatServiceConfiguration {
                 objectMapper,
                 chatOfflineMessageOperations,
                 messageRecallWindowSeconds,
-                 300
+                messageEditWindowSeconds,
+                messageRateLimitMax,
+                messageRateLimitWindowSeconds
         );
     }
 
@@ -99,7 +104,7 @@ public class ChatServiceConfiguration {
             ChatMessageReadMapper chatMessageReadMapper,
             SimpMessagingTemplate messagingTemplate,
             ObjectMapper objectMapper,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
+            @Value("${app.chat.message.recall-window-seconds}") long messageRecallWindowSeconds
             
     ) {
         return new ChatMessageManagementService(
@@ -132,7 +137,8 @@ public class ChatServiceConfiguration {
             SimpMessagingTemplate messagingTemplate,
             SysUserRoleMapper sysUserRoleMapper,
             ObjectProvider<ChatPresenceCallbacks> callbacksProvider,
-            @Value("${app.chat.agent-reconnect-grace-seconds:20}") long agentReconnectGraceSeconds
+            @Value("${app.chat.agent-reconnect-grace-seconds:20}") long agentReconnectGraceSeconds,
+            @Value("${app.chat.typing.ttl-seconds}") long typingTtlSeconds
     ) {
         return new ChatPresenceService(
                 chatRedisRepository,
@@ -141,7 +147,8 @@ public class ChatServiceConfiguration {
                 messagingTemplate,
                 sysUserRoleMapper,
                 callbacksProvider,
-                agentReconnectGraceSeconds
+                agentReconnectGraceSeconds,
+                typingTtlSeconds
         );
     }
 
@@ -209,8 +216,8 @@ public class ChatServiceConfiguration {
             @Value("${app.chat.queue.average-handle-seconds:300}") long averageHandleSeconds,
             @Value("${app.chat.queue.vip-priority-step-seconds:1000000000}") long vipPriorityStepSeconds,
             @Value("${app.chat.queue.anti-starvation-seconds:180}") long antiStarvationSeconds,
-            @Value("${app.chat.message.recall-window-seconds:120}") long messageRecallWindowSeconds
-            ,
+            @Value("${app.chat.message.recall-window-seconds}") long messageRecallWindowSeconds,
+            @Value("${app.chat.message.edit-window-seconds}") long messageEditWindowSeconds,
             @Value("${app.chat.reconciliation.active-session-batch-size:200}")
             int activeSessionReconciliationBatchSize
     ) {
@@ -235,8 +242,8 @@ public class ChatServiceConfiguration {
                 vipPriorityStepSeconds,
                 antiStarvationSeconds,
                 messageRecallWindowSeconds,
-                 300,
-                 activeSessionReconciliationBatchSize
+                messageEditWindowSeconds,
+                activeSessionReconciliationBatchSize
         );
     }
 

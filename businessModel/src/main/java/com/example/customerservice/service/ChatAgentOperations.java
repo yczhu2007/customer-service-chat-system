@@ -11,5 +11,9 @@ public interface ChatAgentOperations {
 
     void setAgentVipSkill(String agentId, boolean enabled);
 
+    void setAgentVipSkillByLoginNumber(String loginNumber, boolean enabled);
+
     Set<String> findVipSkillAgentIds();
+
+    Set<String> findVipSkillAgentLoginNumbers();
 }

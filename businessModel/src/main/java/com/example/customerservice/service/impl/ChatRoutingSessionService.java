@@ -449,6 +449,30 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
     }
 
     @Override
+    public boolean cancelWaitingUser(String userId) {
+        if (userId == null || userId.isBlank()) {
+            throw new IllegalArgumentException("userId不能为空");
+        }
+        Long removed = chatRedisRepository.cancelQueueEntry(userId);
+        boolean cancelled = removed != null && removed > 0;
+        try {
+            refreshWaitingPositions();
+        } catch (RuntimeException exception) {
+            log.warn("刷新排队位置通知失败，取消操作已完成，userId={}", userId, exception);
+        }
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    userId,
+                    "/queue/chat",
+                    Map.of("event", "QUEUE_CANCELLED")
+            );
+        } catch (RuntimeException exception) {
+            log.warn("发送取消排队通知失败，取消操作已完成，userId={}", userId, exception);
+        }
+        return cancelled;
+    }
+
+    @Override
     public void backfillWaitingUsers(Iterable<String> userIds) {
         boolean changed = false;
         for (String userId : userIds) {

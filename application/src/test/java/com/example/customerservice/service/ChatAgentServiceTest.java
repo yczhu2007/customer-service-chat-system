@@ -115,4 +115,49 @@ class ChatAgentServiceTest {
 
         verify(routingOperations).refreshWaitingPositions();
     }
+
+    @Test
+    void vipSkillCanBeAssignedUsingEnabledAgentLoginNumber() {
+        ChatRedisRepository redisRepository = mock(ChatRedisRepository.class);
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        SysUserRoleMapper userRoleMapper = mock(SysUserRoleMapper.class);
+        ChatAgentSkillMapper skillMapper = mock(ChatAgentSkillMapper.class);
+        SysUser agent = new SysUser();
+        agent.setId("A001");
+        agent.setStatus("ENABLED");
+        when(userMapper.findByUsername("agent-login")).thenReturn(agent);
+        when(userMapper.selectById("A001")).thenReturn(agent);
+        when(userRoleMapper.findRoleCodesByUserId("A001")).thenReturn(Set.of("AGENT"));
+        when(skillMapper.selectCount(any())).thenReturn(0L);
+        when(skillMapper.selectList(any())).thenReturn(List.of());
+        ChatAgentService service = new ChatAgentService(
+                redisRepository, mock(ChatAgentSessionRecoveryService.class),
+                mock(ChatRoutingOperations.class), mock(ChatPresenceOperations.class),
+                mock(ChatSessionNotificationOperations.class), userMapper, userRoleMapper, skillMapper
+        );
+
+        service.setAgentVipSkillByLoginNumber("agent-login", true);
+
+        verify(skillMapper).insert(any(ChatAgentSkill.class));
+    }
+
+    @Test
+    void vipSkillAgentListUsesLoginNumbers() {
+        ChatRedisRepository redisRepository = mock(ChatRedisRepository.class);
+        SysUserMapper userMapper = mock(SysUserMapper.class);
+        SysUser agent = new SysUser();
+        agent.setUsername("agent-login");
+        when(redisRepository.setMembers(RedisConstants.AGENT_SKILL_VIP)).thenReturn(Set.of("A001"));
+        when(userMapper.selectById("A001")).thenReturn(agent);
+        ChatAgentService service = new ChatAgentService(
+                redisRepository, mock(ChatAgentSessionRecoveryService.class),
+                mock(ChatRoutingOperations.class), mock(ChatPresenceOperations.class),
+                mock(ChatSessionNotificationOperations.class), userMapper,
+                mock(SysUserRoleMapper.class), mock(ChatAgentSkillMapper.class)
+        );
+
+        Set<String> loginNumbers = service.findVipSkillAgentLoginNumbers();
+
+        assertEquals(Set.of("agent-login"), loginNumbers);
+    }
 }

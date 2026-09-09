@@ -1,40 +1,22 @@
 package com.example.customerservice.controller;
 
-import com.example.customerservice.constant.SessionParticipantType;
 import com.example.customerservice.domain.ChatMessage;
-import com.example.customerservice.domain.ChatSession;
-import com.example.customerservice.domain.SysUser;
-import com.example.customerservice.mapper.ChatSessionMapper;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
-import com.example.customerservice.repository.ChatRedisRepository;
-import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.dto.*;
-import com.example.customerservice.security.CurrentUser;
-import com.example.customerservice.security.AuthRateLimiter;
 import com.example.customerservice.service.IAuthenticationService;
-import com.example.customerservice.service.ChatAgentOperations;
 import com.example.customerservice.service.ChatMessageOperations;
 import com.example.customerservice.service.ChatPresenceOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.ChatSessionOperations;
-import com.example.customerservice.service.MessagePersistService;
-import com.example.customerservice.service.ChatSessionQueryService;
-import com.example.customerservice.common.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
 import org.springframework.validation.annotation.Validated;
 
 import java.security.Principal;
@@ -42,7 +24,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.TimeUnit;
 
 
 @Component
@@ -67,15 +48,6 @@ public class ChatController {
 
     @Autowired
     private Validator validator;
-
-    @Autowired
-    private ChatSessionMapper chatSessionMapper;
-
-    @Autowired
-    private ChatRedisRepository chatRedisRepository;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
 
     @MessageMapping("/chat.start")
     public void startConsultation(
@@ -127,24 +99,9 @@ public class ChatController {
         if (sessionId == null || sessionId.isBlank() || sessionId.length() > 64) {
             throw new IllegalArgumentException("sessionId不能为空");
         }
-        ChatSession session = chatSessionMapper.selectById(sessionId);
-        if (session == null) throw new IllegalArgumentException("会话不存在");
         String senderId = principal.getName();
-        String recipientId;
-        if (senderId.equals(session.getUserId())) recipientId = session.getAgentId();
-        else if (senderId.equals(session.getAgentId())) recipientId = session.getUserId();
-        else throw new IllegalArgumentException("无权操作该会话");
-        if (recipientId == null || recipientId.isBlank()) return;
         boolean typing = Boolean.TRUE.equals(request.get("typing"));
-        String key = RedisConstants.SESSION_TYPING + sessionId + ":" + senderId;
-        if (typing) chatRedisRepository.setValue(key, "1", 5, TimeUnit.SECONDS);
-        else chatRedisRepository.delete(key);
-        Map<String, Object> event = new HashMap<>();
-        event.put("event", "TYPING");
-        event.put("sessionId", sessionId);
-        event.put("senderId", senderId);
-        event.put("typing", typing);
-        messagingTemplate.convertAndSendToUser(recipientId, "/queue/chat", event);
+        chatPresenceOperations.handleTyping(sessionId, senderId, typing);
     }
 
     @MessageMapping("/chat.send")

@@ -131,6 +131,23 @@ class ChatMessageServiceTest {
     }
 
     @Test
+    void cancellingWaitingUserRemovesQueueEntryAndNotifiesUser() {
+        when(redisTemplate.execute(
+                any(RedisScript.class), anyList(), any(Object[].class)
+        )).thenReturn(1L);
+
+        boolean cancelled = routingOperations.cancelWaitingUser("U001");
+
+        assertTrue(cancelled);
+        verify(messagingTemplate).convertAndSendToUser(
+                eq("U001"), eq("/queue/chat"),
+                org.mockito.ArgumentMatchers.argThat(
+                        (Map<String, Object> event) -> "QUEUE_CANCELLED".equals(event.get("event"))
+                )
+        );
+    }
+
+    @Test
     void markMessagesReadRejectsOwnMessageAsReadAnchor() {
         ChatSession session = activeSession();
         ChatMessage anchor = textMessage();
@@ -498,7 +515,7 @@ class ChatMessageServiceTest {
                                 messagingTemplate,
                                 objectMapper
                         ),
-                        120, 300
+                        120, 300, 10, 1
                 ),
                 new ChatMessageManagementService(
                         chatRedisRepository, chatSessionMapper, chatMessageMapper,

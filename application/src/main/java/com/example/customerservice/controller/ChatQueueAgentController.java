@@ -1,21 +1,15 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
-import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.DeadLetterMessageVO;
 import com.example.customerservice.dto.PageResult;
-import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAgentOperations;
 import com.example.customerservice.service.ChatRoutingOperations;
 import com.example.customerservice.service.MessagePersistService;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,14 +20,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/chat")
-@Slf4j
 @Validated
 public class ChatQueueAgentController {
 
@@ -41,30 +31,13 @@ public class ChatQueueAgentController {
     @Autowired private ChatAgentOperations chatAgentOperations;
     @Autowired private MessagePersistService messagePersistService;
     @Autowired private CurrentUser currentUser;
-    @Autowired private ChatRedisRepository chatRedisRepository;
-    @Autowired private SimpMessagingTemplate messagingTemplate;
-    @Autowired private SysUserMapper sysUserMapper;
-    @Autowired private SysUserRoleMapper sysUserRoleMapper;
 
     @PostMapping("/queue/cancel")
     public Result<Void> cancelQueue() {
         currentUser.requireRole("USER");
         currentUser.requirePermission("chat:user:access");
         String userId = currentUser.getUserId();
-        Long removed = chatRedisRepository.cancelQueueEntry(userId);
-        boolean cancelled = removed != null && removed > 0;
-        try {
-            chatRoutingOperations.refreshWaitingPositions();
-        } catch (RuntimeException exception) {
-            log.warn("刷新排队位置通知失败，取消操作已完成，userId={}", userId, exception);
-        }
-        try {
-            Map<String, Object> event = new HashMap<>();
-            event.put("event", "QUEUE_CANCELLED");
-            messagingTemplate.convertAndSendToUser(userId, "/queue/chat", event);
-        } catch (RuntimeException exception) {
-            log.warn("发送取消排队通知失败，取消操作已完成，userId={}", userId, exception);
-        }
+        boolean cancelled = chatRoutingOperations.cancelWaitingUser(userId);
         return Result.successMessage(cancelled ? "已取消排队" : "当前未在等待队列中");
     }
 
@@ -91,7 +64,7 @@ public class ChatQueueAgentController {
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatAgentOperations.setAgentVipSkill(requireEnabledAgentId(agentLoginNumber), true);
+        chatAgentOperations.setAgentVipSkillByLoginNumber(agentLoginNumber, true);
         return Result.successMessage("已加入VIP坐席技能组");
     }
 
@@ -102,7 +75,7 @@ public class ChatQueueAgentController {
     ) {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        chatAgentOperations.setAgentVipSkill(requireEnabledAgentId(agentLoginNumber), false);
+        chatAgentOperations.setAgentVipSkillByLoginNumber(agentLoginNumber, false);
         return Result.successMessage("已移出VIP坐席技能组");
     }
 
@@ -110,11 +83,7 @@ public class ChatQueueAgentController {
     public Result<Set<String>> findVipSkillAgents() {
         currentUser.requireRole("ADMIN");
         currentUser.requirePermission("chat:agent:vip-skill:manage");
-        return Result.success(chatAgentOperations.findVipSkillAgentIds().stream()
-                .map(sysUserMapper::selectById)
-                .filter(user -> user != null && user.getUsername() != null && !user.getUsername().isBlank())
-                .map(SysUser::getUsername)
-                .collect(Collectors.toSet()));
+        return Result.success(chatAgentOperations.findVipSkillAgentLoginNumbers());
     }
 
     @GetMapping("/admin/deadletters")
@@ -147,18 +116,6 @@ public class ChatQueueAgentController {
         requireDeadLetterManagementPermission();
         messagePersistService.deleteDeadLetter(messageId);
         return Result.successMessage("死信消息已删除");
-    }
-
-    private String requireEnabledAgentId(String loginNumber) {
-        SysUser agent = sysUserMapper.findByUsername(loginNumber.trim());
-        if (agent == null || !"ENABLED".equals(agent.getStatus())) {
-            throw new IllegalArgumentException("客服登录编号不存在或账号已禁用");
-        }
-        Set<String> roles = sysUserRoleMapper.findRoleCodesByUserId(agent.getId());
-        if (roles == null || !roles.contains("AGENT")) {
-            throw new IllegalArgumentException("该登录编号不是客服账号");
-        }
-        return agent.getId();
     }
 
     private void requireDeadLetterManagementPermission() {

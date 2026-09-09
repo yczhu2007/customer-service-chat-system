@@ -36,6 +36,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
     private final SysUserRoleMapper sysUserRoleMapper;
     private final ObjectProvider<ChatPresenceCallbacks> callbacksProvider;
     private final long agentReconnectGraceMillis;
+    private final long typingTtlSeconds;
     private final ChatPresenceStateStore presenceStateStore;
 
     public ChatPresenceService(
@@ -45,7 +46,8 @@ public class ChatPresenceService implements ChatPresenceOperations {
             SimpMessagingTemplate messagingTemplate,
             SysUserRoleMapper sysUserRoleMapper,
             ObjectProvider<ChatPresenceCallbacks> callbacksProvider,
-            long agentReconnectGraceSeconds
+            long agentReconnectGraceSeconds,
+            long typingTtlSeconds
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.chatSessionMapper = chatSessionMapper;
@@ -54,6 +56,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.callbacksProvider = callbacksProvider;
         this.agentReconnectGraceMillis = agentReconnectGraceSeconds * 1000L;
+        this.typingTtlSeconds = Math.max(1L, typingTtlSeconds);
         this.presenceStateStore = new ChatPresenceStateStore(chatRedisRepository);
     }
 
@@ -213,6 +216,29 @@ public class ChatPresenceService implements ChatPresenceOperations {
             chatRedisRepository.stopLockRenewal(presenceLockRenewal);
             releasePresenceLock(userId, presenceLockToken);
         }
+    }
+
+    @Override
+    public void handleTyping(String sessionId, String senderId, boolean typing) {
+        if (sessionId == null || sessionId.isBlank() || sessionId.length() > 64) {
+            throw new IllegalArgumentException("sessionId不能为空");
+        }
+        ChatSession session = chatSessionMapper.selectById(sessionId);
+        if (session == null) throw new IllegalArgumentException("会话不存在");
+        String recipientId;
+        if (senderId.equals(session.getUserId())) recipientId = session.getAgentId();
+        else if (senderId.equals(session.getAgentId())) recipientId = session.getUserId();
+        else throw new IllegalArgumentException("无权操作该会话");
+        if (recipientId == null || recipientId.isBlank()) return;
+        String key = RedisConstants.SESSION_TYPING + sessionId + ":" + senderId;
+        if (typing) chatRedisRepository.setValue(key, "1", typingTtlSeconds, TimeUnit.SECONDS);
+        else chatRedisRepository.delete(key);
+        Map<String, Object> event = new HashMap<>();
+        event.put("event", "TYPING");
+        event.put("sessionId", sessionId);
+        event.put("senderId", senderId);
+        event.put("typing", typing);
+        messagingTemplate.convertAndSendToUser(recipientId, "/queue/chat", event);
     }
 
 

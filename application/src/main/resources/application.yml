@@ -49,6 +49,11 @@ app:
     message:
       recall-window-seconds: ${CHAT_MESSAGE_RECALL_WINDOW_SECONDS:120}
       edit-window-seconds: ${CHAT_MESSAGE_EDIT_WINDOW_SECONDS:300}
+      rate-limit:
+        max-messages: ${CHAT_MESSAGE_RATE_LIMIT_MAX_MESSAGES:10}
+        window-seconds: ${CHAT_MESSAGE_RATE_LIMIT_WINDOW_SECONDS:1}
+    typing:
+      ttl-seconds: ${CHAT_TYPING_TTL_SECONDS:5}
     attachment:
       cleanup-initial-delay-ms: ${CHAT_ATTACHMENT_CLEANUP_INITIAL_DELAY_MS:300000}
       cleanup-delay-ms: ${CHAT_ATTACHMENT_CLEANUP_DELAY_MS:86400000}

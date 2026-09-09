@@ -11,6 +11,8 @@ public interface ChatRoutingOperations {
 
     void enqueueWaitingUser(String userId);
 
+    boolean cancelWaitingUser(String userId);
+
     void backfillWaitingUsers(Iterable<String> userIds);
 
     void refreshWaitingPositions();

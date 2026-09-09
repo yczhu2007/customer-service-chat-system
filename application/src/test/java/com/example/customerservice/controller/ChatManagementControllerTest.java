@@ -8,19 +8,14 @@ import com.example.customerservice.dto.AdminReportQueryDTO;
 import com.example.customerservice.dto.ChatSessionListItemVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.dto.SessionTransferLogVO;
-import com.example.customerservice.domain.ChatSession;
-import com.example.customerservice.mapper.ChatSessionMapper;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatManagementQueryService;
-import com.example.customerservice.service.ChatSessionDeletionService;
-import com.example.customerservice.service.ChatSessionOperations;
+import com.example.customerservice.service.ChatAdministrationOperations;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.junit.jupiter.api.BeforeEach;
-import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import java.lang.reflect.Method;
@@ -40,18 +35,9 @@ import static org.mockito.Mockito.when;
 class ChatManagementControllerTest {
 
     @Mock private ChatManagementQueryService managementQueryService;
-    @Mock private ChatSessionMapper sessionMapper;
-    @Mock private ChatSessionDeletionService sessionDeletionService;
-    @Mock private ChatSessionOperations sessionOperations;
+    @Mock private ChatAdministrationOperations administrationOperations;
     @Mock private CurrentUser currentUser;
     @InjectMocks private ChatManagementController controller;
-
-    @BeforeEach
-    void setUp() {
-        ReflectionTestUtils.setField(controller, "sessionMapper", sessionMapper);
-        ReflectionTestUtils.setField(controller, "sessionDeletionService", sessionDeletionService);
-        ReflectionTestUtils.setField(controller, "sessionOperations", sessionOperations);
-    }
 
     @Test
     void agentCanReadOwnSessionViews() {
@@ -174,15 +160,9 @@ class ChatManagementControllerTest {
 
     @Test
     void adminEndsActiveSessionBeforePermanentlyDeletingIt() {
-        ChatSession session = new ChatSession();
-        session.setStatus("ACTIVE");
-        session.setAgentId("A001");
-        when(sessionMapper.selectById("S001")).thenReturn(session);
-
         controller.deleteAdminSession("S001");
 
-        verify(sessionOperations).endSessionByAgent("S001", "A001");
-        verify(sessionDeletionService).deleteSession("S001");
+        verify(administrationOperations).deleteSession("S001");
         verify(currentUser).requireRole("ADMIN");
         verify(currentUser).requirePermission("chat:session:audit:view");
     }

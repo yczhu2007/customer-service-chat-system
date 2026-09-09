@@ -53,6 +53,8 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
     private final ChatOfflineMessageOperations offlineMessageOperations;
     private final long messageRecallWindowSeconds;
     private final long messageEditWindowSeconds;
+    private final long messageRateLimitMax;
+    private final long messageRateLimitWindowSeconds;
 
     public ChatMessageDeliveryService(
             ChatRedisRepository chatRedisRepository,
@@ -65,7 +67,9 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             ObjectMapper objectMapper,
             ChatOfflineMessageOperations offlineMessageOperations,
             long messageRecallWindowSeconds,
-            long messageEditWindowSeconds
+            long messageEditWindowSeconds,
+            long messageRateLimitMax,
+            long messageRateLimitWindowSeconds
     ) {
         this.chatRedisRepository = chatRedisRepository;
         this.chatSessionMapper = chatSessionMapper;
@@ -78,6 +82,8 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         this.offlineMessageOperations = offlineMessageOperations;
         this.messageRecallWindowSeconds = Math.max(1L, messageRecallWindowSeconds);
         this.messageEditWindowSeconds = Math.max(1L, messageEditWindowSeconds);
+        this.messageRateLimitMax = Math.max(1L, messageRateLimitMax);
+        this.messageRateLimitWindowSeconds = Math.max(1L, messageRateLimitWindowSeconds);
     }
     @Override
     public int handleMessage(ChatMessage message) {
@@ -100,17 +106,17 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             );
         }
 
-        /* ── 每用户每秒最多 10 条消息（Redis 原子限流） ── */
+        /* Redis 原子限流。 */
         String rateKey = RedisConstants.MSG_RATE_LIMIT + message.getSenderId();
         Long msgCount = null;
         try {
             // 使用Lua脚本原子执行INCR和条件EXPIRE，避免竞态条件
             // 失败策略：Redis不可用时采用fail-open（允许消息通过），仅记录警告日志
-            msgCount = chatRedisRepository.incrementAndExpire(rateKey, 1, TimeUnit.SECONDS);
+            msgCount = chatRedisRepository.incrementAndExpire(rateKey, messageRateLimitWindowSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException redisException) {
             log.warn("Redis消息限流检查失败，采用fail-open策略放行消息，senderId={}", message.getSenderId(), redisException);
         }
-        if (msgCount != null && msgCount > 10) {
+        if (msgCount != null && msgCount > messageRateLimitMax) {
             throw new BusinessStateException("消息发送过于频繁，请稍后重试");
         }
 
