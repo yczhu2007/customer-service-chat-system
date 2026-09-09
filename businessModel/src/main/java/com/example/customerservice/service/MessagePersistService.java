@@ -6,6 +6,8 @@ import com.example.customerservice.dto.PageResult;
 
 public interface MessagePersistService {
 
+    void retryAndCheckBacklog(long alertThreshold);
+
     void markPending(ChatMessage message);
 
     void persistMessageAsync(ChatMessage message);

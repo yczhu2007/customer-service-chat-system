@@ -43,6 +43,18 @@ import org.springframework.data.redis.core.ZSetOperations;
 @Slf4j
 public class MessagePersistServiceImpl implements MessagePersistService {
 
+    @Override
+    public void retryAndCheckBacklog(long alertThreshold) {
+        retryFailedMessages();
+        Long pendingCount = redisTemplate.opsForZSet().zCard(RedisConstants.PERSIST_PENDING);
+        Long deadLetterCount = redisTemplate.opsForZSet().zCard(RedisConstants.PERSIST_DEADLETTER);
+        if ((pendingCount != null && pendingCount >= alertThreshold)
+                || (deadLetterCount != null && deadLetterCount > 0)) {
+            log.warn("消息持久化告警：pending={}, deadletter={}, threshold={}",
+                    pendingCount, deadLetterCount, alertThreshold);
+        }
+    }
+
     @PreDestroy
     public void shutdownRetryLeaseWatchdog() {
         RETRY_LEASE_WATCHDOG.shutdownNow();
