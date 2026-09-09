@@ -20,7 +20,7 @@ public class AgentReconnectGraceScheduler {
         this.schedulerLock = schedulerLock;
     }
 
-    @Scheduled(fixedDelay = 5_000)
+    @Scheduled(fixedDelayString = "${app.chat.agent-reconnect-sweep-delay-ms:5000}")
     public void handleExpiredGracePeriods() {
         schedulerLock.execute(
                 "agent-reconnect-grace",
@@ -29,19 +29,6 @@ public class AgentReconnectGraceScheduler {
     }
 
     private void handleExpiredGracePeriodsLocked() {
-        /* Set<String> agentIds = redisTemplate.opsForZSet().rangeByScore(
-                RedisConstants.AGENT_RECONNECT_GRACE,
-                0,
-                System.currentTimeMillis(),
-                0,
-                100
-        );
-        if (agentIds == null || agentIds.isEmpty()) {
-            return;
-        }
-        for (String agentId : agentIds) {
-            chatPresenceOperations.handleAgentReconnectGraceTimeout(agentId);
-        } */
         chatPresenceOperations.handleExpiredReconnectGracePeriods(System.currentTimeMillis(), 100);
     }
 }

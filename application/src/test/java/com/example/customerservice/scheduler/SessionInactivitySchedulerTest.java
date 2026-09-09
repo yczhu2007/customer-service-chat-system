@@ -28,7 +28,6 @@ class SessionInactivitySchedulerTest {
             return true;
         }).when(schedulerLock).execute(anyString(), any(Runnable.class));
         scheduler = new SessionInactivityScheduler(
-                null,
                 chatMaintenanceOperations,
                 schedulerLock,
                 60

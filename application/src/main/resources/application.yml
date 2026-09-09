@@ -51,14 +51,18 @@ app:
       password: ${ADMIN_BOOTSTRAP_PASSWORD:}
   chat:
     agent-reconnect-grace-seconds: ${CHAT_AGENT_RECONNECT_GRACE_SECONDS:20}
+    agent-reconnect-sweep-delay-ms: ${CHAT_AGENT_RECONNECT_SWEEP_DELAY_MS:5000}
+    heartbeat-sweep-delay-ms: ${CHAT_HEARTBEAT_SWEEP_DELAY_MS:10000}
     # 客服上线恢复会话时，单次IN查询的最大会话ID数量。
     agent-session-restore-batch-size: ${CHAT_AGENT_SESSION_RESTORE_BATCH_SIZE:100}
     vip:
       reserved-slots: ${CHAT_VIP_RESERVED_SLOTS:1}
     persist:
       alert-threshold: ${CHAT_PERSIST_ALERT_THRESHOLD:20}
+      reconciliation-delay-ms: ${CHAT_PERSIST_RECONCILIATION_DELAY_MS:30000}
     reconciliation:
       active-session-batch-size: ${CHAT_ACTIVE_SESSION_RECONCILIATION_BATCH_SIZE:200}
+      sweep-delay-ms: ${CHAT_RECONCILIATION_SWEEP_DELAY_MS:30000}
     redis-retention-sweep-delay-ms: ${CHAT_REDIS_RETENTION_SWEEP_DELAY_MS:3600000}
     message:
       recall-window-seconds: ${CHAT_MESSAGE_RECALL_WINDOW_SECONDS:120}

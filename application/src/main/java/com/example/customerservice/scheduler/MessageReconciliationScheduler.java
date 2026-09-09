@@ -31,9 +31,7 @@ public class MessageReconciliationScheduler {
         this.alertThreshold = alertThreshold;
     }
 
-    @Scheduled(
-            fixedDelay = 30_000
-    )
+    @Scheduled(fixedDelayString = "${app.chat.persist.reconciliation-delay-ms:30000}")
     public void retryFailedMessages() {
         schedulerLock.execute(
                 "message-reconciliation",

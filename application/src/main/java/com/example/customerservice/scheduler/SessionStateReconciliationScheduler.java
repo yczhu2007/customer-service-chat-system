@@ -23,7 +23,7 @@ public class SessionStateReconciliationScheduler {
         this.schedulerLock = schedulerLock;
     }
 
-    @Scheduled(fixedDelay = 30_000)
+    @Scheduled(fixedDelayString = "${app.chat.reconciliation.sweep-delay-ms:30000}")
     public void reconcileSessionState() {
         schedulerLock.execute(
                 "session-state-reconciliation",

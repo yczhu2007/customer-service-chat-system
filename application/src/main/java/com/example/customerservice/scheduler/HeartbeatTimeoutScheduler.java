@@ -34,9 +34,7 @@ public class HeartbeatTimeoutScheduler {
      * 上一次任务结束10秒后，
      * 再执行下一次任务。
      */
-    @Scheduled(
-            fixedDelay = 10_000
-    )
+    @Scheduled(fixedDelayString = "${app.chat.heartbeat-sweep-delay-ms:10000}")
     public void scanHeartbeatTimeout() {
         schedulerLock.execute(
                 "heartbeat-timeout",
