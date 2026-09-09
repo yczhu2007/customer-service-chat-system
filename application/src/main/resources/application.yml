@@ -13,6 +13,20 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    distribution:
+      percentiles:
+        chat.message.persist.latency: 0.95
+        chat.redis.session.lock.acquire: 0.95
+      percentiles-histogram:
+        chat.message.persist.latency: true
+        chat.redis.session.lock.acquire: true
+
 app:
   auth:
     # 登录Token写入Redis时设置TTL，过期后认证自动失效。
