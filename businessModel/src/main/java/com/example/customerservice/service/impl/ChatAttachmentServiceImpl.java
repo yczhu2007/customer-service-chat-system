@@ -235,8 +235,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
         }
     }
 
-    @Override
-    public ChatAttachment requireAccessible(String userId, String attachmentId) {
+    private ChatAttachment requireAccessible(String userId, String attachmentId) {
         ChatAttachment attachment = attachmentMapper.selectById(attachmentId);
         if (attachment == null) throw new NotFoundException("附件不存在");
         requireParticipant(userId, attachment.getSessionId());
@@ -261,8 +260,7 @@ public class ChatAttachmentServiceImpl implements ChatAttachmentService {
                 .toList();
     }
 
-    @Override
-    public Resource load(ChatAttachment attachment) {
+    private Resource load(ChatAttachment attachment) {
         try {
             return new InputStreamResource(storage.open(attachment.getStoredName()));
         } catch (RuntimeException exception) {
