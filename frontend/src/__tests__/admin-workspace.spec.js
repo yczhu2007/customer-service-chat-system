@@ -486,13 +486,42 @@ describe('AdminDashboard', () => {
     const { findAdminDashboard } = await import('../api/admin-api')
     findAdminDashboard.mockResolvedValue({ data: {} })
     const AdminDashboard = (await import('../components/admin/AdminDashboard.vue')).default
-    const wrapper = mount(AdminDashboard)
+    const wrapper = mount(AdminDashboard, {
+      global: { stubs: { SystemMonitoringPanel: true } },
+    })
     await new Promise((resolve) => setTimeout(resolve, 0))
     await nextTick()
 
     const initialCalls = findAdminDashboard.mock.calls.length
     await wrapper.get('button.refresh-dashboard').trigger('click')
     expect(findAdminDashboard.mock.calls.length).toBe(initialCalls + 1)
+  })
+
+  it('shows system monitoring on the management dashboard', async () => {
+    const AdminDashboard = (await import('../components/admin/AdminDashboard.vue')).default
+    const wrapper = mount(AdminDashboard, {
+      global: {
+        stubs: {
+          SystemMonitoringPanel: { template: '<div class="monitoring-stub">系统监控</div>' },
+        },
+      },
+    })
+
+    expect(wrapper.find('.monitoring-stub').exists()).toBe(true)
+  })
+
+  it('does not show system monitoring in the report panel', async () => {
+    const AdminReportPanel = (await import('../components/admin/AdminReportPanel.vue')).default
+    const wrapper = mount(AdminReportPanel, {
+      global: {
+        stubs: {
+          SystemMonitoringPanel: { template: '<div class="monitoring-stub">系统监控</div>' },
+          ReportChart: true,
+        },
+      },
+    })
+
+    expect(wrapper.find('.monitoring-stub').exists()).toBe(false)
   })
 })
 

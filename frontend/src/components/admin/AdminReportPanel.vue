@@ -4,7 +4,6 @@ import { ElMessage } from 'element-plus'
 import { findAdminReportOverview } from '../../api/admin-api'
 import { createRecent30DayRange } from '../../utils/admin-date-range'
 import ReportChart from './ReportChart.vue'
-import SystemMonitoringPanel from './SystemMonitoringPanel.vue'
 import { buildReportXlsx, createReportFilename } from './report-export'
 import {
   buildAgentReceptionOption,
@@ -98,8 +97,6 @@ onMounted(loadReport)
         <button class="btn export-report" :disabled="loading || !!error || !report" @click="exportReport">导出 XLSX</button>
       </div>
     </div>
-
-    <SystemMonitoringPanel />
 
     <div v-if="loading" class="loading">报表加载中…</div>
     <div v-else-if="error" class="error">{{ error }}</div>

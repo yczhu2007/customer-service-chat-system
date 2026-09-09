@@ -1,6 +1,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { findAdminDashboard } from '../../api/admin-api'
+import SystemMonitoringPanel from './SystemMonitoringPanel.vue'
 
 const loading = ref(true)
 const error = ref(null)
@@ -52,6 +53,8 @@ onMounted(loadDashboard)
       </div>
 
     </template>
+
+    <SystemMonitoringPanel />
   </section>
 </template>
 
