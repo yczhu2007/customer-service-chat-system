@@ -22,6 +22,10 @@ public interface IAuthenticationService {
 
     Set<String> findRoleCodesByUserId(String userId);
 
+    void requireEnabledUser(String userId);
+
+    void requireChatSubscriptionPermission(String userId);
+
     void requireRole(String userId, String roleCode);
 
     void requirePermission(String userId, String permissionCode);

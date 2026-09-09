@@ -1,7 +1,6 @@
 package com.example.customerservice.config;
 
-import com.example.customerservice.mapper.SysRolePermissionMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.TokenService;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
@@ -40,17 +39,14 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     private static final String CHAT_QUEUE = "/user/queue/chat";
 
     private final TokenService tokenService;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final SysRolePermissionMapper sysRolePermissionMapper;
+    private final IAuthenticationService authenticationService;
 
     public StompAuthChannelInterceptor(
             TokenService tokenService,
-            SysUserRoleMapper sysUserRoleMapper,
-            SysRolePermissionMapper sysRolePermissionMapper
+            IAuthenticationService authenticationService
     ) {
         this.tokenService = tokenService;
-        this.sysUserRoleMapper = sysUserRoleMapper;
-        this.sysRolePermissionMapper = sysRolePermissionMapper;
+        this.authenticationService = authenticationService;
     }
 
     @Override
@@ -129,16 +125,10 @@ public class StompAuthChannelInterceptor implements ChannelInterceptor {
     }
 
     private void requireChatSubscriptionPermission(String userId) {
-        Set<String> roleCodes = sysUserRoleMapper.findRoleCodesByUserId(userId);
-        if (roleCodes != null && (roleCodes.contains("AGENT") || roleCodes.contains("ADMIN"))) {
-            return;
-        }
-        if (roleCodes == null || !roleCodes.contains("USER")) {
-            throw new MessageDeliveryException("当前用户角色不允许订阅聊天队列");
-        }
-        Set<String> permissionCodes = sysRolePermissionMapper.findPermissionCodesByUserId(userId);
-        if (permissionCodes == null || !permissionCodes.contains("chat:user:access")) {
-            throw new MessageDeliveryException("当前用户缺少聊天接入权限");
+        try {
+            authenticationService.requireChatSubscriptionPermission(userId);
+        } catch (IllegalArgumentException exception) {
+            throw new MessageDeliveryException(exception.getMessage());
         }
     }
 }

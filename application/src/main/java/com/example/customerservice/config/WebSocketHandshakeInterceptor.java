@@ -1,8 +1,6 @@
 package com.example.customerservice.config;
 
-import com.example.customerservice.domain.SysUser;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.TokenService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.server.ServerHttpRequest;
@@ -35,17 +33,14 @@ public class WebSocketHandshakeInterceptor
             "Bearer ";
 
     private final TokenService tokenService;
-    private final SysUserMapper sysUserMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
+    private final IAuthenticationService authenticationService;
 
     public WebSocketHandshakeInterceptor(
             TokenService tokenService,
-            SysUserMapper sysUserMapper,
-            SysUserRoleMapper sysUserRoleMapper
+            IAuthenticationService authenticationService
     ) {
         this.tokenService = tokenService;
-        this.sysUserMapper = sysUserMapper;
-        this.sysUserRoleMapper = sysUserRoleMapper;
+        this.authenticationService = authenticationService;
     }
 
     @Override
@@ -76,28 +71,16 @@ public class WebSocketHandshakeInterceptor
             return false;
         }
 
-        SysUser user =
-                sysUserMapper.selectById(
-                        userId
-                );
-
-        if (
-                user == null ||
-                        !"ENABLED".equals(
-                                user.getStatus()
-                        )
-        ) {
+        try {
+            authenticationService.requireEnabledUser(userId);
+        } catch (IllegalArgumentException exception) {
             response.setStatusCode(
                     HttpStatus.UNAUTHORIZED
             );
             return false;
         }
 
-        Set<String> roleCodes =
-                sysUserRoleMapper
-                        .findRoleCodesByUserId(
-                                userId
-                        );
+        Set<String> roleCodes = authenticationService.findRoleCodesByUserId(userId);
 
         // Keep the credential in the server-side session attributes only; never expose it via Principal.
         attributes.put(ACCESS_TOKEN_ATTRIBUTE, token);
