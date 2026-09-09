@@ -43,6 +43,20 @@
           )
     </select>
 
+    <select id="findLastReadWatermark"
+            resultType="com.example.customerservice.dto.MessageReadWatermark">
+        SELECT read_state.message_id AS messageId,
+               message.create_time AS messageCreateTime,
+               read_state.read_time AS readAt
+        FROM chat_message_read read_state
+        INNER JOIN chat_message message
+                ON message.id = read_state.message_id
+        WHERE read_state.session_id = #{sessionId}
+          AND read_state.user_id = #{readerId}
+        ORDER BY message.create_time DESC, message.id DESC
+        LIMIT 1
+    </select>
+
     <select id="countUnreadBySessions" resultType="java.util.Map">
         SELECT message.session_id AS sessionId, COUNT(*) AS unreadCount
         FROM chat_message message

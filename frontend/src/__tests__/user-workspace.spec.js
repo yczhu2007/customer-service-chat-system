@@ -216,6 +216,38 @@ describe('User Workspace', () => {
     }
   })
 
+  it('restores peer-read state from the history watermark without overmarking newer messages', () => {
+    const auth = useAuthStore()
+    auth.login({ token: 't', userId: 'u1', role: 'USER' })
+    const chat = useChatStore()
+    chat.activeSessionId = 's1'
+    chat.markActiveSessionRead = vi.fn()
+
+    chat._handleChatEvent({
+      event: 'CHAT_HISTORY',
+      sessionId: 's1',
+      counterpartLastReadMessageId: 'm2',
+      counterpartLastReadMessageCreateTime: '2026-09-09T10:05:00',
+      counterpartLastReadAt: '2026-09-09T10:06:00',
+      messages: [
+        { id: 'm1', sessionId: 's1', senderId: 'u1', createTime: '2026-09-09T10:00:00' },
+        { id: 'm2', sessionId: 's1', senderId: 'u1', createTime: '2026-09-09T10:05:00' },
+        { id: 'm3', sessionId: 's1', senderId: 'u1', createTime: '2026-09-09T10:05:00' },
+        { id: 'm4', sessionId: 's1', senderId: 'u1', createTime: '2026-09-09T10:05:30' },
+        { id: 'm5', sessionId: 's1', senderId: 'a1', createTime: '2026-09-09T10:01:00' },
+      ],
+    })
+
+    expect(chat.messages.find((message) => message.id === 'm1')).toMatchObject({
+      readByPeer: true,
+      peerReadAt: '2026-09-09T10:06:00',
+    })
+    expect(chat.messages.find((message) => message.id === 'm2').readByPeer).toBe(true)
+    expect(chat.messages.find((message) => message.id === 'm3').readByPeer).not.toBe(true)
+    expect(chat.messages.find((message) => message.id === 'm4').readByPeer).not.toBe(true)
+    expect(chat.messages.find((message) => message.id === 'm5').readByPeer).not.toBe(true)
+  })
+
   it('does not turn the current user persisted message into unread after switching sessions', () => {
     const auth = useAuthStore()
     auth.login({ token: 't', userId: 'u1', role: 'USER' })
@@ -1261,6 +1293,49 @@ describe('User Workspace', () => {
   })
 
   describe('message rendering types', () => {
+    it('shows unread only on the latest persisted message sent by the current user', () => {
+      const auth = useAuthStore()
+      auth.login({ token: 't', userId: 'u1', role: 'USER' })
+      const chat = useChatStore()
+      chat.activeSessionId = 's1'
+      chat.messages = [
+        { id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '第一条', ackStatus: 'STORED' },
+        { id: 'm2', sessionId: 's1', senderId: 'a1', type: 'TEXT', content: '回复' },
+        { id: 'm3', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '最后一条', ackStatus: 'STORED' },
+        { id: 'm4', sessionId: 's2', senderId: 'u1', type: 'TEXT', content: '其他会话', ackStatus: 'STORED' },
+      ]
+
+      const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+
+      expect(wrapper.findAll('.message-state').map((state) => state.text())).toEqual(['未读'])
+      expect(wrapper.get('#message-m3').text()).toContain('未读')
+      expect(wrapper.get('#message-m4').find('.message-state').exists()).toBe(false)
+    })
+
+    it('changes the latest outgoing status to read and exposes the read time', async () => {
+      const auth = useAuthStore()
+      auth.login({ token: 't', userId: 'u1', role: 'USER' })
+      const chat = useChatStore()
+      chat.activeSessionId = 's1'
+      chat.messages = [
+        { id: 'm1', sessionId: 's1', senderId: 'u1', type: 'TEXT', content: '消息' },
+      ]
+      const wrapper = mount(MessageList, { props: { sessionId: 's1' } })
+
+      chat._handleMessageEvent({
+        event: 'MESSAGES_READ',
+        sessionId: 's1',
+        readerId: 'a1',
+        lastReadMessageId: 'm1',
+        readAt: '2026-09-09T18:20:00',
+      })
+      await wrapper.vm.$nextTick()
+
+      const status = wrapper.get('.message-state')
+      expect(status.text()).toBe('已读')
+      expect(status.attributes('title')).toBe('对方已于 2026-09-09 18:20 阅读')
+    })
+
     it('distinguishes TEXT, IMAGE, and FILE message types', () => {
       const messages = [
         { id: 'm1', type: 'TEXT', content: '你好', senderId: 'u1' },

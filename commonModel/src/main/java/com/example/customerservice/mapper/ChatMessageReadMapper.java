@@ -1,5 +1,6 @@
 package com.example.customerservice.mapper;
 
+import com.example.customerservice.dto.MessageReadWatermark;
 import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
@@ -19,6 +20,11 @@ public interface ChatMessageReadMapper {
     long countUnread(
             @Param("sessionId") String sessionId,
             @Param("userId") String userId
+    );
+
+    MessageReadWatermark findLastReadWatermark(
+            @Param("sessionId") String sessionId,
+            @Param("readerId") String readerId
     );
 
     /** 批量查询多个会话的未读消息数，返回 sessionId → 未读数。 */

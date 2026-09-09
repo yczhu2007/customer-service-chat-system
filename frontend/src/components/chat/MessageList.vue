@@ -1,9 +1,10 @@
 <script setup>
-import { ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { computed, ref, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useChatStore } from '../../stores/chat'
 import { useAuthStore } from '../../stores/auth'
 import { fetchAttachmentBlob, fetchAttachmentMetadataBatch, fetchAttachmentPreview } from '../../api/chat-api'
 import { previewCellText } from './xlsx-preview'
+import { formatDateTime } from '../../constants/session-ui'
 
 const props = defineProps({
   sessionId: { type: String, default: null },
@@ -65,6 +66,26 @@ function isMine(msg) {
 
 function isSystem(msg) {
   return !msg.senderId || msg.type === 'SYSTEM'
+}
+
+const latestPersistedOwnMessageId = computed(() => {
+  for (let index = chat.messages.length - 1; index >= 0; index -= 1) {
+    const message = chat.messages[index]
+    if (message.sessionId === props.sessionId && message.id && !message.recalled && isMine(message)) {
+      return message.id
+    }
+  }
+  return null
+})
+
+function isLatestPersistedMine(message) {
+  return message.id === latestPersistedOwnMessageId.value
+}
+
+function peerReadTitle(message) {
+  return message.readByPeer && message.peerReadAt
+    ? `对方已于 ${formatDateTime(message.peerReadAt)} 阅读`
+    : undefined
 }
 
 /** Format time for display */
@@ -426,9 +447,9 @@ onUnmounted(() => {
           <span v-if="msg.recalled" class="recalled-tag">(已撤回)</span>
           <span v-if="msg.sendState === 'SENDING'" class="message-state">发送中…</span>
           <span v-else-if="msg.sendState === 'FAILED'" class="message-state failed" :title="msg.failureReason">发送失败</span>
-          <span v-else-if="msg.ackStatus === 'STORED'" class="message-state">已保存</span>
-          <span v-else-if="msg.ackStatus === 'DELIVERED'" class="message-state">已送达</span>
-          <span v-if="isMine(msg) && msg.readByPeer" class="message-state">已读</span>
+          <span v-else-if="isLatestPersistedMine(msg)" class="message-state" :title="peerReadTitle(msg)">
+            {{ msg.readByPeer ? '已读' : '未读' }}
+          </span>
         </div>
 
         <!-- TEXT message -->

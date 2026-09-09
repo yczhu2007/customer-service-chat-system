@@ -356,6 +356,9 @@ public class ChatController {
         response.put("nextCursor", historyPage.nextCursor());
         response.put("hasMore", historyPage.hasMore());
         response.put("unreadCount", historyPage.unreadCount());
+        response.put("counterpartLastReadMessageId", historyPage.counterpartLastReadMessageId());
+        response.put("counterpartLastReadMessageCreateTime", historyPage.counterpartLastReadMessageCreateTime());
+        response.put("counterpartLastReadAt", historyPage.counterpartLastReadAt());
 
 
         response.put(

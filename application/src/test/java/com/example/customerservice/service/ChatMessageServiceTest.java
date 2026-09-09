@@ -6,6 +6,7 @@ import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
+import com.example.customerservice.dto.MessageReadWatermark;
 import com.example.customerservice.dto.AssignResult;
 import com.example.customerservice.dto.ChatHistoryPage;
 import com.example.customerservice.dto.ChatMessageDTO;
@@ -127,6 +128,11 @@ class ChatMessageServiceTest {
 
         assertEquals(3, result.markedCount());
         assertEquals(1L, result.unreadCount());
+        ArgumentCaptor<LocalDateTime> readAt = ArgumentCaptor.forClass(LocalDateTime.class);
+        verify(chatMessageReadMapper).markReadThrough(
+                eq("S001"), eq("U001"), eq("M001"), readAt.capture()
+        );
+        assertEquals(readAt.getValue(), result.readAt());
         verify(messagingTemplate).convertAndSendToUser(
                 eq("A001"), eq("/queue/messages"), eq(result)
         );
@@ -311,6 +317,40 @@ class ChatMessageServiceTest {
         assertEquals(10, result.pageSize());
         assertEquals(false, result.hasMore());
         assertEquals(4, result.unreadCount());
+    }
+
+    @Test
+    void historyQueryIncludesCounterpartReadWatermark() {
+        LocalDateTime readAt = LocalDateTime.of(2026, 9, 9, 18, 10);
+        LocalDateTime messageCreateTime = LocalDateTime.of(2026, 9, 9, 18, 5);
+        MessageReadWatermark watermark = new MessageReadWatermark("M001", messageCreateTime, readAt);
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(chatMessageMapper.selectLatestHistory("S001", 11)).thenReturn(List.of(textMessage()));
+        when(chatMessageMapper.selectCount(any())).thenReturn(1L);
+        when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(0L);
+        when(chatMessageReadMapper.findLastReadWatermark("S001", "A001"))
+                .thenReturn(watermark);
+
+        ChatHistoryPage result = service.getHistory("S001", "U001", null, 10);
+
+        assertEquals("M001", result.counterpartLastReadMessageId());
+        assertEquals(messageCreateTime, result.counterpartLastReadMessageCreateTime());
+        assertEquals(readAt, result.counterpartLastReadAt());
+    }
+
+    @Test
+    void historyQueryReturnsNullWatermarkWhenCounterpartHasNotReadMessages() {
+        when(chatSessionMapper.selectById("S001")).thenReturn(activeSession());
+        when(chatMessageMapper.selectLatestHistory("S001", 11)).thenReturn(List.of(textMessage()));
+        when(chatMessageMapper.selectCount(any())).thenReturn(1L);
+        when(chatMessageReadMapper.countUnread("S001", "U001")).thenReturn(0L);
+        when(chatMessageReadMapper.findLastReadWatermark("S001", "A001")).thenReturn(null);
+
+        ChatHistoryPage result = service.getHistory("S001", "U001", null, 10);
+
+        assertEquals(null, result.counterpartLastReadMessageId());
+        assertEquals(null, result.counterpartLastReadMessageCreateTime());
+        assertEquals(null, result.counterpartLastReadAt());
     }
 
     @Test

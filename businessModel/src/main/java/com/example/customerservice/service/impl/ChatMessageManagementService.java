@@ -11,6 +11,7 @@ import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.exception.BusinessStateException;
 import com.example.customerservice.dto.MessageMutationResult;
 import com.example.customerservice.dto.MessageReadResult;
+import com.example.customerservice.dto.MessageReadWatermark;
 import com.example.customerservice.mapper.ChatMessageMapper;
 import com.example.customerservice.mapper.ChatMessageReadMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -77,11 +78,12 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
             throw new IllegalArgumentException("最后已读消息必须由会话对方发送");
         }
 
+        LocalDateTime readAt = LocalDateTime.now();
         int markedCount = chatMessageReadMapper.markReadThrough(
                 sessionId,
                 readerId,
                 lastReadMessageId,
-                LocalDateTime.now()
+                readAt
         );
         long unreadCount = chatMessageReadMapper.countUnread(
                 sessionId,
@@ -92,7 +94,8 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 readerId,
                 lastReadMessageId,
                 markedCount,
-                unreadCount
+                unreadCount,
+                readAt
         );
 
         String counterpartId = readerId.equals(session.getUserId())
@@ -373,6 +376,10 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 Wrappers.<ChatMessage>lambdaQuery()
                         .eq(ChatMessage::getSessionId, sessionId)
         );
+        String counterpartId = isUser ? session.getAgentId() : session.getUserId();
+        MessageReadWatermark counterpartWatermark = counterpartId == null || counterpartId.isBlank()
+                ? null
+                : chatMessageReadMapper.findLastReadWatermark(sessionId, counterpartId);
 
         log.info(
                 "聊天历史查询成功，sessionId={}，查询者={}，游标={}，本次消息数量={}",
@@ -387,7 +394,10 @@ public class ChatMessageManagementService implements ChatMessageManagementOperat
                 pageSize,
                 nextCursor,
                 hasMore,
-                chatMessageReadMapper.countUnread(sessionId, operatorId)
+                chatMessageReadMapper.countUnread(sessionId, operatorId),
+                counterpartWatermark == null ? null : counterpartWatermark.messageId(),
+                counterpartWatermark == null ? null : counterpartWatermark.messageCreateTime(),
+                counterpartWatermark == null ? null : counterpartWatermark.readAt()
         );
     }
 

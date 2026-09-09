@@ -1,6 +1,7 @@
 package com.example.customerservice.dto;
 
 import java.io.Serializable;
+import java.time.LocalDateTime;
 
 /** 消息批量已读结果，同时作为发送给会话双方的已读状态事件。 */
 public record MessageReadResult(
@@ -9,7 +10,8 @@ public record MessageReadResult(
         String readerId,
         String lastReadMessageId,
         long markedCount,
-        long unreadCount
+        long unreadCount,
+        LocalDateTime readAt
 ) implements Serializable {
 
     private static final long serialVersionUID = 1L;
@@ -19,7 +21,8 @@ public record MessageReadResult(
             String readerId,
             String lastReadMessageId,
             long markedCount,
-            long unreadCount
+            long unreadCount,
+            LocalDateTime readAt
     ) {
         return new MessageReadResult(
                 "MESSAGES_READ",
@@ -27,7 +30,8 @@ public record MessageReadResult(
                 readerId,
                 lastReadMessageId,
                 markedCount,
-                unreadCount
+                unreadCount,
+                readAt
         );
     }
 }

@@ -286,7 +286,20 @@ export const useChatStore = defineStore('chat', {
       if (event === 'CHAT_HISTORY') {
         // History response
         if (this._historyPendingRequestId && body.requestId !== this._historyPendingRequestId) return
-        const incoming = body.messages || []
+        const auth = useAuthStore()
+        const watermarkTime = Date.parse(body.counterpartLastReadMessageCreateTime)
+        const incoming = (body.messages || []).map((message) => {
+          if (message.senderId !== auth.userId || !message.id || !Number.isFinite(watermarkTime)) {
+            return message
+          }
+          const messageTime = Date.parse(message.createTime)
+          const beforeWatermark = Number.isFinite(messageTime) && messageTime < watermarkTime
+          const atWatermark = messageTime === watermarkTime
+            && message.id <= body.counterpartLastReadMessageId
+          return beforeWatermark || atWatermark
+            ? { ...message, readByPeer: true, peerReadAt: body.counterpartLastReadAt }
+            : message
+        })
         // Prepend older messages or replace
         if (body.sessionId === this.activeSessionId) {
           this.messages = [...incoming, ...this.messages]
@@ -436,7 +449,7 @@ export const useChatStore = defineStore('chat', {
               return { ...message, read: true }
             }
             if (body.readerId !== auth.userId && message.senderId === auth.userId) {
-              return { ...message, readByPeer: true }
+              return { ...message, readByPeer: true, peerReadAt: body.readAt || message.peerReadAt }
             }
             return message
           })

@@ -14,6 +14,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -50,11 +51,30 @@ class ChatControllerTest {
         request.setRequestId("history-1");
         request.setPageSize(20);
         when(chatMessageOperations.getHistory("S001", "U001", null, 20))
-                .thenReturn(new ChatHistoryPage(List.of(), 0, 20, null, false, 0));
+                .thenReturn(new ChatHistoryPage(List.of(), 0, 20, null, false, 0, null, null, null));
 
         Map<String, Object> response = controller.getHistory(request, () -> "U001");
 
         assertEquals("history-1", response.get("requestId"));
+    }
+
+    @Test
+    void historyResponseIncludesCounterpartReadWatermark() {
+        HistoryRequest request = new HistoryRequest();
+        request.setSessionId("S001");
+        request.setPageSize(20);
+        LocalDateTime readAt = LocalDateTime.of(2026, 9, 9, 18, 15);
+        LocalDateTime messageCreateTime = LocalDateTime.of(2026, 9, 9, 18, 10);
+        when(chatMessageOperations.getHistory("S001", "U001", null, 20))
+                .thenReturn(new ChatHistoryPage(
+                        List.of(), 0, 20, null, false, 0, "M001", messageCreateTime, readAt
+                ));
+
+        Map<String, Object> response = controller.getHistory(request, () -> "U001");
+
+        assertEquals("M001", response.get("counterpartLastReadMessageId"));
+        assertEquals(messageCreateTime, response.get("counterpartLastReadMessageCreateTime"));
+        assertEquals(readAt, response.get("counterpartLastReadAt"));
     }
 
     @Test

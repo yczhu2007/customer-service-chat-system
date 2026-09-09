@@ -47,17 +47,17 @@
 **后端**
 
 1. `ChatMessageReadMapper` 新增查询：`findLastReadMessageId(String sessionId, String readerId)`，返回对方在该会话中已读到的最新消息 ID（`chat_message_read` 表中已读记录按消息创建时间倒序取第一条；表结构先读 `commonModel/src/main/resources/mapper/` 下对应 XML 确认字段名再写 SQL）。
-2. `ChatHistoryPage` record 增加字段 `counterpartLastReadMessageId`（String）和 `counterpartLastReadAt`（LocalDateTime，步骤 2 用）。注意这是 record，改构造签名会影响所有 `new ChatHistoryPage(...)` 调用点，全局搜索一并改。
+2. `ChatHistoryPage` record 增加字段 `counterpartLastReadMessageId`（String）、`counterpartLastReadMessageCreateTime`（LocalDateTime）和 `counterpartLastReadAt`（LocalDateTime，步骤 2 用）。注意这是 record，改构造签名会影响所有 `new ChatHistoryPage(...)` 调用点，全局搜索一并改。
 3. `getHistory` 组装结果时：取对方 ID（`readerId` 的对端），调 `findLastReadMessageId` 查出对方水位线，填入 `ChatHistoryPage`。
 
 **前端**
 
-4. `stores/chat.js` 加载历史（调 getHistory 的 action）完成后：遍历返回的消息，`createTime <= counterpartLastReadAt`（或以水位线消息为锚点比较序号/时间）且 `senderId === 当前用户` → `readByPeer: true`；`senderId !== 当前用户` → `read: true`。优先用时间比较，避免依赖消息 ID 的字典序。
+4. `stores/chat.js` 加载历史（调 getHistory 的 action）完成后：遍历返回的消息，按 `counterpartLastReadMessageCreateTime + counterpartLastReadMessageId` 复合水位线判断，且 `senderId === 当前用户` → `readByPeer: true`。`counterpartLastReadAt` 仅用于展示阅读时间，不能用于判断消息先后。
 
 ### 步骤 2：已读时间戳（半小时）
 
 1. `MessageReadResult` record 增加 `readAt`（LocalDateTime）；`completed(...)` 工厂方法签名同步扩展，`markMessagesRead` 里传入 `markReadThrough` 使用的同一个 `LocalDateTime.now()` 实例，保证库内时间与事件时间一致。
-2. 步骤 1 的水位线查询同时返回已读时间，`ChatHistoryPage.counterpartLastReadAt` 已预留。
+2. 步骤 1 的水位线查询同时返回水位线消息创建时间和已读时间，`ChatHistoryPage` 中对应字段已预留。
 3. 前端 `MessageList.vue` 的"已读" `<span>` 加 `:title` 绑定：`对方已于 ${formatDateTime(msg.peerReadAt)} 阅读`。用原生 title，不做弹层组件。
 
 ### 步骤 3："未读"状态渲染（1 小时）
