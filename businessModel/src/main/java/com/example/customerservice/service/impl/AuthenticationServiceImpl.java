@@ -120,6 +120,26 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     }
 
     @Override
+    public void requireEnabledUser(String userId) {
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || !"ENABLED".equals(user.getStatus())) {
+            throw new IllegalArgumentException("用户无效或已禁用");
+        }
+    }
+
+    @Override
+    public void requireChatSubscriptionPermission(String userId) {
+        Set<String> roleCodes = findRoleCodesByUserId(userId);
+        if (roleCodes.contains("AGENT") || roleCodes.contains("ADMIN")) {
+            return;
+        }
+        if (!roleCodes.contains("USER")) {
+            throw new IllegalArgumentException("当前用户角色不允许订阅聊天队列");
+        }
+        requirePermission(userId, "chat:user:access");
+    }
+
+    @Override
     public void requireRole(String userId, String roleCode) {
         if (!findRoleCodesByUserId(userId).contains(roleCode)) {
             throw new IllegalArgumentException("当前用户缺少角色：" + roleCode);

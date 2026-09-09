@@ -2,6 +2,7 @@ package com.example.customerservice.repository;
 
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.monitoring.ChatMonitoringMetrics;
+import jakarta.annotation.PreDestroy;
 import org.springframework.data.redis.connection.DataType;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.RedisScript;
@@ -27,6 +28,11 @@ import java.util.concurrent.ThreadFactory;
  */
 @Repository
 public class ChatRedisRepository {
+
+    @PreDestroy
+    public void shutdownLockWatchdog() {
+        LOCK_WATCHDOG.shutdownNow();
+    }
 
     private static final ScheduledExecutorService LOCK_WATCHDOG =
             Executors.newScheduledThreadPool(2, new ThreadFactory() {

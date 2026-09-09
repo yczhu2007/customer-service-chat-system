@@ -1,6 +1,7 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.AdminSupportTicketListItemVO;
 import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
@@ -11,6 +12,7 @@ import com.example.customerservice.dto.SupportTicketVO;
 import com.example.customerservice.dto.SupportTicketStatusHistoryVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.security.WorkspaceRoleResolver;
 import com.example.customerservice.service.SupportTicketService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -37,15 +39,18 @@ public class SupportTicketController {
     private final SupportTicketService supportTicketService;
     private final CurrentUser currentUser;
     private final HttpServletRequest httpServletRequest;
+    private final WorkspaceRoleResolver workspaceRoleResolver;
 
     public SupportTicketController(
             SupportTicketService supportTicketService,
             CurrentUser currentUser,
-            HttpServletRequest httpServletRequest
+            HttpServletRequest httpServletRequest,
+            WorkspaceRoleResolver workspaceRoleResolver
     ) {
         this.supportTicketService = supportTicketService;
         this.currentUser = currentUser;
         this.httpServletRequest = httpServletRequest;
+        this.workspaceRoleResolver = workspaceRoleResolver;
     }
 
     @GetMapping("/sessions/{sessionId}/ticket")
@@ -73,7 +78,7 @@ public class SupportTicketController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SupportTicketCreateDTO request
     ) {
-        currentUser.requireRole("AGENT");
+        currentUser.requireRole(ChatConstants.ROLE_AGENT);
         return Result.success(supportTicketService.createTicket(
                 currentUser.getUserId(), sessionId, request
         ));
@@ -84,7 +89,7 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUpdateDTO request
     ) {
-        currentUser.requireRole("AGENT");
+        currentUser.requireRole(ChatConstants.ROLE_AGENT);
         return Result.success(supportTicketService.updateTicket(
                 currentUser.getUserId(), ticketNo, request
         ));
@@ -104,7 +109,7 @@ public class SupportTicketController {
     public Result<PageResult<AdminSupportTicketListItemVO>> findAdminTickets(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         return Result.success(supportTicketService.findAdminTickets(query));
     }
 
@@ -112,7 +117,7 @@ public class SupportTicketController {
     public Result<List<SupportTicketStatusCountVO>> findAdminTicketStatusCounts(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         return Result.success(supportTicketService.findAdminTicketStatusCounts(query));
     }
 
@@ -121,28 +126,20 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUserFeedbackDTO request
     ) {
-        currentUser.requireRole("USER");
-        SupportTicketVO ticket = "CONFIRM".equals(request.getAction())
-                ? supportTicketService.confirmResolution(currentUser.getUserId(), ticketNo, request.getVersion())
-                : supportTicketService.requestFurtherHandling(currentUser.getUserId(), ticketNo, request.getVersion());
+        currentUser.requireRole(ChatConstants.ROLE_USER);
+        SupportTicketVO ticket = supportTicketService.submitUserFeedback(
+                currentUser.getUserId(), ticketNo, request);
         return Result.success(ticket);
     }
 
     private boolean isAdministratorWorkspace() {
-        String workspaceRole = httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role");
-        if (workspaceRole == null || workspaceRole.isBlank()) {
-            return currentUser.getRoleCodes().contains("ADMIN");
-        }
-        if (!"USER".equals(workspaceRole) && !"AGENT".equals(workspaceRole) && !"ADMIN".equals(workspaceRole)) {
-            throw new IllegalArgumentException("当前工作台角色无效");
-        }
-        if (!currentUser.getRoleCodes().contains(workspaceRole)) {
-            throw new IllegalArgumentException("当前工作台角色无效");
-        }
-        if (!"ADMIN".equals(workspaceRole)) {
+        String workspaceRole = workspaceRoleResolver.resolve(
+                httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role"),
+                currentUser.getRoleCodes(), ChatConstants.ROLE_USER, ChatConstants.ROLE_AGENT, ChatConstants.ROLE_ADMIN);
+        if (!ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
             return false;
         }
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         currentUser.requirePermission("chat:session:audit:view");
         return true;
     }

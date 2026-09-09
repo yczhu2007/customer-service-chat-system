@@ -9,6 +9,8 @@ import com.example.customerservice.dto.MessageReadResult;
 import com.example.customerservice.dto.ReadMessagesRequest;
 import com.example.customerservice.dto.RecallMessageRequest;
 import com.example.customerservice.dto.TransferSessionRequest;
+import com.example.customerservice.dto.TypingRequest;
+import com.example.customerservice.service.ChatStompApplicationService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.messaging.handler.annotation.Header;
@@ -24,66 +26,66 @@ import java.util.Map;
 @Validated
 public class ChatStompController {
 
-    @Autowired private ChatController chatHandler;
+    @Autowired private ChatStompApplicationService chatApplicationService;
 
     @MessageMapping("/chat.start")
     public void startConsultation(Principal principal) {
-        chatHandler.startConsultation(principal);
+        chatApplicationService.startConsultation(principal);
     }
 
     @MessageMapping("/chat.typing")
     public void handleTyping(
-            @org.springframework.messaging.handler.annotation.Payload Map<String, Object> request,
+            @Valid TypingRequest request,
             Principal principal
     ) {
-        chatHandler.handleTyping(request, principal);
+        chatApplicationService.handleTyping(request, principal);
     }
 
     @MessageMapping("/chat.send")
     public void handleSend(@Valid ChatMessageDTO request, Principal principal) {
-        chatHandler.handleSend(request, principal);
+        chatApplicationService.handleSend(request, principal);
     }
 
     @MessageMapping("/chat.end")
     public void handleEndSession(@Valid EndSessionRequest request, Principal principal) {
-        chatHandler.handleEndSession(request, principal);
+        chatApplicationService.handleEndSession(request, principal);
     }
 
     @MessageMapping("/chat.transfer")
     public void handleTransferSession(@Valid TransferSessionRequest request, Principal principal) {
-        chatHandler.handleTransferSession(request, principal);
+        chatApplicationService.handleTransferSession(request, principal);
     }
 
     @MessageMapping("/chat.history")
     @SendToUser("/queue/chat")
     public Map<String, Object> getHistory(@Valid HistoryRequest request, Principal principal) {
-        return chatHandler.getHistory(request, principal);
+        return chatApplicationService.getHistory(request, principal);
     }
 
     @MessageMapping("/chat.offline.pull")
     public void pullOfflineMessages(Principal principal) {
-        chatHandler.pullOfflineMessages(principal);
+        chatApplicationService.pullOfflineMessages(principal);
     }
 
     @MessageMapping("/chat.ack")
     public void handleAck(@Valid AckRequest request, Principal principal) {
-        chatHandler.handleAck(request, principal);
+        chatApplicationService.handleAck(request, principal);
     }
 
     @MessageMapping("/chat.read")
     @SendToUser("/queue/messages")
     public MessageReadResult markMessagesRead(@Valid ReadMessagesRequest request, Principal principal) {
-        return chatHandler.markMessagesRead(request, principal);
+        return chatApplicationService.markMessagesRead(request, principal);
     }
 
     @MessageMapping("/chat.message.recall")
     @SendToUser("/queue/messages")
     public MessageMutationResult recallMessage(@Valid RecallMessageRequest request, Principal principal) {
-        return chatHandler.recallMessage(request, principal);
+        return chatApplicationService.recallMessage(request, principal);
     }
 
     @MessageMapping("/chat.heartbeat")
     public void handleHeartbeat(Principal principal, @Header("simpSessionId") String wsSessionId) {
-        chatHandler.handleHeartbeat(principal, wsSessionId);
+        chatApplicationService.handleHeartbeat(principal, wsSessionId);
     }
 }

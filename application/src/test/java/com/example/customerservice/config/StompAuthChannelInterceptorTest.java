@@ -1,8 +1,6 @@
 package com.example.customerservice.config;
 
-import com.example.customerservice.mapper.SysRolePermissionMapper;
-import com.example.customerservice.mapper.SysUserMapper;
-import com.example.customerservice.mapper.SysUserRoleMapper;
+import com.example.customerservice.service.IAuthenticationService;
 import com.example.customerservice.service.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,23 +17,21 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class StompAuthChannelInterceptorTest {
 
     @Mock private TokenService tokenService;
-    @Mock private SysUserMapper sysUserMapper;
-    @Mock private SysUserRoleMapper sysUserRoleMapper;
-    @Mock private SysRolePermissionMapper sysRolePermissionMapper;
+    @Mock private IAuthenticationService authenticationService;
 
     private StompAuthChannelInterceptor interceptor;
 
     @BeforeEach
     void setUp() {
         interceptor = new StompAuthChannelInterceptor(
-                tokenService, sysUserRoleMapper, sysRolePermissionMapper);
-        // Per-test user stubs keep Mockito strict-stubbing checks meaningful.
+                tokenService, authenticationService);
     }
 
     @Test
@@ -80,13 +76,13 @@ class StompAuthChannelInterceptorTest {
     }
 
     @Test
-    void acceptsValidTokenWithoutLoadingUserStateForEveryFrame() {
+    void acceptsValidTokenWithoutCheckingSubscriptionPermissionForSendFrame() {
         when(tokenService.resolveUserId("valid-token")).thenReturn("U001");
 
         assertDoesNotThrow(() -> interceptor.preSend(
                 frame(StompCommand.SEND, "/app/chat.send", rawPrincipal()), null));
 
-        org.mockito.Mockito.verifyNoInteractions(sysUserMapper);
+        org.mockito.Mockito.verifyNoInteractions(authenticationService);
     }
 
     @Test
@@ -97,12 +93,10 @@ class StompAuthChannelInterceptorTest {
 
     @Test
     void allowsPermittedUserChatSubscription() {
-        when(sysUserRoleMapper.findRoleCodesByUserId("U001")).thenReturn(Set.of("USER"));
-        when(sysRolePermissionMapper.findPermissionCodesByUserId("U001"))
-                .thenReturn(Set.of("chat:user:access"));
-
         assertDoesNotThrow(() -> interceptor.preSend(
                 frame(StompCommand.SUBSCRIBE, "/user/queue/chat", principal()), null));
+
+        verify(authenticationService).requireChatSubscriptionPermission("U001");
     }
 
     private WebSocketUserPrincipal principal() {

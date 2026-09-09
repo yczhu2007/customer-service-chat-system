@@ -1,22 +1,13 @@
-package com.example.customerservice.controller;
+package com.example.customerservice.service;
 
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.*;
-import com.example.customerservice.service.IAuthenticationService;
-import com.example.customerservice.service.ChatMessageOperations;
-import com.example.customerservice.service.ChatPresenceOperations;
-import com.example.customerservice.service.ChatRoutingOperations;
-import com.example.customerservice.service.ChatSessionOperations;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.handler.annotation.Header;
-import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.simp.annotation.SendToUser;
-import org.springframework.stereotype.Component;
-import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
+import org.springframework.stereotype.Service;
 import org.springframework.validation.annotation.Validated;
 
 import java.security.Principal;
@@ -26,10 +17,10 @@ import java.util.Map;
 import java.util.Set;
 
 
-@Component
 @Slf4j
 @Validated
-public class ChatController {
+@Service
+public class ChatStompApplicationService {
 
     @Autowired
     private ChatRoutingOperations chatRoutingOperations;
@@ -49,7 +40,6 @@ public class ChatController {
     @Autowired
     private Validator validator;
 
-    @MessageMapping("/chat.start")
     public void startConsultation(
             Principal principal
     ) {
@@ -89,22 +79,21 @@ public class ChatController {
     }
 
 
-    @MessageMapping("/chat.typing")
     public void handleTyping(
-            @org.springframework.messaging.handler.annotation.Payload Map<String, Object> request,
+            TypingRequest request,
             Principal principal
     ) {
-        if (principal == null) throw new IllegalArgumentException("当前STOMP连接没有用户身份");
-        String sessionId = request == null ? null : String.valueOf(request.get("sessionId"));
-        if (sessionId == null || sessionId.isBlank() || sessionId.length() > 64) {
+        if (principal == null) {
+            throw new IllegalArgumentException("当前STOMP连接没有用户身份");
+        }
+        requireValidStompPayload(request, "输入状态不能为空");
+        if (request.sessionId() == null || request.sessionId().isBlank()
+                || request.sessionId().length() > 64) {
             throw new IllegalArgumentException("sessionId不能为空");
         }
-        String senderId = principal.getName();
-        boolean typing = Boolean.TRUE.equals(request.get("typing"));
-        chatPresenceOperations.handleTyping(sessionId, senderId, typing);
+        chatPresenceOperations.handleTyping(request.sessionId(), principal.getName(), request.typing());
     }
 
-    @MessageMapping("/chat.send")
     public void handleSend(
             @Valid
             ChatMessageDTO request,
@@ -193,7 +182,6 @@ public class ChatController {
      * 客户端发送地址：
      * /app/chat.end
      */
-    @MessageMapping("/chat.end")
     public void handleEndSession(
             @Valid EndSessionRequest request,
             Principal principal
@@ -249,7 +237,6 @@ public class ChatController {
      * 客服转接自己正在处理的会话。
      * 客户端发送地址：/app/chat.transfer
      */
-    @MessageMapping("/chat.transfer")
     public void handleTransferSession(
             @Valid TransferSessionRequest request,
             Principal principal
@@ -276,8 +263,6 @@ public class ChatController {
      * 返回地址：
      * /user/queue/chat
      */
-    @MessageMapping("/chat.history")
-    @SendToUser("/queue/chat")
     public Map<String, Object> getHistory(
             @Valid HistoryRequest request,
             Principal principal
@@ -378,7 +363,6 @@ public class ChatController {
     /**
      * 当前用户主动拉取离线消息
      */
-    @MessageMapping("/chat.offline.pull")
     public void pullOfflineMessages(
             Principal principal
     ) {
@@ -402,7 +386,6 @@ public class ChatController {
     /**
      * 客户端确认已经收到聊天消息
      */
-    @MessageMapping("/chat.ack")
     public void handleAck(
             @Valid AckRequest request,
             Principal principal
@@ -428,8 +411,6 @@ public class ChatController {
      * 客户端发送地址：/app/chat.read
      * 当前用户和会话对方均从/user/queue/messages接收MESSAGES_READ事件。
      */
-    @MessageMapping("/chat.read")
-    @SendToUser("/queue/messages")
     public MessageReadResult markMessagesRead(
             @Valid ReadMessagesRequest request,
             Principal principal
@@ -449,8 +430,6 @@ public class ChatController {
      * 撤回当前用户自己发送且仍在允许时间内的消息。
      * 会话双方均从 /user/queue/messages 接收 MESSAGE_RECALLED 事件。
      */
-    @MessageMapping("/chat.message.recall")
-    @SendToUser("/queue/messages")
     public MessageMutationResult recallMessage(
             @Valid RecallMessageRequest request,
             Principal principal
@@ -470,10 +449,8 @@ public class ChatController {
      * 浏览器发送地址：
      * /app/chat.heartbeat
      */
-    @MessageMapping("/chat.heartbeat")
     public void handleHeartbeat(
             Principal principal,
-            @Header("simpSessionId")
             String wsSessionId
     ) {
 

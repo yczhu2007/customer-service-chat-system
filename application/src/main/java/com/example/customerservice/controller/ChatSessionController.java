@@ -14,6 +14,7 @@ import com.example.customerservice.dto.SessionRatingVO;
 import com.example.customerservice.dto.SessionRatingDTO;
 import com.example.customerservice.dto.UserProfileSidebarVO;
 import com.example.customerservice.security.CurrentUser;
+import com.example.customerservice.security.WorkspaceRoleResolver;
 import com.example.customerservice.service.ChatSessionQueryService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -42,6 +43,7 @@ public class ChatSessionController {
     @Autowired private CurrentUser currentUser;
     @Autowired private ChatSessionQueryService chatSessionQueryService;
     @Autowired private HttpServletRequest httpServletRequest;
+    @Autowired private WorkspaceRoleResolver workspaceRoleResolver;
 
     @GetMapping("/sessions")
     public Result<PageResult<ChatSessionListItemVO>> findMySessions(
@@ -148,23 +150,7 @@ public class ChatSessionController {
     }
 
     private String resolveWorkspaceRole(String... allowedRoles) {
-        Set<String> roleCodes = currentUser.getRoleCodes();
         String workspaceRole = httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role");
-        if (workspaceRole != null && !workspaceRole.isBlank()) {
-            for (String allowedRole : allowedRoles) {
-                if (allowedRole.equals(workspaceRole) && roleCodes != null && roleCodes.contains(workspaceRole)) {
-                    return workspaceRole;
-                }
-            }
-            throw new IllegalArgumentException("当前工作台角色无效");
-        }
-        if (roleCodes != null) {
-            for (String allowedRole : allowedRoles) {
-                if (roleCodes.contains(allowedRole)) {
-                    return allowedRole;
-                }
-            }
-        }
-        throw new IllegalArgumentException("当前工作台没有执行此操作所需角色");
+        return workspaceRoleResolver.resolve(workspaceRole, currentUser.getRoleCodes(), allowedRoles);
     }
 }

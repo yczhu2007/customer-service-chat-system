@@ -39,6 +39,15 @@ import java.util.Objects;
 @Slf4j
 public class SupportTicketService {
 
+    @Transactional
+    public SupportTicketVO submitUserFeedback(String userId, String ticketNo,
+                                              com.example.customerservice.dto.SupportTicketUserFeedbackDTO request) {
+        if (request == null || !"CONFIRM".equals(request.getAction())) {
+            return requestFurtherHandling(userId, ticketNo, request == null ? 0 : request.getVersion());
+        }
+        return confirmResolution(userId, ticketNo, request.getVersion());
+    }
+
     private final SupportTicketMapper ticketMapper;
     private final SupportTicketStatusHistoryMapper historyMapper;
     private final ChatSessionMapper sessionMapper;

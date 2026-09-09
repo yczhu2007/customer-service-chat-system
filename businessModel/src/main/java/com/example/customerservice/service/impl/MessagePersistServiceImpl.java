@@ -1,6 +1,7 @@
 package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.RedisConstants;
+import jakarta.annotation.PreDestroy;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.dto.DeadLetterMessageVO;
@@ -41,6 +42,40 @@ import org.springframework.data.redis.core.ZSetOperations;
 @Service
 @Slf4j
 public class MessagePersistServiceImpl implements MessagePersistService {
+
+    @Override
+    public int cleanupExpiredRedisData(long deadLetterCutoff, long statsCutoff, int batchSize) {
+        int total = cleanupExpiredDeadLetters(deadLetterCutoff, batchSize);
+        total += cleanupStatistics(RedisConstants.STATS_VIP_WAIT_CREATED_AT, RedisConstants.STATS_VIP_WAIT, statsCutoff, batchSize);
+        total += cleanupStatistics(RedisConstants.STATS_VIP_RESOLVE_CREATED_AT, RedisConstants.STATS_VIP_RESOLVE, statsCutoff, batchSize);
+        return total;
+    }
+
+    private int cleanupStatistics(String timestampKey, String valueKey, long cutoff, int batchSize) {
+        Set<String> ids = redisTemplate.opsForZSet().rangeByScore(timestampKey, 0, cutoff, 0, batchSize);
+        if (ids == null || ids.isEmpty()) return 0;
+        Object[] values = ids.toArray();
+        redisTemplate.opsForZSet().remove(timestampKey, values);
+        redisTemplate.opsForZSet().remove(valueKey, values);
+        return ids.size();
+    }
+
+    @Override
+    public void retryAndCheckBacklog(long alertThreshold) {
+        retryFailedMessages();
+        Long pendingCount = redisTemplate.opsForZSet().zCard(RedisConstants.PERSIST_PENDING);
+        Long deadLetterCount = redisTemplate.opsForZSet().zCard(RedisConstants.PERSIST_DEADLETTER);
+        if ((pendingCount != null && pendingCount >= alertThreshold)
+                || (deadLetterCount != null && deadLetterCount > 0)) {
+            log.warn("消息持久化告警：pending={}, deadletter={}, threshold={}",
+                    pendingCount, deadLetterCount, alertThreshold);
+        }
+    }
+
+    @PreDestroy
+    public void shutdownRetryLeaseWatchdog() {
+        RETRY_LEASE_WATCHDOG.shutdownNow();
+    }
 
     /** 首次执行 + 3 次指数退避重试。 */
     private static final int MAX_ATTEMPTS = 4;
