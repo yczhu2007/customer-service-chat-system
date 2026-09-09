@@ -1,6 +1,7 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.dto.DeadLetterMessageVO;
 import com.example.customerservice.dto.PageResult;
 import com.example.customerservice.security.CurrentUser;
@@ -34,8 +35,8 @@ public class ChatQueueAgentController {
 
     @PostMapping("/queue/cancel")
     public Result<Void> cancelQueue() {
-        currentUser.requireRole("USER");
-        currentUser.requirePermission("chat:user:access");
+        currentUser.requireRole(ChatConstants.ROLE_USER);
+        currentUser.requirePermission(ChatConstants.PERMISSION_CHAT_USER_ACCESS);
         String userId = currentUser.getUserId();
         boolean cancelled = chatRoutingOperations.cancelWaitingUser(userId);
         return Result.successMessage(cancelled ? "已取消排队" : "当前未在等待队列中");

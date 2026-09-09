@@ -1,6 +1,7 @@
 package com.example.customerservice.controller;
 
 import com.example.customerservice.common.Result;
+import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.dto.SupportTicketCreateDTO;
 import com.example.customerservice.dto.AdminSupportTicketListItemVO;
 import com.example.customerservice.dto.AdminSupportTicketQueryDTO;
@@ -73,7 +74,7 @@ public class SupportTicketController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody SupportTicketCreateDTO request
     ) {
-        currentUser.requireRole("AGENT");
+        currentUser.requireRole(ChatConstants.ROLE_AGENT);
         return Result.success(supportTicketService.createTicket(
                 currentUser.getUserId(), sessionId, request
         ));
@@ -84,7 +85,7 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUpdateDTO request
     ) {
-        currentUser.requireRole("AGENT");
+        currentUser.requireRole(ChatConstants.ROLE_AGENT);
         return Result.success(supportTicketService.updateTicket(
                 currentUser.getUserId(), ticketNo, request
         ));
@@ -104,7 +105,7 @@ public class SupportTicketController {
     public Result<PageResult<AdminSupportTicketListItemVO>> findAdminTickets(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         return Result.success(supportTicketService.findAdminTickets(query));
     }
 
@@ -112,7 +113,7 @@ public class SupportTicketController {
     public Result<List<SupportTicketStatusCountVO>> findAdminTicketStatusCounts(
             @Valid @org.springframework.web.bind.annotation.ModelAttribute AdminSupportTicketQueryDTO query
     ) {
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         return Result.success(supportTicketService.findAdminTicketStatusCounts(query));
     }
 
@@ -121,8 +122,8 @@ public class SupportTicketController {
             @PathVariable @Pattern(regexp = "TK-\\d{8}") String ticketNo,
             @Valid @RequestBody SupportTicketUserFeedbackDTO request
     ) {
-        currentUser.requireRole("USER");
-        SupportTicketVO ticket = "CONFIRM".equals(request.getAction())
+        currentUser.requireRole(ChatConstants.ROLE_USER);
+        SupportTicketVO ticket = ChatConstants.TICKET_FEEDBACK_CONFIRM.equals(request.getAction())
                 ? supportTicketService.confirmResolution(currentUser.getUserId(), ticketNo, request.getVersion())
                 : supportTicketService.requestFurtherHandling(currentUser.getUserId(), ticketNo, request.getVersion());
         return Result.success(ticket);
@@ -131,18 +132,18 @@ public class SupportTicketController {
     private boolean isAdministratorWorkspace() {
         String workspaceRole = httpServletRequest == null ? null : httpServletRequest.getHeader("X-Workspace-Role");
         if (workspaceRole == null || workspaceRole.isBlank()) {
-            return currentUser.getRoleCodes().contains("ADMIN");
+            return currentUser.getRoleCodes().contains(ChatConstants.ROLE_ADMIN);
         }
-        if (!"USER".equals(workspaceRole) && !"AGENT".equals(workspaceRole) && !"ADMIN".equals(workspaceRole)) {
+        if (!ChatConstants.ROLE_USER.equals(workspaceRole) && !ChatConstants.ROLE_AGENT.equals(workspaceRole) && !ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
             throw new IllegalArgumentException("当前工作台角色无效");
         }
         if (!currentUser.getRoleCodes().contains(workspaceRole)) {
             throw new IllegalArgumentException("当前工作台角色无效");
         }
-        if (!"ADMIN".equals(workspaceRole)) {
+        if (!ChatConstants.ROLE_ADMIN.equals(workspaceRole)) {
             return false;
         }
-        currentUser.requireRole("ADMIN");
+        currentUser.requireRole(ChatConstants.ROLE_ADMIN);
         currentUser.requirePermission("chat:session:audit:view");
         return true;
     }
