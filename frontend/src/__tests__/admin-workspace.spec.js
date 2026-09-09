@@ -42,6 +42,7 @@ vi.mock('../api/admin-api', () => ({
   ),
   findAdminDashboard: vi.fn(() => Promise.resolve({ data: {} })),
   findAdminReportOverview: vi.fn(() => Promise.resolve({ data: {} })),
+  findSystemMonitoringSnapshot: vi.fn(() => Promise.resolve({ data: {} })),
   findVipSkillAgents: vi.fn(() => Promise.resolve({ data: [] })),
   addVipSkill: vi.fn(),
   removeVipSkill: vi.fn(),

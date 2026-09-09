@@ -113,6 +113,10 @@ export function findAdminReportOverview(params = {}) {
   return request(`/chat/admin/reports/overview${qs.size ? `?${qs}` : ''}`)
 }
 
+export function findSystemMonitoringSnapshot() {
+  return request('/chat/admin/monitoring')
+}
+
 function ticketQueryString(params = {}, includePaging = true) {
   const query = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
