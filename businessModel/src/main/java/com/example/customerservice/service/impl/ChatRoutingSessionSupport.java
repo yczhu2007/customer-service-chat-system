@@ -375,8 +375,7 @@ abstract class ChatRoutingSessionSupport
 
 
         session.setStatus(
-                RedisConstants
-                        .SESSION_STATUS_CLOSED
+                ChatConstants.SESSION_STATUS_CLOSED
         );
 
 

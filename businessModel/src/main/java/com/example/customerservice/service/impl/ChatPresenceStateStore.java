@@ -41,8 +41,7 @@ final class ChatPresenceStateStore {
 
         long timeoutAt =
                 nowMillis
-                        + RedisConstants
-                        .HEARTBEAT_TIMEOUT_MILLIS;
+                        + RedisConstants.HEARTBEAT_TIMEOUT_SECONDS * 1000L;
 
 
         String userOnlineKey =
