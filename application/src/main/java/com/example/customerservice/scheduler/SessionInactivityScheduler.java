@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import java.util.concurrent.TimeUnit;
 
@@ -28,6 +29,14 @@ public class SessionInactivityScheduler {
         this.inactivityTimeoutMillis = TimeUnit.SECONDS.toMillis(
                 Math.max(60L, inactivityTimeoutSeconds)
         );
+    }
+
+    /** 兼容旧测试/调用方，Redis 访问已由业务服务负责。 */
+    public SessionInactivityScheduler(StringRedisTemplate ignoredRedisTemplate,
+                                      ChatMaintenanceOperations operations,
+                                      DistributedSchedulerLock lock,
+                                      long inactivityTimeoutSeconds) {
+        this(operations, lock, inactivityTimeoutSeconds);
     }
 
     @Scheduled(
