@@ -254,14 +254,14 @@ public class RoleController {
     private void requirePermissionManagementPermission() {
         currentUser.requireRole(RoleCodes.ADMIN);
         currentUser.requirePermission(
-                "permission:manage"
+                PermissionCodes.PERMISSION_MANAGE
         );
     }
     private void requireRolePermissionManagementPermission() {
         currentUser.requireRole(RoleCodes.ADMIN);
         currentUser.requirePermission(PermissionCodes.ROLE_MANAGE);
         currentUser.requirePermission(
-                "permission:manage"
+                PermissionCodes.PERMISSION_MANAGE
         );
     }
 }

@@ -21,4 +21,5 @@ public final class PermissionCodes {
     public static final String CHAT_QUICK_REPLY_MANAGE = "chat:quick-reply:manage";
     public static final String ROLE_MANAGE = "role:manage";
     public static final String USER_MANAGE = "user:manage";
+    public static final String PERMISSION_MANAGE = "permission:manage";
 }

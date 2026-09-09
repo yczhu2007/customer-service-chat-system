@@ -18,7 +18,7 @@ class ChatSecurityConstantsTest {
                         catch (Exception exception) { throw new IllegalStateException(exception); }
                     })
                     .reduce("", String::concat);
-            assertFalse(source.matches("(?s).*require(Role|Permission)\\(\\\"[^\\\"]+\\\"\\).*"));
+            assertFalse(source.matches("(?s).*require(Role|Permission)\\(\\s*\\\"[^\\\"]+\\\"\\s*\\).*"));
         }
     }
 }

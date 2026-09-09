@@ -94,8 +94,8 @@ public class ChatSessionController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId
     ) {
         String actorId = currentUser.getUserId();
-        String workspaceRole = resolveWorkspaceRole("AGENT", "USER", "ADMIN");
-        if ("ADMIN".equals(workspaceRole)) {
+        String workspaceRole = resolveWorkspaceRole(RoleCodes.AGENT, RoleCodes.USER, RoleCodes.ADMIN);
+        if (RoleCodes.ADMIN.equals(workspaceRole)) {
             currentUser.requireRole(RoleCodes.ADMIN);
             currentUser.requirePermission(PermissionCodes.CHAT_SESSION_AUDIT_VIEW);
             return Result.success(chatSessionQueryService.getSessionMetadata(actorId, true, sessionId));
@@ -109,7 +109,7 @@ public class ChatSessionController {
             @PathVariable @NotBlank @Size(max = 64) String sessionId,
             @Valid @RequestBody ChatSessionMetadataUpdateDTO request
     ) {
-        resolveWorkspaceRole("AGENT");
+        resolveWorkspaceRole(RoleCodes.AGENT);
         currentUser.requireRole(RoleCodes.AGENT);
         currentUser.requirePermission(PermissionCodes.CHAT_SESSION_METADATA_UPDATE);
         return Result.success(chatSessionQueryService.updateSessionMetadata(currentUser.getUserId(), sessionId, request));
@@ -150,7 +150,7 @@ public class ChatSessionController {
     }
 
     private SessionParticipantType resolveSessionParticipantType() {
-        return SessionParticipantType.valueOf(resolveWorkspaceRole("USER", "AGENT"));
+        return SessionParticipantType.valueOf(resolveWorkspaceRole(RoleCodes.USER, RoleCodes.AGENT));
     }
 
     private String resolveWorkspaceRole(String... allowedRoles) {

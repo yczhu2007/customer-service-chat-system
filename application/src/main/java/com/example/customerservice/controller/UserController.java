@@ -216,12 +216,12 @@ public class UserController {
     private void requireUserManagementPermission() {
 
         currentUser.requireRole(
-                "ADMIN"
+                RoleCodes.ADMIN
         );
 
 
         currentUser.requirePermission(
-                "user:manage"
+                PermissionCodes.USER_MANAGE
         );
     }
 

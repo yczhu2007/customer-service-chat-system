@@ -287,8 +287,8 @@ public class ChatManagementController {
             @Size(max = 64, message = "会话ID长度不能超过64个字符")
             String sessionId
     ) {
-        boolean admin = currentUser.hasRole("ADMIN");
-        boolean agent = currentUser.hasRole("AGENT");
+        boolean admin = currentUser.hasRole(RoleCodes.ADMIN);
+        boolean agent = currentUser.hasRole(RoleCodes.AGENT);
         if (!admin && !agent) {
             currentUser.requireRole(RoleCodes.USER);
         }
