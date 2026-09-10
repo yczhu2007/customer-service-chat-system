@@ -1,5 +1,7 @@
 package com.example.customerservice.service;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.constant.SupportTicketStatus;
 import com.example.customerservice.domain.ChatSession;
@@ -460,7 +462,7 @@ public class SupportTicketService {
 
     private void notifyParticipant(String userId, Map<String, Object> payload, String ticketNo, String sessionId) {
         try {
-            messagingTemplate.convertAndSendToUser(userId, "/queue/chat", payload);
+            messagingTemplate.convertAndSendToUser(userId, USER_CHAT_QUEUE, payload);
         } catch (RuntimeException exception) {
             log.warn("工单实时通知发送失败，工单：{}，会话：{}", ticketNo, sessionId);
         }

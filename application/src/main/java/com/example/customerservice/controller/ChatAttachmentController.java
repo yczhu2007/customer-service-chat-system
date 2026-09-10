@@ -3,6 +3,7 @@ package com.example.customerservice.controller;
 import com.example.customerservice.common.Result;
 import com.example.customerservice.dto.AttachmentDownload;
 import com.example.customerservice.dto.ChatAttachmentVO;
+import com.example.customerservice.dto.AttachmentUpload;
 import com.example.customerservice.security.CurrentUser;
 import com.example.customerservice.service.ChatAttachmentService;
 import com.example.customerservice.service.AttachmentPreview;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
+import java.io.IOException;
 import java.util.List;
 
 @RestController
@@ -34,8 +36,12 @@ public class ChatAttachmentController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public Result<ChatAttachmentVO> upload(
             @RequestParam @NotBlank @Size(max=64) String sessionId,
-            @RequestPart("file") MultipartFile file) {
-        return Result.success(service.upload(currentUser.getUserId(), sessionId, file));
+            @RequestPart("file") MultipartFile file) throws IOException {
+        return Result.success(service.upload(
+                currentUser.getUserId(),
+                sessionId,
+                new AttachmentUpload(file.getOriginalFilename(), file.getBytes())
+        ));
     }
     @PostMapping("/metadata")
     public Result<List<ChatAttachmentVO>> metadata(
@@ -54,7 +60,7 @@ public class ChatAttachmentController {
         MediaType type;
         try { type = MediaType.parseMediaType(download.contentType()); }
         catch (Exception ignored) { type = MediaType.APPLICATION_OCTET_STREAM; }
-        ContentDisposition disposition = "IMAGE".equals(download.messageType())
+        ContentDisposition disposition = download.inline()
                 ? ContentDisposition.inline().filename(download.filename(), StandardCharsets.UTF_8).build()
                 : ContentDisposition.attachment().filename(download.filename(), StandardCharsets.UTF_8).build();
         return ResponseEntity.ok()

@@ -1,8 +1,7 @@
 <script setup>
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { request } from '../../services/http-client'
-import { createAdminSession, deleteAdminSession, findTransferLogs, updateAdminSession } from '../../api/admin-api'
+import { createAdminSession, deleteAdminSession, findSessionMetadata, findTransferLogs, listAdminSessions, updateAdminSession } from '../../api/admin-api'
 import { ARCHIVE_STATUS_OPTIONS, CATEGORY_OPTIONS, formatDateTime, priorityLabel, statusLabel, tagLabel } from '../../constants/session-ui'
 import { createRecent30DayRange } from '../../utils/admin-date-range'
 import AdminMessageSearchPanel from './AdminMessageSearchPanel.vue'
@@ -69,19 +68,19 @@ async function loadSessions() {
   loading.value = true
   error.value = null
   try {
-    const qs = new URLSearchParams()
-    qs.set('pageNo', pageNo.value)
-    qs.set('pageSize', pageSize.value)
-    if (filters.value.userLoginNumber) qs.set('userLoginNumber', filters.value.userLoginNumber)
-    if (filters.value.agentLoginNumber) qs.set('agentLoginNumber', filters.value.agentLoginNumber)
-    if (filters.value.status) qs.set('status', filters.value.status)
-    if (filters.value.rating) qs.set('rating', filters.value.rating)
-    if (filters.value.archiveStatus) qs.set('archiveStatus', filters.value.archiveStatus)
-    if (filters.value.ticketNo) qs.set('ticketNo', filters.value.ticketNo)
-    if (filters.value.from) qs.set('from', normalizeDateTime(filters.value.from))
-    if (filters.value.to) qs.set('to', normalizeDateTime(filters.value.to))
-
-    const res = await request(`/chat/admin/sessions?${qs.toString()}`)
+    const params = {
+      pageNo: pageNo.value,
+      pageSize: pageSize.value,
+      userLoginNumber: filters.value.userLoginNumber,
+      agentLoginNumber: filters.value.agentLoginNumber,
+      status: filters.value.status,
+      rating: filters.value.rating,
+      archiveStatus: filters.value.archiveStatus,
+      ticketNo: filters.value.ticketNo,
+      from: filters.value.from ? normalizeDateTime(filters.value.from) : '',
+      to: filters.value.to ? normalizeDateTime(filters.value.to) : '',
+    }
+    const res = await listAdminSessions(params)
     sessions.value = res.data?.records ?? []
     total.value = res.data?.total ?? 0
   } catch (e) {
@@ -191,7 +190,7 @@ async function openEditDialog(row) {
   formError.value = null
   editingSession.value = row
   try {
-    const result = await request(`/chat/sessions/${encodeURIComponent(row.sessionId)}/metadata`)
+    const result = await findSessionMetadata(row.sessionId)
     const metadata = result.data || {}
     editForm.value = {
       title: metadata.title || '',

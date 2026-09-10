@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.constant.AccountStatus;
+
 import com.example.customerservice.domain.SysPermission;
 import com.example.customerservice.dto.PermissionVO;
 import org.springframework.util.StringUtils;
@@ -70,8 +72,8 @@ abstract class RbacServiceSupport {
                 status.trim().toUpperCase(Locale.ROOT);
 
         if (
-                !"ENABLED".equals(normalizedStatus) &&
-                        !"DISABLED".equals(normalizedStatus)
+                !AccountStatus.ENABLED.equals(normalizedStatus) &&
+                        !AccountStatus.DISABLED.equals(normalizedStatus)
         ) {
             throw new IllegalArgumentException(
                     "status只能是ENABLED或DISABLED"

@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.domain.ChatMessage;
 import com.example.customerservice.dto.ChatMessageDTO;
@@ -205,7 +207,7 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
                  */
                 messagingTemplate.convertAndSendToUser(
                         userId,
-                        "/queue/chat",
+                        USER_CHAT_QUEUE,
                         ChatMessageDTO.fromEntity(
                                 message
                         )
@@ -250,7 +252,7 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
     private void notifyReplayCompleted(String userId, int pushedCount) {
         messagingTemplate.convertAndSendToUser(
                 userId,
-                "/queue/chat",
+                USER_CHAT_QUEUE,
                 Map.of(
                         "event", "OFFLINE_MESSAGES_REPLAYED",
                         "count", pushedCount

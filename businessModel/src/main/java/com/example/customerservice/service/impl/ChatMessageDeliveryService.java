@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.constant.ChatConstants;
@@ -174,7 +176,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             duplicateAcknowledgement.setAckStatus("DUPLICATE");
             messagingTemplate.convertAndSendToUser(
                     message.getSenderId(),
-                    "/queue/chat",
+                    USER_CHAT_QUEUE,
                     duplicateAcknowledgement
             );
 
@@ -332,7 +334,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         try {
             messagingTemplate.convertAndSendToUser(
                     userId,
-                    "/queue/chat",
+                    USER_CHAT_QUEUE,
                     payload
             );
         } catch (RuntimeException exception) {
@@ -604,7 +606,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         try {
             messagingTemplate.convertAndSendToUser(
                     receiverId,
-                    "/queue/chat",
+                    USER_CHAT_QUEUE,
                     ChatMessageDTO.fromEntity(
                             message
                     )

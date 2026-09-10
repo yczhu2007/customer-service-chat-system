@@ -16,11 +16,13 @@ public final class ChatConstants {
     public static final String EVENT_SESSION_CLOSED = "SESSION_CLOSED";
     public static final String EVENT_SESSION_ENDED = "SESSION_ENDED";
     public static final String EVENT_AGENT_RECONNECTING = "AGENT_RECONNECTING";
+    public static final String EVENT_TYPING = "TYPING";
     public static final String REASON_AGENT_OFFLINE = "AGENT_OFFLINE";
     public static final String REASON_WEBSOCKET_DISCONNECT = "WEBSOCKET_DISCONNECT";
     public static final String REASON_HEARTBEAT_TIMEOUT = "HEARTBEAT_TIMEOUT";
     public static final String REASON_AGENT_DISCONNECTED = "AGENT_DISCONNECTED";
     public static final String REASON_SESSION_INACTIVITY_TIMEOUT = "SESSION_INACTIVITY_TIMEOUT";
+    public static final String REASON_AGENT_RECONNECT_TIMEOUT = "AGENT_RECONNECT_TIMEOUT";
     public static final String AGENT_SKILL_VIP_CODE = "VIP";
     public static final String DEFAULT_SESSION_TITLE = "新咨询";
     public static final String PRIORITY_LOW = "LOW";

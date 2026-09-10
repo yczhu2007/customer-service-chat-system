@@ -3,6 +3,7 @@ package com.example.customerservice.service.impl;
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.constant.RoleCodes;
+import com.example.customerservice.constant.AccountStatus;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.UserCreateDTO;
 import com.example.customerservice.dto.UserUpdateDTO;
@@ -194,7 +195,7 @@ public class UserServiceImpl
         user.setStatus(
                 normalizeStatus(
                         request.getStatus(),
-                        "ENABLED"
+                        AccountStatus.ENABLED
                 )
         );
 
@@ -292,7 +293,7 @@ public class UserServiceImpl
                     isDefaultAdmin(
                             currentUser
                     ) &&
-                            "DISABLED".equals(
+                            AccountStatus.DISABLED.equals(
                                     normalizedStatus
                             )
             ) {
@@ -323,7 +324,7 @@ public class UserServiceImpl
                 user
         );
 
-        if ("DISABLED".equals(user.getStatus())) {
+        if (AccountStatus.DISABLED.equals(user.getStatus())) {
             tokenService.revokeAllForUser(currentUser.getId());
         }
 
@@ -422,7 +423,7 @@ public class UserServiceImpl
 
         SysRole role = requireRole(roleId);
 
-        if (!"ENABLED".equals(role.getStatus())) {
+        if (!AccountStatus.ENABLED.equals(role.getStatus())) {
             throw new IllegalArgumentException(
                     "不能分配已经禁用的角色"
             );
@@ -562,10 +563,10 @@ public class UserServiceImpl
 
 
         if (
-                !"ENABLED".equals(
+                !AccountStatus.ENABLED.equals(
                         normalizedStatus
                 ) &&
-                        !"DISABLED".equals(
+                        !AccountStatus.DISABLED.equals(
                                 normalizedStatus
                         )
         ) {

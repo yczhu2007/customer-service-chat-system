@@ -1,5 +1,7 @@
 package com.example.customerservice.controller;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.dto.AckRequest;
 import com.example.customerservice.dto.ChatMessageDTO;
 import com.example.customerservice.dto.EndSessionRequest;
@@ -57,7 +59,7 @@ public class ChatStompController {
     }
 
     @MessageMapping("/chat.history")
-    @SendToUser("/queue/chat")
+    @SendToUser(USER_CHAT_QUEUE)
     public Map<String, Object> getHistory(@Valid HistoryRequest request, Principal principal) {
         return chatApplicationService.getHistory(request, principal);
     }

@@ -1,6 +1,7 @@
 package com.example.customerservice.service.impl;
 
 import com.example.customerservice.constant.ChatConstants;
+import com.example.customerservice.constant.AccountStatus;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.ChatSession;
@@ -156,7 +157,7 @@ public class ChatAgentService implements ChatAgentOperations {
     @Override
     public void setAgentVipSkillByLoginNumber(String loginNumber, boolean enabled) {
         SysUser agent = sysUserMapper.findByUsername(loginNumber == null ? null : loginNumber.trim());
-        if (agent == null || !"ENABLED".equals(agent.getStatus())) {
+        if (agent == null || !AccountStatus.ENABLED.equals(agent.getStatus())) {
             throw new IllegalArgumentException("客服登录编号不存在或账号已禁用");
         }
         Set<String> roles = sysUserRoleMapper.findRoleCodesByUserId(agent.getId());
@@ -209,16 +210,17 @@ public class ChatAgentService implements ChatAgentOperations {
                     new TransactionSynchronization() {
                         @Override
                         public void afterCommit() {
-                            rebuildVipSkillCacheSafely();
+                            rebuildVipSkillCache();
                         }
                     }
             );
             return;
         }
-        rebuildVipSkillCacheSafely();
+        rebuildVipSkillCache();
     }
 
-    private void rebuildVipSkillCacheSafely() {
+    @Override
+    public void rebuildVipSkillCache() {
         try {
             List<String> persistedAgentIds = chatAgentSkillMapper.selectList(
                             Wrappers.<ChatAgentSkill>lambdaQuery()
@@ -240,7 +242,7 @@ public class ChatAgentService implements ChatAgentOperations {
             }
         } catch (RuntimeException exception) {
             log.error(
-                    "数据库已更新，但VIP客服技能缓存重建失败；后续空缓存回源或应用重启将继续修复",
+                    "VIP客服技能缓存重建失败；后续空缓存回源或应用重启将继续修复",
                     exception
             );
         }

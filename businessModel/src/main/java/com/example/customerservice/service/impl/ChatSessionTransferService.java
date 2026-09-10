@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.constant.RoleCodes;
@@ -259,17 +261,17 @@ public class ChatSessionTransferService implements ChatSessionTransferOperations
         notice.setReason("SESSION_TRANSFERRED");
         messagingTemplate.convertAndSendToUser(
                 session.getUserId(),
-                "/queue/chat",
+                USER_CHAT_QUEUE,
                 notice
         );
         messagingTemplate.convertAndSendToUser(
                 sourceAgentId,
-                "/queue/chat",
+                USER_CHAT_QUEUE,
                 notice
         );
         messagingTemplate.convertAndSendToUser(
                 targetAgentId,
-                "/queue/chat",
+                USER_CHAT_QUEUE,
                 notice
         );
     }

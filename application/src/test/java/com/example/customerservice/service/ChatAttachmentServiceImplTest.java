@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.TableInfoHelper;
 import com.example.customerservice.domain.ChatAttachment;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AttachmentDownload;
+import com.example.customerservice.dto.AttachmentUpload;
 import com.example.customerservice.config.MinioAttachmentProperties;
 import com.example.customerservice.mapper.ChatAttachmentMapper;
 import com.example.customerservice.mapper.ChatSessionMapper;
@@ -13,7 +14,6 @@ import com.example.customerservice.service.OfficePreviewConverter;
 import com.example.customerservice.storage.AttachmentObjectStorage;
 import org.junit.jupiter.api.Test;
 import org.apache.ibatis.builder.MapperBuilderAssistant;
-import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.Instant;
 import java.io.ByteArrayInputStream;
@@ -31,6 +31,14 @@ class ChatAttachmentServiceImplTest {
                 .anyMatch(method -> method.getReturnType() == ChatAttachment.class
                         || java.util.Arrays.asList(method.getParameterTypes()).contains(ChatAttachment.class));
         assertFalse(exposesEntity);
+    }
+
+    @Test
+    void publicAttachmentServiceDoesNotExposeWebUploadType() {
+        boolean exposesMultipartFile = java.util.Arrays.stream(ChatAttachmentService.class.getMethods())
+                .flatMap(method -> java.util.Arrays.stream(method.getParameterTypes()))
+                .anyMatch(type -> type.getName().equals("org.springframework.web.multipart.MultipartFile"));
+        assertFalse(exposesMultipartFile);
     }
 
     @Test
@@ -53,7 +61,7 @@ class ChatAttachmentServiceImplTest {
         assertEquals("schedule.xlsx", download.filename());
         assertEquals("application/test", download.contentType());
         assertEquals(123L, download.size());
-        assertEquals("FILE", download.messageType());
+        assertFalse(download.inline());
         assertNotNull(download.resource());
     }
     @Test
@@ -69,7 +77,7 @@ class ChatAttachmentServiceImplTest {
         ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
 
         var result = service.upload("U1", "S1",
-                new MockMultipartFile("file", "safe.jpg", "text/html", new byte[]{
+                new AttachmentUpload("safe.jpg", new byte[]{
                         (byte) 0xFF, (byte) 0xD8, (byte) 0xFF, 0x00, 0x01
                 }));
 
@@ -87,9 +95,9 @@ class ChatAttachmentServiceImplTest {
         ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
 
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
-                new MockMultipartFile("file", "payload.jpg", "image/jpeg", "<script>alert(1)</script>".getBytes())));
+                new AttachmentUpload("payload.jpg", "<script>alert(1)</script>".getBytes())));
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
-                new MockMultipartFile("file", "payload.zip", "application/zip", new byte[]{0x50, 0x4B, 0x03, 0x04})));
+                new AttachmentUpload("payload.zip", new byte[]{0x50, 0x4B, 0x03, 0x04})));
     }
 
     @Test
@@ -101,9 +109,9 @@ class ChatAttachmentServiceImplTest {
         when(sessionMapper.selectById("S1")).thenReturn(session);
         ChatAttachmentServiceImpl service = service(attachmentMapper, sessionMapper, storage);
         assertThrows(IllegalArgumentException.class, () -> service.upload("X1", "S1",
-                new MockMultipartFile("file", "safe.jpg", "image/jpeg", new byte[]{1})));
+                new AttachmentUpload("safe.jpg", new byte[]{1})));
         assertThrows(IllegalArgumentException.class, () -> service.upload("U1", "S1",
-                new MockMultipartFile("file", "attack.html", "text/html", new byte[]{1})));
+                new AttachmentUpload("attack.html", new byte[]{1})));
     }
 
     @Test

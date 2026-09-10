@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.dto.AssignResult;
@@ -26,10 +28,10 @@ public class ChatSessionNotificationService implements ChatSessionNotificationOp
         AssignResult notice = AssignResult.assigned(session);
         notice.setVipLevel(vipLevel);
         messagingTemplate.convertAndSendToUser(
-                session.getUserId(), "/queue/chat", notice
+                session.getUserId(), USER_CHAT_QUEUE, notice
         );
         messagingTemplate.convertAndSendToUser(
-                session.getAgentId(), "/queue/chat", notice
+                session.getAgentId(), USER_CHAT_QUEUE, notice
         );
         log.info("会话创建通知已发送，用户：{}，客服：{}", session.getUserId(), session.getAgentId());
     }
@@ -42,10 +44,10 @@ public class ChatSessionNotificationService implements ChatSessionNotificationOp
         );
         notice.setEndedBy(operatorId);
         messagingTemplate.convertAndSendToUser(
-                session.getUserId(), "/queue/chat", notice
+                session.getUserId(), USER_CHAT_QUEUE, notice
         );
         messagingTemplate.convertAndSendToUser(
-                session.getAgentId(), "/queue/chat", notice
+                session.getAgentId(), USER_CHAT_QUEUE, notice
         );
         log.info("会话结束通知已发送，用户：{}，客服：{}", session.getUserId(), session.getAgentId());
     }
@@ -56,7 +58,7 @@ public class ChatSessionNotificationService implements ChatSessionNotificationOp
         notice.put("event", ChatConstants.EVENT_SESSION_CLOSED);
         notice.put("sessionId", sessionId);
         notice.put("reason", reason);
-        messagingTemplate.convertAndSendToUser(userId, "/queue/chat", notice);
+        messagingTemplate.convertAndSendToUser(userId, USER_CHAT_QUEUE, notice);
     }
 
     @Override
@@ -64,12 +66,12 @@ public class ChatSessionNotificationService implements ChatSessionNotificationOp
         AssignResult notice = AssignResult.reconnected(session);
         notice.setVipLevel(vipLevel);
         messagingTemplate.convertAndSendToUser(
-                session.getUserId(), "/queue/chat", notice
+                session.getUserId(), USER_CHAT_QUEUE, notice
         );
     }
 
     @Override
     public void notifyWaitingUser(String userId, AssignResult notice) {
-        messagingTemplate.convertAndSendToUser(userId, "/queue/chat", notice);
+        messagingTemplate.convertAndSendToUser(userId, USER_CHAT_QUEUE, notice);
     }
 }

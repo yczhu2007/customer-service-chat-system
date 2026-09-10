@@ -16,6 +16,9 @@ import java.util.concurrent.TimeUnit;
 /** Repairs pending assignments and converges MySQL/Redis session state. */
 @Slf4j
 final class ChatSessionReconciliationService {
+    private static final long ASSIGNMENT_SETTLE_SECONDS = 60L;
+    private static final long FINALIZATION_SETTLE_SECONDS = 10L;
+    private static final int PENDING_BATCH_SIZE = 100;
 
     private final ChatRedisRepository chatRedisRepository;
     private final ChatSessionMapper chatSessionMapper;
@@ -38,9 +41,9 @@ final class ChatSessionReconciliationService {
         Set<String> userIds = chatRedisRepository.sortedSetRangeByScore(
                 RedisConstants.ASSIGNMENT_PENDING,
                 0,
-                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(60),
+                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(ASSIGNMENT_SETTLE_SECONDS),
                 0,
-                100
+                PENDING_BATCH_SIZE
         );
         if (userIds == null || userIds.isEmpty()) {
             return;
@@ -149,9 +152,9 @@ final class ChatSessionReconciliationService {
         Set<String> sessionIds = chatRedisRepository.sortedSetRangeByScore(
                 RedisConstants.SESSION_FINALIZE_PENDING,
                 0,
-                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(10),
+                System.currentTimeMillis() - TimeUnit.SECONDS.toMillis(FINALIZATION_SETTLE_SECONDS),
                 0,
-                100
+                PENDING_BATCH_SIZE
         );
         if (sessionIds == null || sessionIds.isEmpty()) {
             return;

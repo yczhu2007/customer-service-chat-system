@@ -170,6 +170,18 @@ export function deleteAdminSession(sessionId) {
   })
 }
 
+export function listAdminSessions(params = {}) {
+  const query = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') query.set(key, value)
+  })
+  return request(`/chat/admin/sessions?${query}`)
+}
+
+export function findSessionMetadata(sessionId) {
+  return request(`/chat/sessions/${encodeURIComponent(sessionId)}/metadata`)
+}
+
 export function findArchiveStats() {
   return request('/chat/admin/archive-stats')
 }

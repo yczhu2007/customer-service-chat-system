@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.constant.RedisConstants;
 import com.example.customerservice.repository.ChatRedisRepository;
 import com.example.customerservice.service.ChatRoutingOperations;
@@ -85,7 +87,7 @@ public class QueueTimeoutService {
                     int vipLevel = Math.toIntExact(removedVipMarker - 1);
                     messagingTemplate.convertAndSendToUser(
                             userId,
-                            "/queue/chat",
+                            USER_CHAT_QUEUE,
                             java.util.Map.of(
                                     "event", "WAITING_TIMEOUT",
                                     "message", "排队超时，请稍后重新发起咨询"
@@ -146,7 +148,7 @@ public class QueueTimeoutService {
             try {
                 messagingTemplate.convertAndSendToUser(
                         agentId,
-                        "/queue/chat",
+                        USER_CHAT_QUEUE,
                         java.util.Map.of(
                                 "event", "VIP_WAITING_TIMEOUT",
                                 "userId", userId,

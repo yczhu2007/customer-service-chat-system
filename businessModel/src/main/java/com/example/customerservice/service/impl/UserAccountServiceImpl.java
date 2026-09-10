@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.constant.AccountStatus;
+
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.SysUser;
@@ -61,7 +63,7 @@ public class UserAccountServiceImpl implements UserAccountService {
             throw new IllegalArgumentException("用户名已经存在");
         }
         SysRole defaultRole = roleMapper.findByCode(RoleCodes.USER);
-        if (defaultRole == null || !"ENABLED".equals(defaultRole.getStatus())) {
+        if (defaultRole == null || !AccountStatus.ENABLED.equals(defaultRole.getStatus())) {
             throw new IllegalStateException("系统默认USER角色未配置或已禁用");
         }
         SysUser user = new SysUser();
@@ -69,7 +71,7 @@ public class UserAccountServiceImpl implements UserAccountService {
         user.setUsername(username);
         user.setNickname(username);
         user.setPassword(PasswordUtil.hash(request.getPassword()));
-        user.setStatus("ENABLED");
+        user.setStatus(AccountStatus.ENABLED);
         user.setVipLevel(0);
         try {
             if (userMapper.insert(user) != 1 || userRoleMapper.assignRole(user.getId(), defaultRole.getId()) != 1) {
@@ -131,7 +133,7 @@ public class UserAccountServiceImpl implements UserAccountService {
                 || !PasswordUtil.matches(submittedCode, recovery.getRecoveryHash())) {
             throw new IllegalArgumentException("用户名或恢复码错误");
         }
-        if (!"ENABLED".equals(user.getStatus())) {
+        if (!AccountStatus.ENABLED.equals(user.getStatus())) {
             throw new IllegalArgumentException("当前账号已被禁用");
         }
         if (PasswordUtil.matches(request.getNewPassword(), user.getPassword())) {

@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import static com.example.customerservice.service.impl.ChatRedisScripts.*;
 
 
@@ -483,7 +485,7 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
         try {
             messagingTemplate.convertAndSendToUser(
                     userId,
-                    "/queue/chat",
+                    USER_CHAT_QUEUE,
                     Map.of("event", "QUEUE_CANCELLED")
             );
         } catch (RuntimeException exception) {

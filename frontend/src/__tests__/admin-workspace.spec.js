@@ -4,6 +4,8 @@ import { ElMessageBox } from 'element-plus'
 import { createPinia, setActivePinia } from 'pinia'
 import { ref, nextTick } from 'vue'
 
+const requestMock = vi.hoisted(() => vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })))
+
 // ─── Mock admin-api ──────────────────────────────────────────
 vi.mock('../api/admin-api', () => ({
   listUsers: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
@@ -50,6 +52,16 @@ vi.mock('../api/admin-api', () => ({
   createAdminSession: vi.fn(),
   updateAdminSession: vi.fn(),
   deleteAdminSession: vi.fn(),
+  listAdminSessions: vi.fn((params = {}) => {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && String(value).trim() !== '') query.set(key, value)
+    })
+    return requestMock(`/chat/admin/sessions?${query}`)
+  }),
+  findSessionMetadata: vi.fn((sessionId) =>
+    requestMock(`/chat/sessions/${encodeURIComponent(sessionId)}/metadata`)
+  ),
   searchAdminMessages: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
   deleteAdminMessage: vi.fn(),
   listAdminTickets: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
@@ -58,7 +70,7 @@ vi.mock('../api/admin-api', () => ({
 
 // ─── Mock http-client ────────────────────────────────────────
 vi.mock('../services/http-client', () => ({
-  request: vi.fn(() => Promise.resolve({ data: { records: [], total: 0 } })),
+  request: requestMock,
 }))
 
 describe('AdminWorkspaceView', () => {

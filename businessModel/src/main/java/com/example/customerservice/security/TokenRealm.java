@@ -1,5 +1,7 @@
 package com.example.customerservice.security;
 
+import com.example.customerservice.constant.AccountStatus;
+
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.mapper.SysRolePermissionMapper;
 import com.example.customerservice.mapper.SysUserMapper;
@@ -148,7 +150,7 @@ public class TokenRealm
          * 也不能继续访问系统。
          */
         if (
-                !"ENABLED".equals(
+                !AccountStatus.ENABLED.equals(
                         user.getStatus()
                 )
         ) {

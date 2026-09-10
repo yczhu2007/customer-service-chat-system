@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.example.customerservice.domain.SysPermission;
 import com.example.customerservice.constant.PermissionCodes;
+import com.example.customerservice.constant.AccountStatus;
 import com.example.customerservice.constant.RoleCodes;
 import com.example.customerservice.domain.SysRole;
 import com.example.customerservice.dto.*;
@@ -110,7 +111,7 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
         role.setDescription(request.getDescription());
         role.setStatus(normalizeStatus(
                 request.getStatus(),
-                "ENABLED"
+                AccountStatus.ENABLED
         ));
 
         int insertedRows = sysRoleMapper.insert(role);
@@ -337,7 +338,7 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
         permission.setStatus(
                 normalizeStatus(
                         request.getStatus(),
-                        "ENABLED"
+                        AccountStatus.ENABLED
                 )
         );
 
@@ -562,13 +563,13 @@ public class RoleServiceImpl extends RbacServiceSupport implements IRoleService 
         SysPermission permission =
                 requirePermission(permissionId);
 
-        if (!"ENABLED".equals(role.getStatus())) {
+        if (!AccountStatus.ENABLED.equals(role.getStatus())) {
             throw new IllegalArgumentException(
                     "不能给已禁用角色分配权限"
             );
         }
 
-        if (!"ENABLED".equals(permission.getStatus())) {
+        if (!AccountStatus.ENABLED.equals(permission.getStatus())) {
             throw new IllegalArgumentException(
                     "不能分配已禁用权限"
             );

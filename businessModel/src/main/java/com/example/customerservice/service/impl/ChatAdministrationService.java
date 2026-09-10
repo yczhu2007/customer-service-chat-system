@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.constant.AccountStatus;
+
 import com.example.customerservice.domain.ChatSession;
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.constant.ChatConstants;
@@ -85,7 +87,7 @@ public class ChatAdministrationService implements ChatAdministrationOperations {
 
     private SysUser requireEnabledUser(String loginNumber, String accountType) {
         SysUser user = userMapper.findByUsername(loginNumber == null ? null : loginNumber.trim());
-        if (user == null || !"ENABLED".equals(user.getStatus())) {
+        if (user == null || !AccountStatus.ENABLED.equals(user.getStatus())) {
             throw new IllegalArgumentException(accountType + "登录编号不存在或账号已禁用");
         }
         return user;

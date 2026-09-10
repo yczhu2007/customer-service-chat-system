@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.example.customerservice.constant.RedisConstants;
 import jakarta.annotation.PreDestroy;
 import com.example.customerservice.domain.ChatMessage;
@@ -449,7 +451,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
         }
         ChatMessageDTO acknowledgement = ChatMessageDTO.fromEntity(message);
         acknowledgement.setAckStatus("STORED");
-        messagingTemplate.convertAndSendToUser(message.getSenderId(), "/queue/chat", acknowledgement);
+        messagingTemplate.convertAndSendToUser(message.getSenderId(), USER_CHAT_QUEUE, acknowledgement);
     }
 
     private void moveToDeadLetter(String messageId) {

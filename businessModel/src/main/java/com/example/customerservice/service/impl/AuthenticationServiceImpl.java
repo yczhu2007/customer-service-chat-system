@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import com.example.customerservice.constant.AccountStatus;
+
 import com.example.customerservice.domain.SysUser;
 import com.example.customerservice.dto.LoginRequest;
 import com.example.customerservice.dto.LoginResponse;
@@ -69,7 +71,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
             );
         }
 
-        if (!"ENABLED".equals(user.getStatus())) {
+        if (!AccountStatus.ENABLED.equals(user.getStatus())) {
             throw new ResponseStatusException(
                     HttpStatus.FORBIDDEN,
                     "当前用户已被禁用"
@@ -124,7 +126,7 @@ public class AuthenticationServiceImpl implements IAuthenticationService {
     @Override
     public void requireEnabledUser(String userId) {
         SysUser user = sysUserMapper.selectById(userId);
-        if (user == null || !"ENABLED".equals(user.getStatus())) {
+        if (user == null || !AccountStatus.ENABLED.equals(user.getStatus())) {
             throw new IllegalArgumentException("用户无效或已禁用");
         }
     }

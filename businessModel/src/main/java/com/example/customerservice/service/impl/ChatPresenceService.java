@@ -1,5 +1,7 @@
 package com.example.customerservice.service.impl;
 
+import static com.example.customerservice.constant.ChatDestinations.USER_CHAT_QUEUE;
+
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.example.customerservice.constant.ChatConstants;
 import com.example.customerservice.constant.RedisConstants;
@@ -256,11 +258,11 @@ public class ChatPresenceService implements ChatPresenceOperations {
         if (typing) chatRedisRepository.setValue(key, "1", typingTtlSeconds, TimeUnit.SECONDS);
         else chatRedisRepository.delete(key);
         Map<String, Object> event = new HashMap<>();
-        event.put("event", "TYPING");
+        event.put("event", ChatConstants.EVENT_TYPING);
         event.put("sessionId", sessionId);
         event.put("senderId", senderId);
         event.put("typing", typing);
-        messagingTemplate.convertAndSendToUser(recipientId, "/queue/chat", event);
+        messagingTemplate.convertAndSendToUser(recipientId, USER_CHAT_QUEUE, event);
     }
 
 
@@ -592,7 +594,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
             try {
                 messagingTemplate.convertAndSendToUser(
                         userId,
-                        "/queue/chat",
+                        USER_CHAT_QUEUE,
                         notice
                 );
             } catch (RuntimeException exception) {
@@ -606,7 +608,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
             try {
                 messagingTemplate.convertAndSendToUser(
                         agentId,
-                        "/queue/chat",
+                        USER_CHAT_QUEUE,
                         notice
                 );
             } catch (RuntimeException exception) {
@@ -664,7 +666,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 RedisConstants.AGENT_RECONNECT_GRACE,
                 agentId
         );
-        handleOffline(agentId, null, "AGENT_RECONNECT_TIMEOUT");
+        handleOffline(agentId, null, ChatConstants.REASON_AGENT_RECONNECT_TIMEOUT);
     }
 
     private void scheduleAgentReconnectGrace(String agentId) {
@@ -687,7 +689,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
             notice.put("sessionId", session.getId());
             notice.put("graceSeconds", TimeUnit.MILLISECONDS.toSeconds(agentReconnectGraceMillis));
             try {
-                messagingTemplate.convertAndSendToUser(session.getUserId(), "/queue/chat", notice);
+                messagingTemplate.convertAndSendToUser(session.getUserId(), USER_CHAT_QUEUE, notice);
             } catch (RuntimeException exception) {
                 log.warn("通知用户客服重连中失败，userId={}", session.getUserId(), exception);
             }

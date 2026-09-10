@@ -16,4 +16,6 @@ public interface ChatAgentOperations {
     Set<String> findVipSkillAgentIds();
 
     Set<String> findVipSkillAgentLoginNumbers();
+
+    void rebuildVipSkillCache();
 }
