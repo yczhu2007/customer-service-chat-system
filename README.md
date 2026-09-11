@@ -75,13 +75,16 @@ $env:CHAT_ATTACHMENT_PREVIEW_COMMAND = 'C:\Program Files\LibreOffice\program\sof
 CREATE DATABASE springboot CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-然后在该数据库中执行：
+然后按以下顺序执行全新安装脚本：
 
 ```text
+sql/user_ddl.sql
+sql/rbac_ddl.sql
 sql/chat_ddl.sql
 ```
 
-已有数据库按需要执行 `sql` 目录中尚未应用的升级脚本。
+这些脚本面向全新数据库，使用 `CREATE TABLE IF NOT EXISTS`，不会自动升级已有表结构。
+如果接入已有数据库，请先备份并人工核对表结构，再编写经过验证的 `ALTER TABLE` 变更；不要把全新安装脚本直接当作升级脚本执行。
 
 ### 2. 启动 Redis 和 MinIO
 
