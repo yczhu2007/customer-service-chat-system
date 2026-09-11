@@ -169,9 +169,6 @@ async respondToTicketResolution(ticketNo, action, version) {
   }
 },
 
-/**
- * Connect STOMP and subscribe to user queues.
- */
 /** Refresh agent view counts and the currently selected view. */
 refreshAgentViews() {
   const auth = useAuthStore()
@@ -395,4 +392,3 @@ async selectAgentSession(sessionId) {
  */
 
 }
-

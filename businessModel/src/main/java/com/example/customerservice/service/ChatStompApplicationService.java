@@ -270,9 +270,6 @@ public class ChatStompApplicationService {
             Principal principal
     ) {
 
-        /*
-         * 1. 检查STOMP身份
-         */
         if (principal == null) {
             throw new IllegalArgumentException(
                     "当前STOMP连接没有用户身份"
@@ -280,9 +277,6 @@ public class ChatStompApplicationService {
         }
 
 
-        /*
-         * 2. 检查请求参数
-         */
         requireValidStompPayload(request, "历史消息请求不能为空");
         if (
                 request.getSessionId() == null ||
@@ -294,9 +288,6 @@ public class ChatStompApplicationService {
         }
 
 
-        /*
-         * 3. 查询历史消息
-         */
         ChatHistoryPage historyPage = chatMessageOperations.getHistory(
                         request.getSessionId(),
                         principal.getName(),
@@ -312,9 +303,6 @@ public class ChatStompApplicationService {
                         .toList();
 
 
-        /*
-         * 4. 构造返回结果
-         */
         Map<String, Object> response =
                 new HashMap<>();
 

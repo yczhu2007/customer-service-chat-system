@@ -450,11 +450,7 @@ public class UserServiceImpl
 
         SysRole role = requireRole(roleId);
 
-        /*
-         * 文档规定启动时创建默认管理员admin。
-         * 禁止移除默认管理员的ADMIN角色，
-         * 避免系统失去管理入口。
-         */
+        /* 保留默认管理员的 ADMIN 角色，避免系统失去管理入口。 */
         if (
                 isDefaultAdmin(user) &&
                         RoleCodes.ADMIN.equals(role.getRoleCode())

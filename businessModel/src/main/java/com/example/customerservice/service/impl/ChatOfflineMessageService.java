@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
-/** Redis based pending delivery, offline replay and receiver ACK handling. */
+/** 基于 Redis 的待确认投递、离线重推和接收确认服务。 */
 @Slf4j
 public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
 
@@ -47,18 +47,12 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
 
         try {
 
-            /*
-             * 将完整消息转换为JSON
-             */
             String messageJson =
                     objectMapper.writeValueAsString(
                             message
                     );
 
 
-            /*
-             * 将消息加入接收者的待确认列表
-             */
             chatRedisRepository.listRightPush(
                             offlineKey,
                             messageJson
@@ -421,10 +415,7 @@ public class ChatOfflineMessageService implements ChatOfflineMessageOperations {
                                 matchedMessageJson
                         );
 
-        /*
-         * 文档规定msg:ack:{messageId}使用Set，
-         * Set成员记录已经确认该消息的接收者。
-         */
+        /* ACK Key 使用 Set，成员记录已确认该消息的接收者。 */
         chatRedisRepository.setAdd(
                         ackKey,
                         receiverId

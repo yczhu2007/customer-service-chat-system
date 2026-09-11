@@ -187,9 +187,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
         );
     }
 
-    /**
-     * 处理聊天消息
-     */
+    /** 处理客户端业务心跳。 */
     @Override
     public void handleHeartbeat(
             String userId,
@@ -369,7 +367,7 @@ public class ChatPresenceService implements ChatPresenceOperations {
                 RedisConstants.AGENT_LOAD,
                 userId
         ) != null;
-        /* Stop new assignments before any session cleanup or reconnect grace handling. */
+        /* 先停止新分配，再处理会话清理或重连宽限期。 */
         if (isAgent) {
             chatRedisRepository.sortedSetRemove(
                     RedisConstants.AGENT_LOAD,

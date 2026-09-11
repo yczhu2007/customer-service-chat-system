@@ -109,12 +109,10 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             );
         }
 
-        /* Redis 原子限流。 */
+        /* Redis 不可用时限流失效开放，避免中断消息发送。 */
         String rateKey = RedisConstants.MSG_RATE_LIMIT + message.getSenderId();
         Long msgCount = null;
         try {
-            // 使用Lua脚本原子执行INCR和条件EXPIRE，避免竞态条件
-            // 失败策略：Redis不可用时采用fail-open（允许消息通过），仅记录警告日志
             msgCount = chatRedisRepository.incrementAndExpire(rateKey, messageRateLimitWindowSeconds, TimeUnit.SECONDS);
         } catch (RuntimeException redisException) {
             log.warn("Redis消息限流检查失败，采用fail-open策略放行消息，senderId={}", message.getSenderId(), redisException);
@@ -390,9 +388,6 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
             throw new IllegalArgumentException("附件不属于当前会话或附件类型不匹配");
         }
     }
-    /**
-     * 把消息放入Redis热缓存
-     */
     @Override
     public void cacheMessage(
             ChatMessage message
@@ -407,18 +402,6 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
 
         try {
 
-            /*
-             * 保存完整ChatMessage：
-             *
-             * id
-             * sessionId
-             * senderId
-             * senderRole
-             * type
-             * content
-             * clientMsgId
-             * createTime
-             */
             messageJson =
                     objectMapper.writeValueAsString(
                             message
@@ -434,20 +417,13 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
         }
 
 
-        /*
-         * 使用rightPush保证消息按产生顺序排列。
-         */
         chatRedisRepository.listRightPush(
                         messageKey,
                         messageJson
                 );
 
 
-        /*
-         * 只保留最后200条。
-         *
-         * -200到-1表示列表末尾最近200条。
-         */
+        /* 只保留最近 200 条 Redis 热缓存消息。 */
         chatRedisRepository.listTrim(
                         messageKey,
                         -RedisConstants
@@ -626,11 +602,7 @@ public class ChatMessageDeliveryService implements ChatMessageDeliveryOperations
                         + receiverId
         );
     }
-    /**
-     * 拉取当前用户的离线消息
-
-     * 拉取当前用户尚未确认的消息
-     */
+    /** 拉取当前用户尚未确认的消息。 */
     @Override
     public void pullOfflineMessages(
             String userId

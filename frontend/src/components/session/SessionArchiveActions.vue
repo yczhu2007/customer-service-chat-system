@@ -7,11 +7,6 @@ const chat = useChatStore()
 
 const ARCHIVE_STATUSES = ARCHIVE_STATUS_OPTIONS
 
-/**
- * Valid state transitions (mirrors backend rules).
- * A session can always be transitioned to any status (reopen is allowed).
- * The backend allows free transitions; we keep the same policy.
- */
 const VALID_TRANSITIONS = {
   null: ['COMPLETED', 'PENDING', 'ON_HOLD', 'OTHER'],
   COMPLETED: ['COMPLETED', 'PENDING', 'ON_HOLD', 'OTHER'],

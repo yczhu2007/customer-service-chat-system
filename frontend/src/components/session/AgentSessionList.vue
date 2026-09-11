@@ -14,7 +14,6 @@ const sessions = computed(() => chat.sortedSessions.filter((session) =>
   && (!ticketCategory.value || session.category === ticketCategory.value)
 ))
 
-/** Priority badge styling */
 function priorityClass(priority) {
   if (priority === 'URGENT') return 'priority-urgent'
   if (priority === 'HIGH') return 'priority-high'

@@ -31,7 +31,6 @@ const consultationButtonLabel = computed(() => {
   return '发起咨询'
 })
 
-/** Queue status display */
 const inQueue = computed(() => chat.queueStatus?.myPosition != null)
 const queuePosition = computed(() => chat.queueStatus?.myPosition)
 const estimatedWait = computed(() => {
@@ -40,12 +39,10 @@ const estimatedWait = computed(() => {
   return sec < 60 ? `${sec}秒` : `${Math.ceil(sec / 60)}分钟`
 })
 
-/** Start a new consultation */
 function startConsultation() {
   chat.startConsultation()
 }
 
-/** Refresh queue status */
 function refreshQueue() {
   chat.loadQueueStatus()
 }
@@ -65,13 +62,10 @@ async function cancelQueue() {
 }
 
 onMounted(() => {
-  // Connect STOMP
   chat.connectStomp()
-  // Load queue status
   chat.loadQueueStatus()
-  // Load sessions
   chat.loadSessions()
-  // Refresh queue status periodically
+  // 定期刷新队列位置和预估等待时间。
   queueTimer = setInterval(() => {
     chat.loadQueueStatus()
   }, 15000)
@@ -93,7 +87,6 @@ onUnmounted(() => {
 <template>
   <el-container class="user-workspace">
     <el-aside class="left-panel">
-      <!-- Queue status panel -->
       <div class="queue-panel">
         <h3>排队状态</h3>
         <div class="queue-info">
@@ -125,7 +118,6 @@ onUnmounted(() => {
       </div>
       <ConnectionStatus class="connection-panel" />
 
-      <!-- Session list -->
       <UserSessionList class="session-list-container" />
     </el-aside>
 
@@ -139,7 +131,6 @@ onUnmounted(() => {
     <el-aside class="right-panel">
       <SupportTicketPanel class="user-ticket-panel" />
 
-      <!-- Rating form (shown at bottom when session is closed) -->
       <SessionRatingForm
         v-if="showRating"
         class="user-rating-form"

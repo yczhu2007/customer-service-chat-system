@@ -7,7 +7,6 @@ const chat = useChatStore()
 
 const profile = computed(() => chat.activeUserProfile)
 
-/** VIP level badge */
 function vipBadge(level) {
   if (level >= 5) return { text: `VIP ${level}`, color: '#7c3aed', background: '#ede9fe' }
   if (level >= 3) return { text: `VIP ${level}`, color: '#d97706', background: '#fef3c7' }

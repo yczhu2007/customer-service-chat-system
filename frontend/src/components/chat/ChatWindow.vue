@@ -12,7 +12,6 @@ const canSend = computed(() => session.value && !isClosed.value && chat.connecte
 
 const statusText = computed(() => statusLabel(session.value?.status))
 
-/** Priority badge color */
 const priorityClass = computed(() => {
   const p = session.value?.priority
   if (p === 'URGENT') return 'priority-urgent'
@@ -24,7 +23,6 @@ const priorityClass = computed(() => {
 
 <template>
   <div class="chat-window">
-    <!-- Session info header -->
     <header v-if="session" class="session-header">
       <div class="header-main">
         <span class="session-title">{{ session.title || '会话' }}</span>
@@ -44,10 +42,8 @@ const priorityClass = computed(() => {
     </div>
 
     <template v-else>
-      <!-- Message list -->
       <MessageList :session-id="session.sessionId" :closed="isClosed" />
 
-      <!-- Composer (disabled when session is closed) -->
       <MessageComposer :session-id="session.sessionId" :disabled="!canSend" />
     </template>
   </div>

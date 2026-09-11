@@ -370,12 +370,6 @@ public class ChatRoutingSessionService extends ChatRoutingSessionMaintenanceSupp
                 session.getAgentId();
 
 
-        /*
-         * 用户 → 当前活动会话
-         *
-         * user:active:session:U990
-         * → 聊天会话ID
-         */
         String metaKey =
                 RedisConstants.SESSION_META
                         + sessionId;

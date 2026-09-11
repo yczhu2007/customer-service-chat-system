@@ -9,7 +9,6 @@ const sessionViews = AGENT_VIEW_OPTIONS.filter((view) => !view.code.startsWith('
 const ticketViews = AGENT_VIEW_OPTIONS.filter((view) => view.code === 'MY_TICKETS')
 const archiveViews = AGENT_VIEW_OPTIONS.filter((view) => view.code.startsWith('MY_ARCHIVED_'))
 
-/** Build a map of code -> count for quick lookup */
 const countMap = computed(() => {
   const map = {}
   for (const v of chat.agentViewCounts) {

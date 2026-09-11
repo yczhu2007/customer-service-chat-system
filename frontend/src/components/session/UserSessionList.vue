@@ -5,12 +5,10 @@ import { archiveStatusLabel, archiveStatusStyle, formatListTime, priorityLabel, 
 
 const chat = useChatStore()
 
-/** Status CSS class */
 function statusClass(status) {
   return (status || '').toLowerCase()
 }
 
-/** Truncate long text */
 function truncate(text, max = 30) {
   if (!text) return ''
   return text.length > max ? text.slice(0, max) + '…' : text
@@ -20,12 +18,10 @@ function preview(content) {
   return content?.startsWith('/chat/attachments/') ? '附件消息' : content
 }
 
-/** Select a session */
 function selectSession(sessionId) {
   chat.selectSession(sessionId)
 }
 
-/** Refresh sessions */
 function refresh() {
   chat.loadSessions()
 }
@@ -48,16 +44,12 @@ onMounted(() => {
       </button>
     </div>
 
-    <!-- Loading state -->
     <div v-if="chat.sessionsLoading" class="loading-state">加载中…</div>
 
-    <!-- Error state -->
     <div v-else-if="chat.sessionsError" class="error-state">{{ chat.sessionsError }}</div>
 
-    <!-- Empty state -->
     <div v-else-if="!chat.sessions.length" class="empty-state">暂无会话</div>
 
-    <!-- Session list -->
     <ul v-else class="session-items">
       <li
         v-for="session in chat.sortedSessions"

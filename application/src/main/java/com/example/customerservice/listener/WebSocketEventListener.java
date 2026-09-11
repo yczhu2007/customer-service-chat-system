@@ -54,9 +54,6 @@ public class WebSocketEventListener {
                 accessor.getUser();
 
 
-        /*
-         * 1. 检查WebSocket会话ID
-         */
         if (
                 sessionId == null ||
                         sessionId.isBlank()
@@ -70,9 +67,6 @@ public class WebSocketEventListener {
         }
 
 
-        /*
-         * 2. 检查当前用户身份
-         */
         if (principal == null) {
 
             log.info(
@@ -87,10 +81,6 @@ public class WebSocketEventListener {
                 principal.getName();
 
 
-        /*
-         * 统一登记在线状态、双向连接映射、
-         * 300秒TTL和初始心跳超时时间。
-         */
         if (principal instanceof WebSocketUserPrincipal authenticatedPrincipal) {
             monitoringMetrics.registerConnection(
                     sessionId,
@@ -150,10 +140,7 @@ public class WebSocketEventListener {
         }
 
 
-        /*
-         * 在线状态清理、旧连接保护和会话结算
-         * 统一由ChatService处理。
-         */
+        /* 在线状态清理、旧连接保护和会话结算由在线状态服务统一处理。 */
         try {
 
             chatPresenceOperations.handleDisconnect(

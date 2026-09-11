@@ -28,14 +28,12 @@ const activeViewLabel = computed(() => (
   AGENT_VIEW_OPTIONS.find((view) => view.code === chat.activeAgentView)?.label || '会话'
 ))
 
-/** Set agent online and connect STOMP */
 async function goOnline() {
   presenceError.value = ''
   try {
     await agentOnline()
     chat.agentOnline = true
     chat.connectStomp()
-    // Load initial view
     await chat.loadAgentViewCounts()
     await chat.loadAgentViewSessions(chat.activeAgentView)
   } catch (e) {
@@ -44,7 +42,6 @@ async function goOnline() {
   }
 }
 
-/** Set agent offline */
 async function goOffline() {
   if (presencePending.value) return
   presenceError.value = ''
@@ -60,13 +57,11 @@ async function goOffline() {
   }
 }
 
-/** Handle quick reply insert into composer */
 function onQuickReplyInsert(content) {
   pendingQuickReply.value = content
 }
 
 onMounted(async () => {
-  // Auto-go online if not already
   if (!chat.agentOnline) {
     await goOnline()
   }
@@ -74,7 +69,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   if (!chat.agentOnline) return
-  // Disconnect synchronously; the best-effort HTTP presence update can finish later.
+  // 先立即断开连接，后台请求仅用于同步客服下线状态。
   chat.agentOnline = false
   chat.disconnectStomp({ manual: true })
   agentOffline().catch(() => {})
@@ -84,7 +79,6 @@ onUnmounted(() => {
 <template>
   <el-container class="agent-workspace">
     <AgentOverviewPanel />
-    <!-- Top bar -->
     <el-header class="workspace-header">
       <h1 class="workspace-title">客服工作台</h1>
       <div class="header-right">
@@ -103,7 +97,6 @@ onUnmounted(() => {
     <el-dialog v-model="showMessageSearch" title="消息搜索" width="680px" append-to-body><AgentMessageSearchPanel @selected="showMessageSearch = false" /></el-dialog>
 
     <el-container class="workspace-content">
-      <!-- Left sidebar: view nav + session list -->
       <el-aside class="left-sidebar">
         <AgentViewNav />
         <div class="sidebar-divider" />
@@ -116,7 +109,6 @@ onUnmounted(() => {
 
       <el-container direction="vertical" class="workspace-main-column">
         <el-container class="workspace-body">
-          <!-- Center: chat window -->
           <el-main class="chat-area">
             <AgentChatWindow
               :quick-reply-content="pendingQuickReply"
@@ -124,7 +116,6 @@ onUnmounted(() => {
             />
           </el-main>
 
-          <!-- Right sidebar: metadata + user profile -->
           <el-aside class="right-sidebar">
             <UserProfileSidebar />
             <div class="sidebar-divider" />
@@ -134,7 +125,6 @@ onUnmounted(() => {
           </el-aside>
         </el-container>
 
-        <!-- Bottom panel: quick replies + archive actions -->
         <el-footer class="workspace-footer">
           <div class="footer-section quick-reply-section">
             <QuickReplyPanel @insert="onQuickReplyInsert" />

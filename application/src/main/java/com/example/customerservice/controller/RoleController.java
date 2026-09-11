@@ -24,9 +24,6 @@ import com.example.customerservice.common.Result;
 
 /**
  * 角色和权限管理接口。
- *
- * 按照技术文档要求，
- * 角色与权限CRUD统一由RoleController提供。
  */
 @RestController
 @Validated

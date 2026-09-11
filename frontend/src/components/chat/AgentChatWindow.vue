@@ -26,7 +26,6 @@ const priorityClass = computed(() => {
   return 'priority-low'
 })
 
-// Transfer
 const showTransfer = ref(false)
 const targetAgentId = ref('')
 const transferring = ref(false)
@@ -60,7 +59,6 @@ async function doTransfer() {
   }
 }
 
-// End session
 async function endSession() {
   try {
     await ElMessageBox.confirm('确定结束此会话？', '结束会话', {
@@ -74,7 +72,6 @@ async function endSession() {
   }
 }
 
-// Quick reply insertion
 const composerRef = ref(null)
 const insertText = ref('')
 
@@ -87,7 +84,6 @@ watch(() => props.quickReplyContent, (content) => {
 
 <template>
   <div class="agent-chat-window">
-    <!-- Session info header with agent actions -->
     <header v-if="session" class="session-header">
       <div class="header-main">
         <span class="session-title">{{ session.title || '会话' }}</span>
@@ -118,7 +114,6 @@ watch(() => props.quickReplyContent, (content) => {
       </div>
       <p v-if="chat.error" class="action-error">{{ chat.error }}</p>
 
-      <!-- Transfer dialog -->
       <div v-if="showTransfer" class="transfer-dialog">
         <input
           v-model="targetAgentId"
@@ -139,10 +134,8 @@ watch(() => props.quickReplyContent, (content) => {
     </div>
 
     <template v-else>
-      <!-- Message list -->
       <MessageList :session-id="session.sessionId" :closed="isClosed" />
 
-      <!-- Composer -->
       <MessageComposer
         ref="composerRef"
         :session-id="session.sessionId"

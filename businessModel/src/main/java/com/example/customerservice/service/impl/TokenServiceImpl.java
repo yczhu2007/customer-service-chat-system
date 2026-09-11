@@ -117,20 +117,7 @@ public class TokenServiceImpl
     }
 
 
-    /**
-     * 签发随机Token。
-     *
-     * Redis：
-     *
-     * key：
-     * token:{token}
-     *
-     * value：
-     * userId
-     *
-     * TTL：
-     * 30分钟
-     */
+    /** 签发随机 Token，并按“记住我”设置有效期。 */
     @Override
     public String issueToken(String userId, boolean rememberMe) {
 
@@ -235,8 +222,7 @@ public class TokenServiceImpl
 
 
         String tokenKey = RedisConstants.tokenKey(token);
-        // 使用Lua脚本原子执行：读取userId、删除token键、从用户索引中移除token
-        // 脚本会自动处理SET或ZSET两种索引类型（兼容历史数据）
+        // Lua 脚本会原子删除 Token 并更新用户索引，兼容历史 SET 和当前 ZSET。
         redisTemplate.execute(
                 REVOKE_TOKEN_SCRIPT,
                 List.of(tokenKey),

@@ -19,13 +19,11 @@ const saving = ref(false)
 const errorMsg = ref('')
 const successMsg = ref('')
 
-/** Whether the current user is the assigned agent for this session */
 const isAssignedAgent = computed(() => {
   const session = chat.activeSession
   return session && session.agentId === auth.userId
 })
 
-/** Populate form from metadata */
 watch(
   () => chat.activeMetadata,
   (m) => {

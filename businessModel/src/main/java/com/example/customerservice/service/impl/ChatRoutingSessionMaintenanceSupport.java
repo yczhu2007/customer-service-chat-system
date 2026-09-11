@@ -336,9 +336,7 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
             }
         }
     }
-    /**
-     * 查询指定会话的聊天历史
-     */
+    /** 原子释放客服预留容量，并按需将用户重新入队。 */
     protected void rollbackAssignmentReservation(
             String userId,
             String agentId,
@@ -405,9 +403,6 @@ abstract class ChatRoutingSessionMaintenanceSupport extends ChatRoutingSessionSu
         }
     }
 
-    /**
-     * 对应用异常退出后遗留的待确认分配进行最终收敛。
-     */
     public abstract ChatSession createSession(String userId, String agentId);
 
     public abstract void enqueueWaitingUser(String userId);

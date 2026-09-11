@@ -8,14 +8,7 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
 
 /**
- * 系统启动时初始化默认管理员。
- *
- * 功能：
- * 1. 检查ADMIN角色是否存在；
- * 2. 检查默认管理员是否存在；
- * 3. 不存在时创建默认管理员；
- * 4. 确认默认管理员拥有ADMIN角色；
- * 5. 重复启动不会重复创建数据。
+ * 在显式启用配置时初始化默认管理员。
  */
 @Component
 @Slf4j

@@ -6,9 +6,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 
-/**
- * 定时扫描心跳超时用户
- */
+/** 定时扫描心跳超时用户。 */
 @Component
 @Slf4j
 public class HeartbeatTimeoutScheduler {
@@ -28,12 +26,6 @@ public class HeartbeatTimeoutScheduler {
     }
 
 
-    /**
-     * 每10秒执行一次。
-     * fixedDelay表示：
-     * 上一次任务结束10秒后，
-     * 再执行下一次任务。
-     */
     @Scheduled(fixedDelayString = "${app.chat.heartbeat-sweep-delay-ms:10000}")
     public void scanHeartbeatTimeout() {
         schedulerLock.execute(

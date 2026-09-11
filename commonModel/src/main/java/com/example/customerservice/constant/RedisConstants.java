@@ -71,7 +71,7 @@ public class RedisConstants {
     public static final long PRESENCE_OPERATION_LOCK_TTL_SECONDS = 10L;
     public static final String ACTIVE_SESSION_RECONCILIATION_CURSOR =
             "reconcile:active-session:cursor";
-    //websocket
+    // WebSocket 在线状态
     public static final String USER_WS = "user:ws:";
     public static final String WS_SESSION = "ws:session:";
     /**
@@ -232,9 +232,7 @@ public class RedisConstants {
     public static final long SESSION_MESSAGE_LIMIT =
             200L;
 
-    /*
-     * 文档规定在线状态Key的TTL为300秒。
-     */
+    /** 在线状态 Key 的存活时间。 */
     public static final long ONLINE_TTL_SECONDS =
             300L;
 

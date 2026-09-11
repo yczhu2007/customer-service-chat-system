@@ -7,7 +7,7 @@ import org.springframework.data.redis.core.script.DefaultRedisScript;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
-/** Maintains WebSocket mappings, online hashes, TTL and heartbeat indexes. */
+/** 维护 WebSocket 映射、在线状态、TTL 和心跳索引。 */
 final class ChatPresenceStateStore {
 
     private static final DefaultRedisScript<Long> CLEANUP_ONLINE_STATE_SCRIPT =
@@ -57,9 +57,6 @@ final class ChatPresenceStateStore {
         String wsSessionKey =
                 RedisConstants.WS_SESSION
                         + wsSessionId;
-        /*
-         * 查询用户之前保存的WebSocket连接。
-         */
         String previousWsSessionId =
                 chatRedisRepository.getValue(
                                 userWsKey
@@ -108,9 +105,6 @@ final class ChatPresenceStateStore {
                 );
 
 
-        /*
-         * userId → wsSessionId
-         */
         chatRedisRepository.setValue(
                         userWsKey,
                         wsSessionId,
@@ -120,9 +114,6 @@ final class ChatPresenceStateStore {
                 );
 
 
-        /*
-         * wsSessionId → userId
-         */
         chatRedisRepository.setValue(
                         wsSessionKey,
                         userId,
@@ -132,9 +123,6 @@ final class ChatPresenceStateStore {
                 );
 
 
-        /*
-         * Hash也必须单独设置TTL。
-         */
         chatRedisRepository.expire(
                 userOnlineKey,
                 RedisConstants
@@ -143,9 +131,6 @@ final class ChatPresenceStateStore {
         );
 
 
-        /*
-         * 记录全局在线用户。
-         */
         chatRedisRepository.setAdd(
                         RedisConstants.ONLINE_USERS,
                         userId

@@ -3,7 +3,7 @@ package com.example.customerservice.constant;
 import java.util.Locale;
 
 /**
- * 技术文档规定的聊天消息类型。
+ * 聊天消息类型。
  */
 public enum ChatMessageType {
     TEXT,

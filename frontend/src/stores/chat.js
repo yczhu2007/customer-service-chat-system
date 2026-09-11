@@ -188,9 +188,6 @@ export const useChatStore = defineStore('chat', {
       this._reconnectTimer = setTimeout(() => this.connectStomp(), delay)
     },
 
-    /**
-     * Load sessions from REST.
-     */
     /** Clear data that belongs to the authenticated account after a token expires. */
     clearAuthenticatedChat() {
       this.disconnectStomp({ manual: true })

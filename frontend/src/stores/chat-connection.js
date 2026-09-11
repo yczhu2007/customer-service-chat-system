@@ -16,7 +16,7 @@ connectStomp() {
   const ticketAbortController = new AbortController()
   this._ticketAbortController = ticketAbortController
 
-  // Acquire ws ticket, then connect
+  // 先获取一次性握手票据，再建立连接。
   request('/chat/ws-ticket', {
   method: 'POST',
   signal: ticketAbortController.signal,
@@ -45,12 +45,10 @@ connectStomp() {
         this.nextReconnectAt = null
         this.logConnection('WebSocket 已连接')
         this.startHeartbeat()
-        // Subscribe to chat events
         stomp.subscribe('/user/queue/chat', (frame) => {
           const body = JSON.parse(frame.body)
           this._handleChatEvent(body)
         })
-        // Subscribe to message events (read, recall, ack)
         stomp.subscribe('/user/queue/messages', (frame) => {
           const body = JSON.parse(frame.body)
           this._handleMessageEvent(body)
@@ -68,11 +66,11 @@ connectStomp() {
           request('/chat/agent/online', { method: 'POST' })
             .catch((error) => this.handleConnectionError(`恢复客服接待失败: ${error.message}`))
         }
-        // Pull offline messages on connect
+        // 连接成功后重推尚未确认的消息。
         this.pullOfflineMessages()
       },
       onMessage: (frame) => {
-        // fallback handler
+        // 兼容 STOMP 客户端的兜底回调；业务事件由专用订阅处理。
       },
       onError: (message) => this.handleConnectionError(message),
       onDisconnect: () => {
@@ -92,7 +90,7 @@ connectStomp() {
     this._stomp = stomp
     stomp.connect()
 
-    // Store deactivate for cleanup
+    // 统一释放当前连接及本地状态。
     this._deactivateStomp = () => {
       stomp.disconnect()
       this.connected = false
@@ -108,10 +106,7 @@ connectStomp() {
   })
 },
 
-/**
- * Disconnect STOMP.
- */
-/** Disconnect transport. Manual disconnects suppress automatic reconnect. */
+/** 断开传输连接；手动断开不会触发自动重连。 */
 disconnectStomp({ manual = true } = {}) {
   this._connectAttempt += 1
   if (this._ticketAbortController) {
@@ -135,7 +130,7 @@ disconnectStomp({ manual = true } = {}) {
 },
 
 
-/** Send the business heartbeat expected by the backend presence tracker. */
+/** 发送后端在线状态服务所需的业务心跳。 */
 startHeartbeat() {
   this.stopHeartbeat()
   if (!this._stomp || !this.connected) return

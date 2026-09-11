@@ -38,12 +38,12 @@ public final class ChatConstants {
     public static final int SESSION_TAG_MAX_LENGTH = 32;
     public static final int SESSION_TAG_MAX_COUNT = 10;
 
-    // ── 会话归档状态（参考 Zendesk Ticket Status） ──────────────────────────
-    /** 已完成（Solved），允许 reopen 回到 PENDING/ON_HOLD。 */
+    // ── 会话归档状态 ────────────────────────────────────────────────────────
+    /** 已完成，可重新打开为 PENDING 或 ON_HOLD。 */
     public static final String ARCHIVE_COMPLETED = "COMPLETED";
-    /** 挂起·等客户回复（Pending），对应 Zendesk Pending。 */
+    /** 挂起，等待客户回复。 */
     public static final String ARCHIVE_PENDING = "PENDING";
-    /** 挂起·等内部处理（On-hold），对应 Zendesk On-hold。 */
+    /** 挂起，等待内部处理。 */
     public static final String ARCHIVE_ON_HOLD = "ON_HOLD";
     /** 其他情况（自定义备注）。 */
     public static final String ARCHIVE_OTHER = "OTHER";
@@ -74,12 +74,12 @@ public final class ChatConstants {
     }
 
     /**
-     * 合法的归档状态流转表（Zendesk 风格）。
+     * 合法的归档状态流转表。
      *
      * <ul>
      *   <li>未归档（null/空）→ 任意状态</li>
      *   <li>PENDING / ON_HOLD / OTHER → 任意状态（含 COMPLETED，已完成终态）</li>
-     *   <li>COMPLETED → PENDING / ON_HOLD（reopen，但不允许直接改 OTHER 或再次 COMPLETED）</li>
+     *   <li>COMPLETED → PENDING / ON_HOLD（重新打开，不允许直接改为 OTHER 或再次 COMPLETED）</li>
      * </ul>
      *
      * @return true 表示允许流转
@@ -88,19 +88,19 @@ public final class ChatConstants {
         if (!isValidArchiveStatus(targetStatus)) {
             return false;
         }
-        // 未归档：首次设置，允许任意目标
+        // 未归档时首次设置，允许任意目标。
         if (currentStatus == null || currentStatus.isBlank()) {
             return true;
         }
         if (!isValidArchiveStatus(currentStatus)) {
             return false;
         }
-        // COMPLETED → 只允许 reopen 到 PENDING / ON_HOLD
+        // 已完成状态只能重新打开为 PENDING 或 ON_HOLD。
         if (ARCHIVE_COMPLETED.equals(currentStatus)) {
             return ARCHIVE_PENDING.equals(targetStatus)
                     || ARCHIVE_ON_HOLD.equals(targetStatus);
         }
-        // PENDING / ON_HOLD / OTHER → 允许任意目标（含 COMPLETED）
+        // 其他归档状态可切换为任意合法状态。
         return true;
     }
 }

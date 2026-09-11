@@ -14,7 +14,6 @@ const replies = ref([])
 const loading = ref(false)
 const errorMsg = ref('')
 
-// Form state
 const editing = ref(false) // false = create, object = editing
 const formContent = ref('')
 const saving = ref(false)
@@ -110,7 +109,6 @@ onMounted(loadReplies)
     <div v-if="loading" class="loading">加载中…</div>
     <div v-else-if="errorMsg && !replies.length" class="error">{{ errorMsg }}</div>
 
-    <!-- Reply list -->
     <ul v-if="replies.length && editing === false" class="reply-list">
       <li v-for="r in replies" :key="r.id" class="reply-item">
         <div class="reply-info" @click="insertReply(r)">
@@ -127,7 +125,6 @@ onMounted(loadReplies)
       暂无快捷回复，点击"新增"创建
     </div>
 
-    <!-- Edit/Create form -->
     <div v-if="editing !== false" class="form-area">
       <div class="form-field">
         <label class="form-label">内容</label>

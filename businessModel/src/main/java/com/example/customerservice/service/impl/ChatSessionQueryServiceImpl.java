@@ -118,8 +118,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
             }
             return toRatingVO(rating);
         } catch (DuplicateKeyException e) {
-            /* The primary-key constraint is the concurrency boundary. Replaying a
-             * concurrent/already-completed request returns the persisted result. */
+            /* 主键约束保证同一会话只有一条评价；并发或重复提交时返回已保存结果。 */
             ChatSessionRating existing = ratingMapper.selectById(sessionId);
             if (existing == null) {
                 throw e;
@@ -481,7 +480,7 @@ public class ChatSessionQueryServiceImpl implements ChatSessionQueryService {
                         w.isNull(ChatSession::getArchiveStatus));
     }
 
-    // ── 归档状态（Zendesk 风格） ────────────────────────────────────────────
+    // ── 归档状态 ────────────────────────────────────────────────────────────
 
     @Override
     @Transactional

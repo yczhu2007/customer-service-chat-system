@@ -58,7 +58,6 @@ async function scrollToReply(message) {
   if (target) target.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
-/** Determine message ownership */
 function isMine(msg) {
   return msg.senderId === auth.userId
 }
@@ -87,7 +86,6 @@ function peerReadTitle(message) {
     : undefined
 }
 
-/** Format time for display */
 function formatTime(ts) {
   if (!ts) return ''
   const d = new Date(ts)
@@ -119,7 +117,6 @@ function releaseAllBlobs() {
   legacyPreviewCache.clear()
 }
 
-/** Fetch blob URL for IMAGE/FILE messages */
 async function loadBlob(msg) {
   if (!msg.id || unavailableAttachmentUrls.has(msg.content)) {
     if (msg.id) blobCache.value[msg.id] = null
@@ -268,7 +265,6 @@ async function downloadFile(msg) {
   link.click()
 }
 
-/** Scroll to bottom */
 function scrollToBottom() {
   nextTick(() => {
     if (listEl.value) {
@@ -338,14 +334,12 @@ onUnmounted(() => {
     </button>
     <div v-if="chat.messagesLoading" class="loading-hint">加载历史消息中…</div>
     <template v-for="msg in chat.messages" :key="msg.clientMsgId || msg.id">
-      <!-- System messages -->
       <div v-if="isSystem(msg)" :id="msg.id ? `message-${msg.id}` : null" class="message-row system" :class="{ 'is-focused': highlightedMessageId === msg.id }">
         <div class="message-bubble system-bubble">
           <span>{{ msg.content }}</span>
         </div>
       </div>
 
-      <!-- Regular messages -->
       <div v-else :id="msg.id ? `message-${msg.id}` : null" class="message-row" :class="{ mine: isMine(msg), other: !isMine(msg), 'is-focused': highlightedMessageId === msg.id }">
         <div class="message-meta">
           <span class="sender">{{ isMine(msg) ? '我' : (msg.senderRole === 'AGENT' ? '客服' : '用户') }}</span>
@@ -358,7 +352,6 @@ onUnmounted(() => {
           </span>
         </div>
 
-        <!-- TEXT message -->
         <div v-if="msg.type === 'TEXT' && !msg.recalled" class="message-bubble">
           <button v-if="replyMessageId(msg)" class="reply-preview" @click="scrollToReply(msg)">
             <span class="reply-preview-label">引用{{ replyAuthorLabel(msg) }}</span>
@@ -372,7 +365,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- IMAGE message -->
         <div v-else-if="msg.type === 'IMAGE'" v-load-image="msg.recalled ? null : msg" class="message-bubble image-bubble">
           <template v-if="msg.recalled">
             <span class="recalled-hint">图片已撤回</span>
@@ -399,7 +391,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- FILE message -->
         <div v-else-if="msg.type === 'FILE'" class="message-bubble file-bubble">
           <template v-if="msg.recalled">
             <span class="recalled-hint">文件已撤回</span>
@@ -429,7 +420,6 @@ onUnmounted(() => {
           </div>
         </div>
 
-        <!-- Recalled text -->
         <div v-else-if="msg.recalled" class="message-bubble recalled-bubble">
           <span class="recalled-hint">消息已撤回</span>
         </div>

@@ -393,17 +393,6 @@ abstract class ChatRoutingSessionSupport
                 session.getId();
 
 
-        /*
-         * 用户不再具有活动会话。
-         */
-        /*
-         * 删除会话双方反向映射，
-         * 防止无TTL Key永久残留。
-         */
-        /*
-         * 会话元数据不立即删除，
-         * 标记为CLOSED并保留24小时。
-         */
         applySessionFinalizationRedisAfterCommit(session, endTime, false);
 
 

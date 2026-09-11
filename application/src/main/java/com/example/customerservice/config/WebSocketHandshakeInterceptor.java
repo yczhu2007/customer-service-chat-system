@@ -24,7 +24,7 @@ public class WebSocketHandshakeInterceptor
             WebSocketHandshakeInterceptor.class.getName()
                     + ".AUTHENTICATED_PRINCIPAL";
 
-    /** Session attribute used only for server-side per-frame token revalidation. */
+    /** 仅供服务端逐帧复验访问令牌的会话属性。 */
     static final String ACCESS_TOKEN_ATTRIBUTE =
             WebSocketHandshakeInterceptor.class.getName()
                     + ".ACCESS_TOKEN";
@@ -82,7 +82,7 @@ public class WebSocketHandshakeInterceptor
 
         Set<String> roleCodes = authenticationService.findRoleCodesByUserId(userId);
 
-        // Keep the credential in the server-side session attributes only; never expose it via Principal.
+        // 令牌仅保存在服务端会话属性中，不放入 Principal。
         attributes.put(ACCESS_TOKEN_ATTRIBUTE, token);
         attributes.put(
                 AUTHENTICATED_PRINCIPAL,

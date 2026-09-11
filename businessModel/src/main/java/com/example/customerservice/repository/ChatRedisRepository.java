@@ -57,23 +57,6 @@ public class ChatRedisRepository {
                             + "else return 0; end;",
                     Long.class
             );
-    /**
-     * 原子递增并设置TTL的Lua脚本。
-     *
-     * <p>用于消息发送频率限制，原子性地完成：
-     * <ol>
-     *   <li>对key执行INCR操作</li>
-     *   <li>如果key是新创建的（值为1），则设置过期时间</li>
-     * </ol>
-     *
-     * <p>参数说明：
-     * <ul>
-     *   <li>KEYS[1] - 限流key</li>
-     *   <li>ARGV[1] - 过期时间（秒）</li>
-     * </ul>
-     *
-     * <p>返回值：递增后的计数值
-     */
     private static final DefaultRedisScript<Long> CANCEL_QUEUE_SCRIPT =
             new DefaultRedisScript<>(
                     "local removed = redis.call('ZREM', KEYS[1], ARGV[1]); "
