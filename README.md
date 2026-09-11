@@ -62,10 +62,44 @@ $env:CHAT_ATTACHMENT_PREVIEW_COMMAND = 'C:\Program Files\LibreOffice\program\sof
 - Maven 3.9 或更高版本
 - Node.js 20 或更高版本
 - MySQL 8 或兼容版本
-- Docker Desktop（推荐用于运行 Redis 和 MinIO）
+- Docker Desktop（推荐用于运行完整系统）
 - LibreOffice（仅预览旧版 Office 文件时需要）
 
-## 快速启动
+## Docker Desktop 一键启动（推荐）
+
+导师电脑安装 Docker Desktop 后，只需要配置一次 `.env`：
+
+```powershell
+Copy-Item .env.example .env
+```
+
+然后修改 `.env` 中的数据库、Redis、MinIO 和管理员密码，至少替换所有 `change-this-` 开头的值。启动完整系统：
+
+```powershell
+docker compose up -d --build
+docker compose ps
+```
+
+浏览器访问 `http://localhost:8080/frontend/`。首次启动会自动创建 MySQL 表、MinIO 附件桶和 `admin` 管理员账号；管理员密码使用 `.env` 中的 `ADMIN_BOOTSTRAP_PASSWORD`。
+
+常用操作：
+
+```powershell
+# 查看应用日志
+docker compose logs -f app
+
+# 停止服务但保留数据
+docker compose down
+
+# 停止服务并删除数据库、Redis、MinIO 数据（谨慎使用）
+docker compose down --volumes
+```
+
+数据保存在 Docker volumes 中。交接已有系统时，除源码和 `.env` 模板外，还需要单独备份并恢复 MySQL 数据和 MinIO 附件。
+
+## 本地开发启动
+
+以下步骤适用于不使用完整应用容器、需要在 IDE 或本机运行源码的开发场景。
 
 ### 1. 准备 MySQL
 
@@ -86,27 +120,17 @@ sql/chat_ddl.sql
 这些脚本面向全新数据库，使用 `CREATE TABLE IF NOT EXISTS`，不会自动升级已有表结构。
 如果接入已有数据库，请先备份并人工核对表结构，再编写经过验证的 `ALTER TABLE` 变更；不要把全新安装脚本直接当作升级脚本执行。
 
-### 2. 启动 Redis 和 MinIO
+### 2. 准备 Redis 和 MinIO
 
-在项目根目录创建 `.env`：
+本分支的 `compose.yml` 只向宿主机发布应用端口，Redis 和 MinIO 仅在 Docker 内部网络中使用；源码在宿主机运行时，请改用本机或其他开发环境提供的 Redis、MinIO，并据此填写连接地址。完整容器化运行请直接使用上面的 Docker Desktop 方式。
 
-```dotenv
-MINIO_ACCESS_KEY=minioadmin
-MINIO_SECRET_KEY=请设置自己的密码
-```
-
-启动服务：
+本地运行后端时，环境变量示例：
 
 ```powershell
-docker compose up -d redis minio
-docker compose ps
+$env:REDIS_HOST = '127.0.0.1'
+$env:REDIS_PORT = '6379'
+$env:MINIO_ENDPOINT = 'http://127.0.0.1:9000'
 ```
-
-默认地址：
-
-- Redis：`127.0.0.1:16379`
-- MinIO API：`http://127.0.0.1:9000`
-- MinIO 控制台：`http://127.0.0.1:9001`
 
 ### 3. 启动后端
 
@@ -116,7 +140,7 @@ docker compose ps
 $env:DB_URL = 'jdbc:mysql://127.0.0.1:3306/springboot?serverTimezone=Asia/Shanghai&characterEncoding=UTF-8'
 $env:DB_USERNAME = 'root'
 $env:DB_PASSWORD = '你的 MySQL 密码'
-$env:REDIS_PORT = '16379'
+$env:REDIS_PORT = '6379'
 $env:MINIO_ENDPOINT = 'http://127.0.0.1:9000'
 $env:MINIO_ACCESS_KEY = 'minioadmin'
 $env:MINIO_SECRET_KEY = '与 .env 相同的密码'
@@ -189,13 +213,13 @@ Set-Location ..
 
 ### 后端无法连接 Redis
 
-Docker 将 Redis 映射到主机的 `16379` 端口。请确认后端设置了：
+使用完整容器化方式时，应用会通过 Compose 服务名 `redis` 连接 Redis；请先检查：
 
 ```powershell
-$env:REDIS_PORT = '16379'
+docker compose ps
 ```
 
-并使用 `docker compose ps` 检查容器状态。
+源码在宿主机运行时，请确认外部 Redis 地址和端口与 `REDIS_HOST`、`REDIS_PORT` 配置一致。
 
 ### 附件上传成功但无法预览
 
@@ -222,5 +246,5 @@ businessModel/     业务服务
 commonModel/       数据模型、DTO 和数据访问定义
 frontend/          Vue 3 前端
 sql/               数据库脚本
-compose.yml        Redis 和 MinIO 容器配置
+compose.yml        应用、MySQL、Redis 和 MinIO 容器编排
 ```
