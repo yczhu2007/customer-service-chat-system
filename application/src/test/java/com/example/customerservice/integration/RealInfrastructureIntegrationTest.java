@@ -27,7 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * 运行前必须已执行项目SQL完成建表和种子数据初始化；首次启动还必须设置
  * ADMIN_BOOTSTRAP_PASSWORD，现有数据库必须包含可用的ADMIN角色。
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @EnabledIfEnvironmentVariable(
         named = "RUN_REAL_INTEGRATION_TESTS",
         matches = "true"

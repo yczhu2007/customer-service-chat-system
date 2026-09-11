@@ -101,7 +101,7 @@ public class MessagePersistServiceImpl implements MessagePersistService {
                     "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('EXPIRE', KEYS[1], ARGV[2]); end; return 0;",
                     Long.class
             );
-    private static final ScheduledExecutorService RETRY_LEASE_WATCHDOG =
+    private final ScheduledExecutorService RETRY_LEASE_WATCHDOG =
             Executors.newSingleThreadScheduledExecutor(new ThreadFactory() {
                 @Override
                 public Thread newThread(Runnable runnable) {

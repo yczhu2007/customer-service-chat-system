@@ -34,7 +34,7 @@ public class ChatRedisRepository {
         LOCK_WATCHDOG.shutdownNow();
     }
 
-    private static final ScheduledExecutorService LOCK_WATCHDOG =
+    private final ScheduledExecutorService LOCK_WATCHDOG =
             Executors.newScheduledThreadPool(2, new ThreadFactory() {
                 @Override
                 public Thread newThread(Runnable runnable) {
