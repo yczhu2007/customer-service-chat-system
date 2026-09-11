@@ -1,0 +1,9 @@
+.git
+.idea
+.m2
+.worktrees
+**/target
+frontend/node_modules
+frontend/dist
+.env
+data
