@@ -83,7 +83,6 @@ onMounted(loadReport)
     <div class="panel-header">
       <div>
         <h2>报表</h2>
-        <p>基于所选时间范围内创建的会话、评价和工单统计。</p>
       </div>
       <div class="report-filters">
         <input v-model="from" type="datetime-local" aria-label="开始时间" />

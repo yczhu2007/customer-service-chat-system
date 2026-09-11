@@ -45,7 +45,6 @@ onBeforeUnmount(() => {
     <div class="monitoring-header">
       <div>
         <h3 id="system-monitoring-title">系统监控</h3>
-        <p>实时运行快照，每 15 秒自动更新。</p>
       </div>
       <button class="btn refresh-monitoring" :disabled="loading" @click="loadMonitoring(false)">
         {{ loading ? '刷新中…' : '刷新' }}
